@@ -36,7 +36,7 @@ const navigation: NavGroup[] = [
     title: '因子库',
     items: [
       { label: '因子概览', href: '/factors', icon: FlaskConical },
-      { label: '因子分析', href: '/factors/analysis', icon: BarChart3, disabled: true },
+      { label: '因子分析', href: '/factors/analysis', icon: BarChart3 },
       { label: '数据清洗', href: '/factors/pipeline', icon: Sparkles },
     ],
   },
@@ -45,13 +45,13 @@ const navigation: NavGroup[] = [
     items: [
       { label: '策略概览', href: '/strategies', icon: Target },
       { label: '回测队列', href: '/strategies/backtest', icon: Play },
-      { label: '策略分析', href: '/strategies/analysis', icon: BarChart3, disabled: true },
+      { label: '策略分析', href: '/strategies/analysis', icon: BarChart3 },
     ],
   },
   {
     title: '研报库',
     items: [
-      { label: '研报概览', href: '/research', icon: FileTextIcon, disabled: true },
+      { label: '研报概览', href: '/research', icon: FileTextIcon },
     ],
   },
   {

@@ -113,8 +113,8 @@ docker compose -f docker/compose/docker-compose.infra.yml down
 ### 4. 访问服务
 
 启动后访问:
-- 前端界面: http://localhost:5173
-- API 文档: http://localhost:8000/docs
+- 前端界面: http://127.0.0.1:4173
+- API 文档: http://127.0.0.1:8000/docs
 
 ## MCP Integration
 
