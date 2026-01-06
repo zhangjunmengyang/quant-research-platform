@@ -76,13 +76,10 @@ cd frontend && pnpm install && cd ..
 docker compose -f docker/compose/docker-compose.infra.yml up -d
 
 # 2. 新终端 - 启动后端 API
-cd backend
-$env:PYTHONPATH="."; $env:PYTHONUTF8="1"
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+cd backend; $env:PYTHONPATH=".;.."; $env:PYTHONUTF8="1"; ..\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 # 3. 新终端 - 构建并启动前端（生产模式，推荐）
-cd frontend
-npm run dev    # 自动构建 + 启动预览服务器
+cd frontend; npm run dev
 ```
 
 > **重要**: Windows 下 Vite 开发模式首次加载很慢（10-30秒），因此默认使用生产构建模式。
@@ -98,20 +95,12 @@ npm run dev    # 自动构建 + 启动预览服务器
 **Windows 启动 MCP 服务（可选）：**
 ```powershell
 # 每个 MCP 服务需要单独终端
-cd backend
-$env:PYTHONPATH="."; $env:PYTHONUTF8="1"
+cd backend; $env:PYTHONPATH=".;.."; $env:PYTHONUTF8="1"
 
-# Factor Hub MCP
-uv run python -m domains.factor_hub.api.mcp.server
-
-# Data Hub MCP（新终端）
-uv run python -m domains.data_hub.api.mcp.server
-
-# Strategy Hub MCP（新终端）
-uv run python -m domains.strategy_hub.api.mcp.server
-
-# Note Hub MCP（新终端）
-uv run python -m domains.note_hub.api.mcp.server
+..\.venv\Scripts\python -m domains.factor_hub.api.mcp.server      # Factor Hub MCP
+..\.venv\Scripts\python -m domains.data_hub.api.mcp.server        # Data Hub MCP
+..\.venv\Scripts\python -m domains.strategy_hub.api.mcp.server    # Strategy Hub MCP
+..\.venv\Scripts\python -m domains.note_hub.api.mcp.server        # Note Hub MCP
 ```
 
 **Windows 停止服务：**
