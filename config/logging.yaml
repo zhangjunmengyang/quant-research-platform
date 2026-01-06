@@ -1,0 +1,102 @@
+# 日志配置
+# 日志输出到 stdout (JSON 格式)
+
+logging:
+  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+
+  # 输出格式: json
+  format: json
+
+  # LLM 调用日志配置
+  llm:
+    # 是否启用 LLM 调用日志
+    enabled: true
+    # 是否记录完整消息历史
+    log_messages: true
+    # 是否记录 prompt 内容
+    log_prompts: true
+    # 是否记录响应内容
+    log_content: true
+    # 内容最大长度（超过会截断）
+    max_content_length: 50000
+    # 是否脱敏敏感信息
+    sanitize_sensitive: true
+    # 是否输出到控制台
+    console_output: true
+
+  # 工具调用日志配置
+  tools:
+    # 是否启用工具调用日志
+    enabled: true
+    # 是否记录调用参数
+    log_arguments: true
+    # 是否记录执行结果
+    log_results: true
+    # 结果最大长度
+    max_result_length: 5000
+    # 是否输出到控制台
+    console_output: true
+
+  # 会话日志配置
+  sessions:
+    # 是否启用会话日志
+    enabled: true
+    # 是否自动计算成本
+    auto_cost_estimate: true
+    # 是否输出到控制台
+    console_output: true
+
+  # 存储配置
+  storage:
+    # 存储类型:
+    #   - stdout: 标准输出（生产环境默认）
+    #   - memory: 内存存储（测试用）
+    type: stdout
+
+# Token 价格配置（每 1K tokens，单位：美元）
+# 用于自动计算 LLM 调用成本
+token_prices:
+  # OpenAI
+  gpt-4:
+    input: 0.03
+    output: 0.06
+  gpt-4-turbo:
+    input: 0.01
+    output: 0.03
+  gpt-4o:
+    input: 0.005
+    output: 0.015
+  gpt-4o-mini:
+    input: 0.00015
+    output: 0.0006
+  gpt-3.5-turbo:
+    input: 0.0005
+    output: 0.0015
+
+  # Anthropic
+  claude-3-opus:
+    input: 0.015
+    output: 0.075
+  claude-3-sonnet:
+    input: 0.003
+    output: 0.015
+  claude-3-haiku:
+    input: 0.00025
+    output: 0.00125
+  claude-3-5-sonnet:
+    input: 0.003
+    output: 0.015
+
+  # DeepSeek
+  deepseek-chat:
+    input: 0.00014
+    output: 0.00028
+  deepseek-coder:
+    input: 0.00014
+    output: 0.00028
+
+  # 默认价格（未知模型使用）
+  default:
+    input: 0.001
+    output: 0.002

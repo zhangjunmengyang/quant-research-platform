@@ -1,0 +1,17 @@
+{
+  "name": "quant-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Quantitative Factor Management Platform",
+  "scripts": {
+    "dev": "cd frontend && pnpm dev",
+    "build": "cd frontend && pnpm build",
+    "lint": "cd frontend && pnpm lint",
+    "format": "cd frontend && pnpm format"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

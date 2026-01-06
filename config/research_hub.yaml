@@ -1,0 +1,238 @@
+# =============================================================================
+# Research Hub 配置
+# =============================================================================
+# 研报知识库 RAG 系统配置
+# 支持:
+# - 多种解析器、切块器、嵌入器、检索器、重排器、生成器
+# - 配置驱动的流水线组装
+# - A/B 测试和对比实验
+# =============================================================================
+
+# 默认配置
+default:
+  pipeline: default               # 默认使用 OpenAI API 嵌入
+  upload_dir: data/research       # 研报上传目录
+  max_file_size_mb: 100           # 最大文件大小(MB)
+
+# 流水线配置
+pipelines:
+  # 默认流水线 - 生产级配置
+  default:
+    name: default
+    description: "默认 RAG 流水线，使用 OpenAI API 嵌入"
+
+    parser:
+      type: basic                 # mineru / basic / marker / unstructured
+      # MinerU 需要额外安装: pip install magic-pdf[full]
+      # basic 使用 PyMuPDF，无需额外依赖
+      options: {}
+
+    chunker:
+      type: recursive             # recursive / semantic / markdown / sentence
+      chunk_size: 512             # 目标 token 数
+      chunk_overlap: 50           # 重叠 token 数
+      separators:
+        - "\n\n"
+        - "\n"
+        - "。"
+        - "."
+        - " "
+      options:
+        preserve_tables: true     # 保持表格完整
+        preserve_formulas: true   # 保持公式完整
+        preserve_code: true       # 保持代码块完整
+        extract_headings: true    # 提取标题层次
+
+    embedder:
+      type: openai                # 使用 OpenAI API 嵌入
+      model: text-embedding-3-small
+      dimensions: 1536
+      batch_size: 100
+      options: {}
+
+    vector_store:
+      type: pgvector              # pgvector / qdrant / milvus / chroma
+      collection_name: research_chunks
+      index_type: hnsw
+      distance_metric: cosine
+      options:
+        hnsw_m: 16
+        hnsw_ef_construction: 64
+        hnsw_ef_search: 40
+
+    retriever:
+      type: dense                 # dense / sparse / hybrid / multi_query
+      top_k: 20
+      options:
+        enable_query_expansion: false
+
+    reranker:
+      type: none                  # 跳过本地重排（需要 torch）
+      # 如需重排，可使用 Cohere API: type: cohere
+
+    generator:
+      type: openai                # openai / anthropic / local
+      model: gpt-4o-mini
+      temperature: 0.3
+      max_tokens: 4096
+      options:
+        system_prompt: |
+          你是一个专业的量化研究助手，帮助用户理解和分析量化研究报告。
+          基于提供的上下文回答问题，如果上下文不足以回答问题，请明确说明。
+          回答时请引用具体的来源。
+
+    # 流水线级别配置
+    enable_query_rewrite: false   # 是否启用查询重写
+    enable_rerank: false          # 是否启用重排
+    max_context_length: 8000      # 最大上下文长度
+
+  # 快速流水线 - 低延迟配置
+  fast:
+    name: fast
+    description: "低延迟流水线，适合实时对话"
+
+    parser:
+      type: basic
+      options: {}
+
+    chunker:
+      type: recursive
+      chunk_size: 256
+      chunk_overlap: 25
+
+    embedder:
+      type: openai
+      model: text-embedding-3-small
+      dimensions: 1536
+      batch_size: 100
+
+    vector_store:
+      type: pgvector
+      collection_name: research_chunks
+      index_type: hnsw
+
+    retriever:
+      type: dense
+      top_k: 10
+
+    reranker:
+      type: none
+
+    generator:
+      type: openai
+      model: gpt-4o-mini
+      temperature: 0.3
+      max_tokens: 2048
+
+    enable_query_rewrite: false
+    enable_rerank: false
+    max_context_length: 4000
+
+  # 高质量流水线 - 最佳效果配置
+  quality:
+    name: quality
+    description: "高质量流水线，使用大维度嵌入"
+
+    parser:
+      type: basic                 # 如需高质量解析，可改为 mineru（需额外安装）
+      options: {}
+
+    chunker:
+      type: semantic              # 语义切块
+      chunk_size: 768
+      chunk_overlap: 100
+      options:
+        similarity_threshold: 0.8
+
+    embedder:
+      type: openai
+      model: text-embedding-3-large  # 使用大模型
+      dimensions: 3072               # 更高维度
+      batch_size: 50
+
+    vector_store:
+      type: pgvector
+      collection_name: research_chunks
+      index_type: hnsw
+      options:
+        hnsw_m: 32
+        hnsw_ef_construction: 128
+        hnsw_ef_search: 100
+
+    retriever:
+      type: dense
+      top_k: 30
+      options:
+        enable_query_expansion: true
+
+    reranker:
+      type: none                  # 如需重排，可使用 Cohere API
+
+    generator:
+      type: openai
+      model: gpt-4o
+      temperature: 0.2
+      max_tokens: 8192
+
+    enable_query_rewrite: true
+    enable_rerank: false
+    max_context_length: 16000
+
+  # 测试流水线 - 仅解析和切块（无需任何模型）
+  test:
+    name: test
+    description: "测试流水线，仅解析和切块，不需要模型"
+
+    parser:
+      type: basic
+      options: {}
+
+    chunker:
+      type: recursive
+      chunk_size: 512
+      chunk_overlap: 50
+
+    embedder:
+      type: none
+
+    vector_store:
+      type: none
+
+    retriever:
+      type: none
+
+    reranker:
+      type: none
+
+    generator:
+      type: none
+
+    enable_query_rewrite: false
+    enable_rerank: false
+    max_context_length: 4000
+
+# 组件类型别名（用于简化配置）
+component_aliases:
+  parser:
+    mineru: mineru
+    marker: marker
+    unstructured: unstructured
+
+  embedder:
+    openai: openai
+
+  reranker:
+    cohere: cohere
+    none: none
+
+# 评估配置
+evaluation:
+  enabled: true
+  metrics:
+    - recall_at_k
+    - precision_at_k
+    - ndcg
+    - mrr
+    - faithfulness
+    - answer_relevance
+  save_results: true

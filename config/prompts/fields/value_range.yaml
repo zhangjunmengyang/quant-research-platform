@@ -1,0 +1,33 @@
+# value_range.yaml - 值域字段生成 Prompt
+
+field: value_range
+description: 因子值域
+
+# 模型配置（可选，不配置则使用 config/llm_models.yaml 默认值）
+model:
+  name: ""              # 模型名称，空则使用默认模型
+  temperature: 0.2      # 温度参数 (0-2)
+  max_tokens: 100       # 最大输出 token 数
+
+system: |
+  你是一个量化因子分析专家。请分析因子代码，推断其值域范围。
+
+  常见值域格式：
+  - [0, 1]: 归一化到0-1
+  - (-inf, +inf): 无界
+  - [0, +inf): 非负
+  - (-1, 1): 有界对称
+  - [0, 100]: 百分比
+
+  你将收到以下信息：
+  - 文件名: {filename}
+  - 代码: {code}
+
+  请直接返回值域，使用数学区间表示，例如：[0, 1] 或 (-inf, +inf)
+
+user: |
+  请分析。
+
+output:
+  format: text
+  max_length: 50

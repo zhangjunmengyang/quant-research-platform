@@ -1,0 +1,101 @@
+# 环境变量（敏感信息）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+/lib/
+/lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+env/
+.venv/
+
+# Node.js
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 数据库（SQLite 本地文件，已迁移到 PostgreSQL）
+*.db
+*.sqlite
+*.sqlite3
+
+# 评分结果和临时文件
+scores/
+archived_factors/
+.pipeline/
+
+# 日志
+*.log
+/logs/
+output/
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 数据缓存（大文件）
+*.pkl
+backend/domains/strategy_hub/data/
+
+# 回测引擎核心（私有）
+backend/domains/engine/
+
+# Python 依赖锁文件（使用 pyproject.toml 管理）
+uv.lock
+
+# 本地数据目录
+/data/
+backend/data/
+
+# 数据库备份（保留目录结构）
+backups/*
+!backups/.gitkeep
+
+# 因子文件（保留目录结构）
+factors/*
+!factors/.gitkeep
+
+# Sections 目录（保留目录结构）
+sections/*
+!sections/.gitkeep
+
+# 本地开发 PID 文件
+.pids/
+
+# 文档（本地维护）
+docs/
+
+# Claude Code 本地配置
+.claude/
+CLAUDE.md

@@ -1,0 +1,67 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+env
+*.egg-info
+.eggs
+dist
+build
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Node
+node_modules
+.pnpm-store
+frontend/node_modules
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Data (large files)
+data/
+backend/data/
+backend/domains/strategy_hub/data/
+backend/domains/strategy_hub/logs/
+backend/domains/*/data/
+*.db
+*.sqlite
+*.sqlite3
+*.parquet
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.csv
+
+# Logs
+logs/
+*.log
+
+# Docker (compose files not needed in context)
+docker-compose*.yml
+
+# Misc
+.DS_Store
+*.bak
+*.tmp
+.env
+.env.*
+!.env.example
+
+# Test artifacts
+coverage/
+htmlcov/
+.coverage

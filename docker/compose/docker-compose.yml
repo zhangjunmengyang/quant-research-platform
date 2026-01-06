@@ -1,0 +1,172 @@
+# Docker Compose 配置
+# 量化研究平台完整部署
+
+name: quant-prod
+
+services:
+  # ============================================
+  # 反向代理 (Caddy - 自动 HTTPS)
+  # ============================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: quant-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../../docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+    restart: unless-stopped
+    networks:
+      - frontend
+
+  # ============================================
+  # FastAPI 后端
+  # ============================================
+  api:
+    build:
+      context: ../..
+      dockerfile: docker/api/Dockerfile
+      target: production
+    container_name: quant-api
+    environment:
+      - DATABASE_URL=postgresql://quant:${DB_PASSWORD:-quant123}@postgres:5432/quant
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    volumes:
+      - ../../data:/app/data
+      - ../../factors:/app/factors:ro
+      - ../../config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ============================================
+  # React 前端
+  # ============================================
+  web:
+    build:
+      context: ../..
+      dockerfile: docker/frontend/Dockerfile
+    container_name: quant-web
+    restart: unless-stopped
+    networks:
+      - frontend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  # ============================================
+  # MCP 服务器
+  # ============================================
+  mcp:
+    build:
+      context: ../..
+      dockerfile: docker/mcp/Dockerfile
+    container_name: quant-mcp
+    environment:
+      - DATABASE_URL=postgresql://quant:${DB_PASSWORD:-quant123}@postgres:5432/quant
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    volumes:
+      - ../../data:/app/data
+      - ../../factors:/app/factors:ro
+      - ../../config:/app/config:ro
+      - mcp_logs:/var/log/supervisor
+    ports:
+      - "6789:6789"   # factor-hub
+      - "6790:6790"   # data-hub
+      - "6791:6791"   # strategy-hub
+      - "6792:6792"   # note-hub
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  # ============================================
+  # PostgreSQL (带 pgvector)
+  # ============================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: quant-postgres
+    environment:
+      POSTGRES_USER: quant
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-quant123}
+      POSTGRES_DB: quant
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quant"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Redis
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: quant-redis
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  redis_data:
+  mcp_logs:

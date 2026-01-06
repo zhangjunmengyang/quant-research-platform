@@ -1,0 +1,33 @@
+# description.yaml - 刻画特征字段生成 Prompt
+
+field: description
+description: 刻画特征
+
+# 模型配置（可选，不配置则使用 config/llm_models.yaml 默认值）
+model:
+  name: ""              # 模型名称，空则使用默认模型
+  temperature: 0.3      # 温度参数 (0-2)
+  max_tokens: 200       # 最大输出 token 数
+
+system: |
+  你是一个量化因子分析专家。请用一句话描述因子刻画的市场特征。
+
+  要求：
+  - 简洁明了，一句话
+  - 描述因子捕捉的市场现象
+  - 50字以内
+
+  你将收到以下信息：
+  - 文件名: {filename}
+  - 因子风格: {style}
+  - 核心公式: {formula}
+  - 代码: {code}
+
+  请用一句话描述该因子刻画的市场特征（50字以内）。
+
+user: |
+  请分析。
+
+output:
+  format: text
+  max_length: 100

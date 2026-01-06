@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "factor-hub": {
+      "url": "http://localhost:6789/mcp"
+    },
+    "data-hub": {
+      "url": "http://localhost:6790/mcp"
+    },
+    "strategy-hub": {
+      "url": "http://localhost:6791/mcp"
+    },
+    "note-hub": {
+      "url": "http://localhost:6792/mcp"
+    }
+  }
+}

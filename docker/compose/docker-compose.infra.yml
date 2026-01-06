@@ -1,0 +1,48 @@
+# Docker Compose 基础设施配置
+# 仅运行 PostgreSQL 和 Redis，Python 代码在本地运行
+
+name: quant-infra
+
+services:
+  # ============================================
+  # PostgreSQL
+  # ============================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: quant-postgres
+    environment:
+      POSTGRES_USER: quant
+      POSTGRES_PASSWORD: quant123
+      POSTGRES_DB: quant
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ../../backups:/backups
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quant"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Redis
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: quant-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,159 @@
+# Docker Compose 开发环境配置
+# 特点：挂载本地代码，支持热重载，与生产环境依赖完全一致
+
+name: quant-dev
+
+services:
+  # ============================================
+  # FastAPI 后端 (开发模式)
+  # ============================================
+  api:
+    build:
+      context: ../..
+      dockerfile: docker/api/Dockerfile
+      target: base  # 使用基础镜像，不运行生产命令
+    container_name: quant-api-dev
+    environment:
+      - DATABASE_URL=postgresql://quant:quant123@postgres:5432/quant
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - LOG_FORMAT=json
+      - PYTHONPATH=/app:/app/backend
+      - PRE_DATA_PATH=/data/preprocess
+      - COIN_CAP_PATH=/data/coin-cap
+    volumes:
+      # 挂载代码目录（热重载核心）
+      - ../../backend:/app/backend
+      - ../../config:/app/config
+      # 数据目录
+      - ../../data:/app/data
+      - ../../factors:/app/factors
+      # 外部数据目录（从 .env 读取 PRE_DATA_PATH 和 COIN_CAP_PATH）
+      - ${PRE_DATA_PATH:-/dev/null}:/data/preprocess:ro
+      - ${COIN_CAP_PATH:-/dev/null}:/data/coin-cap:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 开发模式：使用 uvicorn 热重载
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
+      --reload-dir /app/backend
+    networks:
+      - dev-network
+
+  # ============================================
+  # React 前端 (开发模式)
+  # ============================================
+  web:
+    image: node:20-alpine
+    container_name: quant-web-dev
+    working_dir: /app
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+      - VITE_API_HOST=api  # Docker 网络中使用服务名
+    volumes:
+      - ../../frontend:/app
+      - /app/node_modules  # 排除 node_modules，使用容器内的
+    ports:
+      - "5173:5173"
+    # 开发模式：使用 vite 热重载
+    command: sh -c "npm install -g pnpm && pnpm install && pnpm dev --host 0.0.0.0"
+    networks:
+      - dev-network
+
+  # ============================================
+  # MCP 服务器 (开发模式)
+  # ============================================
+  mcp:
+    build:
+      context: ../..
+      dockerfile: docker/mcp/Dockerfile
+    container_name: quant-mcp-dev
+    environment:
+      - DATABASE_URL=postgresql://quant:quant123@postgres:5432/quant
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=DEBUG
+      - LOG_FORMAT=json
+      - PYTHONPATH=/app:/app/backend
+      - PRE_DATA_PATH=/data/preprocess
+      - COIN_CAP_PATH=/data/coin-cap
+    volumes:
+      # 挂载代码目录（MCP 服务需要重启才能生效）
+      - ../../backend:/app/backend
+      - ../../config:/app/config
+      - ../../data:/app/data
+      - ../../factors:/app/factors
+      # 挂载 supervisor 配置（避免重新构建镜像）
+      - ../../docker/mcp/supervisord.conf:/etc/supervisor/conf.d/mcp.conf:ro
+      # 外部数据目录（从 .env 读取 PRE_DATA_PATH 和 COIN_CAP_PATH）
+      - ${PRE_DATA_PATH}:/data/preprocess:ro
+      - ${COIN_CAP_PATH}:/data/coin-cap:ro
+    ports:
+      - "6789:6789"   # factor-hub
+      - "6790:6790"   # data-hub
+      - "6791:6791"   # strategy-hub
+      - "6792:6792"   # note-hub
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dev-network
+
+  # ============================================
+  # PostgreSQL
+  # ============================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: quant-postgres-dev
+    environment:
+      POSTGRES_USER: quant
+      POSTGRES_PASSWORD: quant123
+      POSTGRES_DB: quant
+    volumes:
+      # 使用本地目录而非 Docker Volume，便于备份和迁移
+      - ../../data/postgres:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # 备份目录
+      - ../../backups:/backups
+    ports:
+      - "5432:5432"
+    networks:
+      - dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quant"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Redis
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: quant-redis-dev
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+networks:
+  dev-network:
+    driver: bridge
+
+volumes:
+  redis_dev_data:

@@ -1,0 +1,38 @@
+# analysis.yaml - 因子分析字段生成 Prompt
+
+field: analysis
+description: 因子分析
+
+# 模型配置（可选，不配置则使用 config/llm_models.yaml 默认值）
+model:
+  name: ""              # 模型名称，空则使用默认模型
+  temperature: 0.5      # 温度参数 (0-2)
+  max_tokens: 800       # 最大输出 token 数
+
+system: |
+  你是一个量化因子分析专家。请为因子生成详细的分析文本。
+
+  分析应包含：
+  1. 高值/低值的市场含义
+  2. 适用的市场环境（趋势/震荡）
+  3. 推荐的时间周期
+  4. 与其他因子的配合建议
+
+  字数：100-200字
+
+  - 文件名: {filename}
+  - 因子风格: {style}
+  - 核心公式: {formula}
+  - 输入数据: {input_data}
+  - 值域: {value_range}
+  - 刻画特征: {description}
+  - 代码: {code}
+
+  请生成因子分析（100-200字），包含：高/低值含义、适用市场环境、推荐周期、配合建议。
+
+user: |
+  请分析。
+
+output:
+  format: text
+  max_length: 500

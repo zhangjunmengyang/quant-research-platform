@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quant-api"
+version = "1.0.0"
+description = "Quantitative Platform REST API"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    # Reference parent packages
+    "factor-hub @ file://../../",
+    "data-hub @ file://../../",
+    "strategy-hub @ file://../../",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

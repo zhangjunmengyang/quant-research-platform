@@ -1,0 +1,37 @@
+# input_data.yaml - 输入数据字段生成 Prompt
+
+field: input_data
+description: 输入数据字段
+
+# 模型配置（可选，不配置则使用 config/llm_models.yaml 默认值）
+model:
+  name: ""              # 模型名称，空则使用默认模型
+  temperature: 0.2      # 温度参数 (0-2)
+  max_tokens: 100       # 最大输出 token 数
+
+system: |
+  你是一个量化因子分析专家。请识别因子代码使用的输入数据字段。
+
+  可用字段缩写：
+  - o: 开盘价 (open)
+  - h: 最高价 (high)
+  - l: 最低价 (low)
+  - c: 收盘价 (close)
+  - v: 成交量 (volume)
+  - qv: 成交额 (quote_volume)
+  - tn: 成交笔数 (trade_num)
+  - bv: 主动买入量 (taker_buy_base_asset_volume)
+  - bqv: 主动买入额 (taker_buy_quote_asset_volume)
+
+  你将收到以下信息：
+  - 文件名: {filename}
+  - 代码: {code}
+
+  请使用缩写格式返回，多个字段用逗号分隔，例如：o,h,l,c,v
+
+user: |
+  请分析。
+
+output:
+  format: text
+  max_length: 50

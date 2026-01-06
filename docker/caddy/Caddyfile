@@ -1,0 +1,59 @@
+# Caddy 反向代理配置
+# 支持自动 HTTPS
+
+# 开发模式（使用 localhost）
+:80 {
+    # API 路由
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+
+    # MCP 管理接口（通过 API 代理）
+    handle /mcp-management/* {
+        reverse_proxy api:8000
+    }
+
+    # 静态文件
+    handle {
+        reverse_proxy web:80
+    }
+
+    # 日志
+    log {
+        output stdout
+        format console
+    }
+}
+
+# 生产模式（取消注释并替换域名）
+# quant.yourdomain.com {
+#     # API 路由
+#     handle /api/* {
+#         reverse_proxy api:8000
+#     }
+#
+#     # MCP 管理接口
+#     handle /mcp-management/* {
+#         reverse_proxy api:8000
+#     }
+#
+#     # 静态文件
+#     handle {
+#         reverse_proxy web:80
+#     }
+#
+#     # 安全头
+#     header {
+#         X-Content-Type-Options nosniff
+#         X-Frame-Options DENY
+#         Referrer-Policy strict-origin-when-cross-origin
+#     }
+#
+#     # 日志
+#     log {
+#         output file /var/log/caddy/access.log {
+#             roll_size 100mb
+#             roll_keep 5
+#         }
+#     }
+# }

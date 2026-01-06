@@ -1,0 +1,34 @@
+# =============================================================================
+# LLM 模型配置
+# =============================================================================
+# API 密钥和端点通过环境变量配置:
+#   LLM_API_KEY: API 密钥
+#   LLM_API_URL: API 端点 (默认: https://api.openai.com/v1/chat/completions)
+# =============================================================================
+
+# 默认配置
+default:
+  model: gemini              # 默认使用的模型 (对应下面 llm_configs 的 key)
+  timeout: 120               # 请求超时(秒)
+  concurrency: 3             # 并发数
+  batch_size: 5              # 批处理大小
+
+# 模型配置
+llm_configs:
+  claude:
+    provider: openai          # API 提供商类型 (openai 兼容格式)
+    model: aws.claude-opus-4.5
+    temperature: 0.6
+    max_tokens: 16384
+
+  gpt:
+    provider: openai
+    model: gpt-5.2
+    temperature: 0.6
+    max_tokens: 16384
+
+  gemini:
+    provider: openai
+    model: gemini-3-flash-preview
+    temperature: 1
+    max_tokens: 16384
