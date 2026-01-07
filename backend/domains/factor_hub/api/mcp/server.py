@@ -2,6 +2,7 @@
 MCP Server - 因子知识库 MCP 服务器
 
 基于 mcp_core 实现的 MCP 服务器。
+使用 Streamable HTTP 传输协议（MCP 2025-03-26 规范推荐）。
 """
 
 import logging
@@ -11,6 +12,8 @@ from domains.mcp_core import (
     BaseMCPServer,
     MCPConfig,
     create_mcp_app,
+    create_streamable_http_app,
+    run_streamable_http_server,
 )
 from domains.mcp_core.server.server import run_server as mcp_run_server
 
@@ -123,7 +126,7 @@ def create_factor_hub_config(
 
 def create_mcp_server(config: Optional[MCPConfig] = None):
     """
-    创建 MCP FastAPI 应用
+    创建 MCP FastAPI 应用 (Streamable HTTP)
 
     Args:
         config: MCP 配置
@@ -135,7 +138,7 @@ def create_mcp_server(config: Optional[MCPConfig] = None):
         config = create_factor_hub_config()
 
     server = FactorHubMCPServer(config)
-    return create_mcp_app(server, config)
+    return create_streamable_http_app(server)
 
 
 def run_server(
@@ -145,7 +148,7 @@ def run_server(
     reload: bool = False,
 ):
     """
-    运行 MCP 服务器
+    运行 MCP 服务器 (Streamable HTTP)
 
     Args:
         host: 监听地址
@@ -160,9 +163,9 @@ def run_server(
         log_level=log_level,
     )
 
-    # 创建服务器并运行（日志配置由 mcp_run_server 处理）
+    # 创建服务器并运行 (使用 Streamable HTTP)
     server = FactorHubMCPServer(config)
-    mcp_run_server(server, host=host, port=port, log_level=log_level, reload=reload)
+    run_streamable_http_server(server, host=host, port=port, log_level=log_level, reload=reload)
 
 
 if __name__ == "__main__":
