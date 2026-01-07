@@ -32,6 +32,9 @@ dependencies = [
     "python-multipart>=0.0.6",  # 文件上传支持
     # 网络请求
     "aiohttp>=3.9.0",
+    # MCP SDK
+    "mcp>=1.0.0",
+    "sse-starlette>=2.0.0",
     # 配置
     "pyyaml>=6.0.0",
     "python-dotenv>=1.0.0",

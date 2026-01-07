@@ -1,15 +1,19 @@
 {
   "mcpServers": {
     "factor-hub": {
+      "type": "http",
       "url": "http://localhost:6789/mcp/"
     },
     "data-hub": {
+      "type": "http",
       "url": "http://localhost:6790/mcp/"
     },
     "strategy-hub": {
+      "type": "http",
       "url": "http://localhost:6791/mcp/"
     },
     "note-hub": {
+      "type": "http",
       "url": "http://localhost:6792/mcp/"
     }
   }
