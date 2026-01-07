@@ -79,16 +79,17 @@ docker compose -f docker/compose/docker-compose.infra.yml up -d
 cd backend; $env:PYTHONPATH=".;.."; $env:PYTHONUTF8="1"; ..\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 # 3. 新终端 - 构建并启动前端（生产模式，推荐）
-cd frontend; npm run dev
+cd frontend; npm run preview
 ```
 
 > **重要**: Windows 下 Vite 开发模式首次加载很慢（10-30秒），因此默认使用生产构建模式。
-> `npm run dev` 会先构建再启动，首次构建约 5 秒，之后页面切换是毫秒级响应。
+> `npm run preview` 会先构建再启动，首次构建约 5 秒，之后页面切换是毫秒级响应。
 
 **Windows 前端命令说明：**
 | 命令 | 说明 |
 |------|------|
-| `npm run dev` | 构建 + 启动（推荐日常使用） |
+| `npm run preview` | 构建 + 启动（推荐日常使用） |
+| `npm run dev` | Vite 热更新模式（macOS 推荐） |
 | `npm run build` | 仅构建 |
 | `npm run start` | 仅启动预览服务器（需先 build） |
 
@@ -113,7 +114,7 @@ docker compose -f docker/compose/docker-compose.infra.yml down
 ### 4. 访问服务
 
 启动后访问:
-- 前端界面: http://127.0.0.1:4173
+- 前端界面: http://127.0.0.1:5173
 - API 文档: http://127.0.0.1:8000/docs
 
 ## MCP Integration
