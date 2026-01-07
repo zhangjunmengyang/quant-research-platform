@@ -6,21 +6,11 @@ Services 模块 - 业务逻辑层
 
 from .prompt_engine import PromptEngine, get_prompt_engine
 from .field_filler import FieldFiller, get_field_filler, FIELD_ORDER, extract_pure_code
-from .factor_analysis import (
-    FactorAnalysisService,
-    get_factor_analysis_service,
-    FactorAnalysisResult,
-    ICAnalysisResult,
-    GroupReturnResult,
-    DistributionResult,
-    StabilityResult,
-)
 from .multi_factor_analysis import (
     MultiFactorAnalysisService,
     get_multi_factor_analysis_service,
     MultiFactorAnalysisResult,
     CorrelationMatrixResult,
-    CollinearityResult,
     OrthogonalizationResult,
     SynthesisResult,
     RedundancyResult,
@@ -46,20 +36,11 @@ __all__ = [
     'get_field_filler',
     'FIELD_ORDER',
     'extract_pure_code',
-    # 单因子分析
-    'FactorAnalysisService',
-    'get_factor_analysis_service',
-    'FactorAnalysisResult',
-    'ICAnalysisResult',
-    'GroupReturnResult',
-    'DistributionResult',
-    'StabilityResult',
     # 多因子分析
     'MultiFactorAnalysisService',
     'get_multi_factor_analysis_service',
     'MultiFactorAnalysisResult',
     'CorrelationMatrixResult',
-    'CollinearityResult',
     'OrthogonalizationResult',
     'SynthesisResult',
     'RedundancyResult',

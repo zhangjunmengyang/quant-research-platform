@@ -27,14 +27,11 @@ from .tools.mutation_tools import (
     DeleteFactorTool,
 )
 from .tools.analysis_tools import (
-    # 单因子分析工具
-    AnalyzeFactorTool,
     GetFactorICTool,
     CompareFactorsTool,
     SuggestSimilarFactorsTool,
     # 多因子分析工具
     GetFactorCorrelationTool,
-    DetectCollinearityTool,
     MultiFactorAnalyzeTool,
     # 分组分析工具
     AnalyzeFactorGroupsTool,
@@ -70,15 +67,13 @@ class FactorHubMCPServer(BaseMCPServer):
         self.register_tool(UpdateFactorTool(), "mutation")
         self.register_tool(DeleteFactorTool(), "mutation")
 
-        # 单因子分析工具
-        self.register_tool(AnalyzeFactorTool(), "analysis")
+        # 分析工具
         self.register_tool(GetFactorICTool(), "analysis")
         self.register_tool(CompareFactorsTool(), "analysis")
         self.register_tool(SuggestSimilarFactorsTool(), "analysis")
 
         # 多因子分析工具
         self.register_tool(GetFactorCorrelationTool(), "analysis")
-        self.register_tool(DetectCollinearityTool(), "analysis")
         self.register_tool(MultiFactorAnalyzeTool(), "analysis")
 
         # 分组分析工具

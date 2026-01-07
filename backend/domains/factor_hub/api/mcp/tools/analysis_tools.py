@@ -4,83 +4,13 @@
 提供因子分析能力的 MCP 工具封装。
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 
 from .base import BaseTool, ToolResult
 from domains.mcp_core.base.tool import ExecutionMode
 
 logger = logging.getLogger(__name__)
-
-
-class AnalyzeFactorTool(BaseTool):
-    """因子分析工具 - 执行单因子深度分析"""
-
-    category = "analysis"
-    execution_mode = ExecutionMode.COMPUTE  # CPU 密集型计算
-    execution_timeout = 60.0
-
-    @property
-    def name(self) -> str:
-        return "analyze_factor"
-
-    @property
-    def description(self) -> str:
-        return """执行单因子深度分析，包括IC分析、分组收益、分布特征和稳定性分析。
-需要提供因子数据（包含因子值和收益率列）。"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "factor_name": {
-                    "type": "string",
-                    "description": "因子名称",
-                },
-                "param": {
-                    "type": ["string", "integer"],
-                    "description": "因子参数",
-                },
-                "n_groups": {
-                    "type": "integer",
-                    "description": "分组数量，默认5组",
-                    "default": 5,
-                },
-            },
-            "required": ["factor_name"],
-        }
-
-    async def execute(
-        self,
-        factor_name: str,
-        param: Optional[str] = None,
-        n_groups: int = 5,
-    ) -> ToolResult:
-        try:
-            from ....services import get_factor_analysis_service
-
-            service = get_factor_analysis_service(n_groups=n_groups)
-
-            # 构建因子列名
-            factor_col = f"{factor_name}_{param}" if param else factor_name
-
-            # 获取因子数据（需要从数据层获取）
-            # 这里返回分析能力说明，实际使用时需要传入数据
-            return ToolResult.ok({
-                "message": f"因子分析服务已就绪，可分析因子: {factor_col}",
-                "capabilities": [
-                    "IC分析（IC均值、ICIR、RankIC）",
-                    "分组收益分析（多空收益、单调性）",
-                    "分布分析（偏度、峰度、正态性）",
-                    "稳定性分析（滚动IC、IC衰减、半衰期）",
-                ],
-                "usage": "需要提供包含因子值和收益率的DataFrame进行分析",
-            })
-
-        except Exception as e:
-            logger.exception("因子分析失败")
-            return ToolResult.fail(str(e))
 
 
 class GetFactorICTool(BaseTool):
@@ -131,7 +61,7 @@ class GetFactorICTool(BaseTool):
 
             # 如果没有存储的数据，提示需要运行分析
             if "ic_mean" not in result:
-                result["note"] = "因子尚未进行IC分析，请使用 analyze_factor 工具执行分析"
+                result["note"] = "因子尚未进行IC分析，请使用因子分组分析工具获取IC数据"
 
             return ToolResult.ok(result)
 
@@ -357,74 +287,6 @@ class GetFactorCorrelationTool(BaseTool):
             return ToolResult.fail(str(e))
 
 
-class DetectCollinearityTool(BaseTool):
-    """共线性检测工具 - 检测因子多重共线性"""
-
-    category = "analysis"
-    execution_mode = ExecutionMode.COMPUTE  # CPU 密集型计算
-    execution_timeout = 60.0
-
-    @property
-    def name(self) -> str:
-        return "detect_collinearity"
-
-    @property
-    def description(self) -> str:
-        return """检测多个因子之间的多重共线性问题。
-使用VIF（方差膨胀因子）和条件数进行诊断。"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "factor_names": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "因子名称列表",
-                },
-                "vif_threshold": {
-                    "type": "number",
-                    "description": "VIF阈值，默认10（超过此值认为存在共线性）",
-                    "default": 10.0,
-                },
-            },
-            "required": ["factor_names"],
-        }
-
-    async def execute(
-        self,
-        factor_names: List[str],
-        vif_threshold: float = 10.0,
-    ) -> ToolResult:
-        try:
-            from ....services import get_multi_factor_analysis_service
-
-            service = get_multi_factor_analysis_service(vif_threshold=vif_threshold)
-
-            return ToolResult.ok({
-                "message": "共线性检测服务已就绪",
-                "factor_count": len(factor_names),
-                "capabilities": [
-                    "VIF（方差膨胀因子）计算",
-                    "条件数分析",
-                    "特征值诊断",
-                    "共线性因子识别",
-                ],
-                "vif_threshold": vif_threshold,
-                "interpretation": {
-                    "vif_1": "无共线性",
-                    "vif_1_5": "轻微共线性",
-                    "vif_5_10": "中度共线性",
-                    "vif_>10": "严重共线性",
-                },
-            })
-
-        except Exception as e:
-            logger.exception("共线性检测失败")
-            return ToolResult.fail(str(e))
-
-
 class MultiFactorAnalyzeTool(BaseTool):
     """多因子完整分析工具 - 一站式多因子分析"""
 
@@ -438,7 +300,7 @@ class MultiFactorAnalyzeTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return """执行完整的多因子分析，包括相关性、共线性、正交化、合成、冗余检测和增量贡献分析。
+        return """执行完整的多因子分析，包括相关性、正交化、合成、冗余检测和增量贡献分析。
 一次调用获取所有多因子分析结果。"""
 
     @property
@@ -489,10 +351,6 @@ class MultiFactorAnalyzeTool(BaseTool):
                     {
                         "name": "相关性分析",
                         "description": "计算因子相关性矩阵，识别高相关因子对",
-                    },
-                    {
-                        "name": "共线性检测",
-                        "description": "使用VIF和条件数检测多重共线性",
                     },
                     {
                         "name": "正交化",

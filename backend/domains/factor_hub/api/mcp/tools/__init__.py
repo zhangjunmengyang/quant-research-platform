@@ -18,14 +18,11 @@ from .mutation_tools import (
     DeleteFactorTool,
 )
 from .analysis_tools import (
-    # 单因子分析工具
-    AnalyzeFactorTool,
     GetFactorICTool,
     CompareFactorsTool,
     SuggestSimilarFactorsTool,
     # 多因子分析工具
     GetFactorCorrelationTool,
-    DetectCollinearityTool,
     MultiFactorAnalyzeTool,
     # 因子分箱分析工具
     AnalyzeFactorGroupsTool,
@@ -46,14 +43,12 @@ __all__ = [
     'CreateFactorTool',
     'UpdateFactorTool',
     'DeleteFactorTool',
-    # 单因子分析工具
-    'AnalyzeFactorTool',
+    # 分析工具
     'GetFactorICTool',
     'CompareFactorsTool',
     'SuggestSimilarFactorsTool',
     # 多因子分析工具
     'GetFactorCorrelationTool',
-    'DetectCollinearityTool',
     'MultiFactorAnalyzeTool',
     # 因子分箱分析工具
     'AnalyzeFactorGroupsTool',

@@ -3,7 +3,6 @@
 
 提供多因子分析能力，包括：
 - 因子相关性矩阵计算
-- 因子共线性检测
 - 因子正交化
 - 因子合成（等权、IC加权、优化权重）
 - 因子冗余检测
@@ -56,25 +55,6 @@ class CorrelationMatrixResult:
         if self.correlation_matrix is not None:
             result["correlation_matrix"] = self.correlation_matrix.round(4).to_dict()
         return result
-
-
-@dataclass
-class CollinearityResult:
-    """共线性检测结果"""
-    vif_scores: Dict[str, float] = field(default_factory=dict)  # 方差膨胀因子
-    condition_number: float = 0.0  # 条件数
-    collinear_factors: List[str] = field(default_factory=list)  # 存在共线性的因子
-    eigenvalues: List[float] = field(default_factory=list)  # 特征值
-    is_multicollinear: bool = False  # 是否存在严重共线性
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "vif_scores": {k: round(v, 4) for k, v in self.vif_scores.items()},
-            "condition_number": round(self.condition_number, 4),
-            "collinear_factors": self.collinear_factors,
-            "eigenvalues": [round(e, 4) for e in self.eigenvalues[:10]],
-            "is_multicollinear": self.is_multicollinear,
-        }
 
 
 @dataclass
@@ -161,7 +141,6 @@ class MultiFactorAnalysisResult:
     factor_names: List[str] = field(default_factory=list)
     analysis_date: str = field(default_factory=lambda: datetime.now().isoformat())
     correlation: Optional[CorrelationMatrixResult] = None
-    collinearity: Optional[CollinearityResult] = None
     orthogonalization: Optional[OrthogonalizationResult] = None
     synthesis: Optional[SynthesisResult] = None
     redundancy: Optional[RedundancyResult] = None
@@ -174,8 +153,6 @@ class MultiFactorAnalysisResult:
         }
         if self.correlation:
             result["correlation"] = self.correlation.to_dict()
-        if self.collinearity:
-            result["collinearity"] = self.collinearity.to_dict()
         if self.orthogonalization:
             result["orthogonalization"] = self.orthogonalization.to_dict()
         if self.synthesis:
@@ -197,17 +174,14 @@ class MultiFactorAnalysisService:
     def __init__(
         self,
         correlation_threshold: float = 0.7,
-        vif_threshold: float = 10.0,
     ):
         """
         初始化多因子分析服务
 
         Args:
             correlation_threshold: 高相关性阈值
-            vif_threshold: VIF阈值（超过此值认为存在共线性）
         """
         self.correlation_threshold = correlation_threshold
-        self.vif_threshold = vif_threshold
 
     def analyze(
         self,
@@ -247,12 +221,6 @@ class MultiFactorAnalysisService:
             result.correlation = self.calculate_correlation_matrix(df, factor_cols)
         except Exception as e:
             logger.warning(f"相关性分析失败: {e}")
-
-        # 共线性检测
-        try:
-            result.collinearity = self.detect_collinearity(df, factor_cols)
-        except Exception as e:
-            logger.warning(f"共线性检测失败: {e}")
 
         # 正交化
         try:
@@ -333,78 +301,6 @@ class MultiFactorAnalysisService:
         if corr_values:
             result.avg_correlation = np.mean(corr_values)
             result.max_correlation = np.max(corr_values)
-
-        return result
-
-    def detect_collinearity(
-        self,
-        df: pd.DataFrame,
-        factor_cols: List[str],
-    ) -> CollinearityResult:
-        """
-        检测因子共线性
-
-        使用VIF（方差膨胀因子）和条件数来检测共线性。
-
-        Args:
-            df: 数据DataFrame
-            factor_cols: 因子列名列表
-
-        Returns:
-            CollinearityResult
-        """
-        result = CollinearityResult()
-
-        factor_data = df[factor_cols].values
-
-        # 标准化
-        factor_data = (factor_data - factor_data.mean(axis=0)) / (factor_data.std(axis=0) + 1e-10)
-
-        # 计算VIF
-        for i, col in enumerate(factor_cols):
-            # 用其他因子回归当前因子
-            y = factor_data[:, i]
-            X = np.delete(factor_data, i, axis=1)
-
-            if X.shape[1] > 0:
-                # 添加常数项
-                X = np.column_stack([np.ones(X.shape[0]), X])
-                try:
-                    # 最小二乘回归
-                    coeffs, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
-                    y_pred = X @ coeffs
-                    ss_res = np.sum((y - y_pred) ** 2)
-                    ss_tot = np.sum((y - y.mean()) ** 2)
-                    r_squared = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-
-                    vif = 1 / (1 - r_squared) if r_squared < 1 else float("inf")
-                    result.vif_scores[col] = vif
-
-                    if vif > self.vif_threshold:
-                        result.collinear_factors.append(col)
-                except Exception:
-                    result.vif_scores[col] = float("nan")
-
-        # 计算条件数
-        try:
-            cov_matrix = np.cov(factor_data.T)
-            eigenvalues = np.linalg.eigvalsh(cov_matrix)
-            eigenvalues = np.sort(eigenvalues)[::-1]
-            result.eigenvalues = eigenvalues.tolist()
-
-            # 条件数 = 最大特征值/最小特征值
-            if eigenvalues[-1] > 0:
-                result.condition_number = eigenvalues[0] / eigenvalues[-1]
-            else:
-                result.condition_number = float("inf")
-
-        except Exception as e:
-            logger.warning(f"计算条件数失败: {e}")
-
-        # 判断是否存在严重共线性
-        result.is_multicollinear = (
-            len(result.collinear_factors) > 0 or result.condition_number > 30
-        )
 
         return result
 
@@ -874,13 +770,11 @@ _multi_factor_analysis_service: Optional[MultiFactorAnalysisService] = None
 
 def get_multi_factor_analysis_service(
     correlation_threshold: float = 0.7,
-    vif_threshold: float = 10.0,
 ) -> MultiFactorAnalysisService:
     """获取多因子分析服务单例"""
     global _multi_factor_analysis_service
     if _multi_factor_analysis_service is None:
         _multi_factor_analysis_service = MultiFactorAnalysisService(
             correlation_threshold=correlation_threshold,
-            vif_threshold=vif_threshold,
         )
     return _multi_factor_analysis_service
