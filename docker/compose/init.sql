@@ -145,7 +145,7 @@ CREATE TRIGGER update_factors_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- 经验笔记表
+-- 经验概览表
 CREATE TABLE IF NOT EXISTS notes (
     id SERIAL PRIMARY KEY,
     title VARCHAR(500) NOT NULL,

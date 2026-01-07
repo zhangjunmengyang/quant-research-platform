@@ -1,6 +1,6 @@
 /**
  * Notes List Page
- * 笔记列表页 - 展示所有经验笔记
+ * 笔记列表页 - 展示所有经验概览
  */
 
 import { useState } from 'react'
@@ -126,7 +126,7 @@ export function Component() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">经验笔记</h1>
+          <h1 className="text-2xl font-bold">经验概览</h1>
           <p className="text-muted-foreground">
             共 {data?.total ?? 0} 条笔记
           </p>

@@ -69,7 +69,7 @@ MCP_SERVERS = {
     },
     "note-hub": {
         "name": "note-hub",
-        "display_name": "经验笔记",
+        "display_name": "经验概览",
         "description": "研究笔记和经验记录服务",
         "host": "localhost",
         "port": 6792,

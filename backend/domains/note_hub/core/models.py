@@ -1,5 +1,5 @@
 """
-经验笔记数据模型定义
+经验概览数据模型定义
 """
 
 from dataclasses import dataclass
@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List
 @dataclass
 class Note:
     """
-    经验笔记数据类
+    经验概览数据类
 
     Attributes:
         id: 笔记 ID（主键，自增）

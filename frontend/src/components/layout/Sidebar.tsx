@@ -57,7 +57,7 @@ const navigation: NavGroup[] = [
   {
     title: '经验库',
     items: [
-      { label: '经验笔记', href: '/notes', icon: BookOpen },
+      { label: '经验概览', href: '/notes', icon: BookOpen },
     ],
   },
   {

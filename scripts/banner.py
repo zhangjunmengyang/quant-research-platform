@@ -89,7 +89,7 @@ def get_services() -> str:
         {CYAN}Factor MCP      {RESET}http://localhost:6789/mcp                          {DIM}因子知识库{RESET}
         {CYAN}Data MCP        {RESET}http://localhost:6790/mcp                          {DIM}数据服务{RESET}
         {CYAN}Strategy MCP    {RESET}http://localhost:6791/mcp                          {DIM}策略知识库{RESET}
-        {CYAN}Note MCP        {RESET}http://localhost:6792/mcp                          {DIM}经验笔记{RESET}
+        {CYAN}Note MCP        {RESET}http://localhost:6792/mcp                          {DIM}经验概览{RESET}
 
 {DIM}════════════════════════════════════════════════════════════════════════════════════════════════════════════════════{RESET}
 """

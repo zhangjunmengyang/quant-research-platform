@@ -18,7 +18,7 @@ class CreateNoteTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return """创建一条经验笔记。
+        return """创建一条经验概览。
 
 用于记录量化研究过程中的洞察、经验和发现。
 
@@ -103,7 +103,7 @@ class SearchNotesTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return """搜索经验笔记。
+        return """搜索经验概览。
 
 在标题和内容中搜索关键词，返回匹配的笔记列表。
 
