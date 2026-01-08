@@ -1,5 +1,5 @@
 .PHONY: help start stop restart logs status clean force-clean local dev prod healthcheck \
-	logs-api logs-mcp logs-frontend version backup \
+	logs-api logs-mcp logs-frontend version backup mcp-tools \
 	_check_tools _check_local_tools _check_ports _ensure_deps \
 	_start_local _start_dev _start_prod _check_docker_ports _check_docker_ports_prod \
 	_wait_infra_ready _wait_docker_healthy _auto_backup _auto_backup_docker \
@@ -87,6 +87,10 @@ help:
 	@echo "  make logs-mcp      - 实时查看 MCP 日志"
 	@echo "  make logs-frontend - 实时查看前端日志"
 	@echo "  make version       - 显示版本信息"
+	@echo ""
+	@echo "  make mcp-tools     - 列出所有 MCP 服务和工具"
+	@echo "  make mcp-tools-json    - JSON 格式输出"
+	@echo "  make mcp-tools-summary - 仅显示摘要"
 	@echo ""
 	@echo "服务地址:"
 	@echo "  前端:     http://localhost:5173 (local/dev) | http://localhost (prod)"
@@ -711,3 +715,15 @@ version:
 	@echo "uv: $$(uv --version 2>/dev/null || echo '未安装')"
 	@echo "pnpm: $$(pnpm --version 2>/dev/null || echo '未安装')"
 	@echo "Node: $$(node --version 2>/dev/null || echo '未安装')"
+
+# ============================================
+# MCP 工具发现
+# ============================================
+mcp-tools:
+	@uv run python scripts/list_mcp_tools.py
+
+mcp-tools-json:
+	@uv run python scripts/list_mcp_tools.py --json
+
+mcp-tools-summary:
+	@uv run python scripts/list_mcp_tools.py --summary
