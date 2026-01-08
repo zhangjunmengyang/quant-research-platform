@@ -1,7 +1,7 @@
 """
 研报知识库数据模型
 
-定义研报、切块、对话等核心数据结构。
+定义研报、切块等核心数据结构。
 """
 
 from dataclasses import dataclass, field
@@ -177,90 +177,3 @@ class ResearchChunk:
         """从字典创建实例"""
         valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**valid_fields)
-
-
-@dataclass
-class Conversation:
-    """
-    对话数据模型
-
-    存储 ChatBot 对话信息。
-    """
-    id: Optional[int] = None
-    uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
-    title: str = ""
-
-    # 关联的研报（可选，None 表示全部研报）
-    report_id: Optional[int] = None
-
-    # 时间戳
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            'id': self.id,
-            'uuid': self.uuid,
-            'title': self.title,
-            'report_id': self.report_id,
-            'created_at': self.created_at,
-            'updated_at': self.updated_at,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Conversation':
-        """从字典创建实例"""
-        valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
-        return cls(**valid_fields)
-
-
-@dataclass
-class Message:
-    """
-    消息数据模型
-
-    存储对话中的单条消息。
-    """
-    id: Optional[int] = None
-    conversation_id: Optional[int] = None
-    role: str = "user"  # user / assistant
-    content: str = ""
-
-    # 来源引用（JSON 格式）
-    sources: str = "[]"  # [{report_id, chunk_id, page, relevance}]
-
-    # 时间戳
-    created_at: Optional[datetime] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
-        return {
-            'id': self.id,
-            'conversation_id': self.conversation_id,
-            'role': self.role,
-            'content': self.content,
-            'sources': self.sources,
-            'created_at': self.created_at,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Message':
-        """从字典创建实例"""
-        import json
-        valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
-        # JSONB 字段会被 psycopg 自动解析为 Python 对象，需要转回字符串
-        if 'sources' in valid_fields and isinstance(valid_fields['sources'], (list, dict)):
-            valid_fields['sources'] = json.dumps(valid_fields['sources'])
-        return cls(**valid_fields)
-
-    @property
-    def sources_list(self) -> List[Dict[str, Any]]:
-        """解析来源列表"""
-        if not self.sources:
-            return []
-        import json
-        try:
-            return json.loads(self.sources)
-        except json.JSONDecodeError:
-            return []

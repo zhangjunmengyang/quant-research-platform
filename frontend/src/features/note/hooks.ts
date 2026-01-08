@@ -4,7 +4,16 @@
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { noteApi } from './api'
-import type { NoteCreate, NoteUpdate, NoteListParams } from './types'
+import type {
+  NoteCreate,
+  NoteUpdate,
+  NoteListParams,
+  ObservationCreate,
+  HypothesisCreate,
+  FindingCreate,
+  PromoteRequest,
+  NoteType,
+} from './types'
 
 // Query Keys
 export const noteKeys = {
@@ -15,6 +24,9 @@ export const noteKeys = {
   detail: (id: number) => [...noteKeys.details(), id] as const,
   stats: () => [...noteKeys.all, 'stats'] as const,
   tags: () => [...noteKeys.all, 'tags'] as const,
+  trails: () => [...noteKeys.all, 'trail'] as const,
+  trail: (sessionId: string, includeArchived: boolean) =>
+    [...noteKeys.trails(), sessionId, includeArchived] as const,
 }
 
 // 默认缓存时间: 5 分钟
@@ -121,4 +133,122 @@ export function useNoteDetail(id: number | null) {
     refetch: query.refetch,
     ...mutations,
   }
+}
+
+// ==================== 研究记录相关 Hooks ====================
+
+/**
+ * Hook for recording notes (observation, hypothesis, finding)
+ */
+export function useRecordNote() {
+  const queryClient = useQueryClient()
+
+  const invalidateNotes = () => {
+    queryClient.invalidateQueries({ queryKey: noteKeys.all })
+  }
+
+  const recordObservation = useMutation({
+    mutationFn: (request: ObservationCreate) => noteApi.recordObservation(request),
+    onSuccess: () => {
+      invalidateNotes()
+    },
+  })
+
+  const recordHypothesis = useMutation({
+    mutationFn: (request: HypothesisCreate) => noteApi.recordHypothesis(request),
+    onSuccess: () => {
+      invalidateNotes()
+    },
+  })
+
+  const recordFinding = useMutation({
+    mutationFn: (request: FindingCreate) => noteApi.recordFinding(request),
+    onSuccess: () => {
+      invalidateNotes()
+    },
+  })
+
+  return {
+    recordObservation,
+    recordHypothesis,
+    recordFinding,
+  }
+}
+
+/**
+ * Hook to record a specific type of note
+ */
+export function useRecordNoteByType(noteType: NoteType) {
+  const { recordObservation, recordHypothesis, recordFinding } = useRecordNote()
+
+  switch (noteType) {
+    case 'observation':
+      return recordObservation
+    case 'hypothesis':
+      return recordHypothesis
+    case 'finding':
+      return recordFinding
+    default:
+      return recordObservation
+  }
+}
+
+/**
+ * Hook to fetch research trail by session id
+ */
+export function useResearchTrail(sessionId: string | null, includeArchived = false) {
+  return useQuery({
+    queryKey: noteKeys.trail(sessionId ?? '', includeArchived),
+    queryFn: () => noteApi.getResearchTrail(sessionId!, includeArchived),
+    enabled: sessionId !== null && sessionId.length > 0,
+    staleTime: DEFAULT_STALE_TIME,
+  })
+}
+
+/**
+ * Hook for archive/unarchive operations
+ */
+export function useNoteArchive() {
+  const queryClient = useQueryClient()
+
+  const invalidateNotes = () => {
+    queryClient.invalidateQueries({ queryKey: noteKeys.all })
+  }
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: number) => noteApi.archive(id),
+    onSuccess: (data) => {
+      queryClient.setQueryData(noteKeys.detail(data.id), data)
+      invalidateNotes()
+    },
+  })
+
+  const unarchiveMutation = useMutation({
+    mutationFn: (id: number) => noteApi.unarchive(id),
+    onSuccess: (data) => {
+      queryClient.setQueryData(noteKeys.detail(data.id), data)
+      invalidateNotes()
+    },
+  })
+
+  return {
+    archive: archiveMutation,
+    unarchive: unarchiveMutation,
+  }
+}
+
+/**
+ * Hook to promote note to experience
+ */
+export function usePromoteToExperience() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: number; request: PromoteRequest }) =>
+      noteApi.promoteToExperience(id, request),
+    onSuccess: (data) => {
+      queryClient.setQueryData(noteKeys.detail(data.id), data)
+      queryClient.invalidateQueries({ queryKey: noteKeys.all })
+    },
+  })
 }

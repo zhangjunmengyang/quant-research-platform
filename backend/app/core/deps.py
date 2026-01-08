@@ -95,6 +95,12 @@ def get_note_service():
     return registry.get("note_service")
 
 
+def get_experience_service():
+    """Get ExperienceService singleton instance."""
+    from domains.experience_hub.services import get_experience_service as _get_service
+    return _get_service()
+
+
 # ============================================================================
 # Resource existence validators
 # ============================================================================
@@ -158,6 +164,18 @@ async def get_note_or_404(
     用作路由依赖注入，自动处理 404 错误。
     """
     return await _get_or_404_async(service.get_note, note_id, "笔记")
+
+
+async def get_experience_or_404(
+    experience_id: Annotated[int, Path(description="经验ID")],
+    service=Depends(get_experience_service),
+):
+    """
+    验证经验存在并返回经验对象。
+
+    用作路由依赖注入，自动处理 404 错误。
+    """
+    return await _get_or_404_async(service.get_experience, experience_id, "经验")
 
 
 # ============================================================================

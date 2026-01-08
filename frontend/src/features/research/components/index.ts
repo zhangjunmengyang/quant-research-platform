@@ -3,4 +3,3 @@
  */
 
 export { PDFViewer } from './PDFViewer'
-export { ModelSelector } from './ModelSelector'

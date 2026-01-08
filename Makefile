@@ -203,7 +203,7 @@ _start_local: _ensure_deps _check_ports
 			exit 1; \
 		fi; \
 	fi
-	@echo "[3/5] 启动 MCP 服务..."
+	@echo "[3/6] 启动 MCP 服务..."
 	@PYTHONPATH=backend DATABASE_URL=postgresql://quant:quant123@localhost:5432/quant \
 		REDIS_URL=redis://localhost:6379 LOG_LEVEL=$(LOG_LEVEL) LOG_FORMAT=$(LOG_FORMAT) \
 		nohup uv run python -m domains.factor_hub.api.mcp.server \
@@ -221,11 +221,12 @@ _start_local: _ensure_deps _check_ports
 		nohup uv run python -m domains.note_hub.api.mcp.server \
 		> $(PID_DIR)/mcp-note.log 2>&1 & echo $$! > $(PID_DIR)/mcp-note.pid
 	@sleep 1
-	@echo "[4/5] 启动前端..."
+	@echo "[4/6] 启动前端..."
 	@nohup sh -c 'cd frontend && exec pnpm dev' > $(PID_DIR)/frontend.log 2>&1 & echo $$! > $(PID_DIR)/frontend.pid
 	@sleep 2
-	@echo "[5/5] 验证服务状态..."
+	@echo "[5/6] 验证服务状态..."
 	@$(MAKE) _healthcheck_local || echo "  [!] 部分服务可能仍在启动中，请稍后运行 make healthcheck local"
+	@echo "[6/6] 完成"
 
 _start_dev: _check_tools _check_docker_ports
 	@echo "========== 启动 Docker 开发环境 =========="

@@ -20,7 +20,10 @@ const NotesList = () => import('@/pages/notes/List')
 const NotesDetail = () => import('@/pages/notes/Detail')
 
 const ResearchList = () => import('@/pages/research/List')
-const ResearchChat = () => import('@/pages/research/Chat')
+const ResearchDetail = () => import('@/pages/research/Detail')
+const ResearchSearch = () => import('@/pages/research/Search')
+
+const ExperiencesDashboard = () => import('@/pages/experiences/Dashboard')
 
 const LogsExplorer = () => import('@/pages/logs/Explorer')
 
@@ -71,7 +74,8 @@ export const router = createBrowserRouter([
         path: 'research',
         children: [
           { index: true, lazy: ResearchList },
-          { path: ':id/chat', lazy: ResearchChat },
+          { path: 'search', lazy: ResearchSearch },
+          { path: ':id', lazy: ResearchDetail },
         ],
       },
       // Notes Hub
@@ -81,6 +85,11 @@ export const router = createBrowserRouter([
           { index: true, lazy: NotesList },
           { path: ':id', lazy: NotesDetail },
         ],
+      },
+      // Experience Hub
+      {
+        path: 'experiences',
+        children: [{ index: true, lazy: ExperiencesDashboard }],
       },
       // Logs Hub
       {

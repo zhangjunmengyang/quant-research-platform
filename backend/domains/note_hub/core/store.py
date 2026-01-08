@@ -3,6 +3,11 @@
 
 提供笔记的持久化存储和查询功能。
 继承 mcp_core.BaseStore，复用连接管理和通用 CRUD。
+
+Note Hub 定位为"研究草稿/临时记录"层，支持：
+- 笔记类型分类（observation/hypothesis/finding/trail）
+- 研究会话追踪
+- 归档管理
 """
 
 import logging
@@ -18,7 +23,7 @@ from domains.mcp_core.base.store import (
 )
 from domains.mcp_core.database.query_builder import QueryBuilder
 
-from .models import Note
+from .models import Note, NoteType
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +40,11 @@ class NoteStore(BaseStore[Note]):
 
     allowed_columns = {
         'id', 'title', 'content', 'tags', 'source', 'source_ref',
+        'note_type', 'research_session_id', 'promoted_to_experience_id', 'is_archived',
         'created_at', 'updated_at'
     }
 
-    numeric_fields = {'id'}
+    numeric_fields = {'id', 'promoted_to_experience_id'}
 
     # 向后兼容别名
     ALLOWED_COLUMNS = allowed_columns
@@ -89,12 +95,15 @@ class NoteStore(BaseStore[Note]):
                 cursor.execute('''
                     INSERT INTO notes (
                         title, content, tags, source, source_ref,
+                        note_type, research_session_id, promoted_to_experience_id, is_archived,
                         created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 ''', (
                     note.title, note.content, note.tags, note.source,
-                    note.source_ref, note.created_at, note.updated_at
+                    note.source_ref, note.note_type, note.research_session_id,
+                    note.promoted_to_experience_id, note.is_archived,
+                    note.created_at, note.updated_at
                 ))
                 result = cursor.fetchone()
                 return result['id'] if result else None
@@ -138,6 +147,10 @@ class NoteStore(BaseStore[Note]):
         search: Optional[str] = None,
         tags: Optional[List[str]] = None,
         source: Optional[str] = None,
+        note_type: Optional[str] = None,
+        research_session_id: Optional[str] = None,
+        is_archived: Optional[bool] = None,
+        is_promoted: Optional[bool] = None,
         order_by: str = "updated_at DESC",
         limit: int = 50,
         offset: int = 0
@@ -149,6 +162,10 @@ class NoteStore(BaseStore[Note]):
             search: 搜索关键词（标题和内容）
             tags: 标签筛选
             source: 来源筛选
+            note_type: 笔记类型筛选
+            research_session_id: 研究会话 ID 筛选
+            is_archived: 归档状态筛选
+            is_promoted: 是否已提炼为经验
             order_by: 排序
             limit: 限制数量
             offset: 偏移量
@@ -170,6 +187,21 @@ class NoteStore(BaseStore[Note]):
 
         if source:
             builder.where("source", source)
+
+        if note_type:
+            builder.where("note_type", note_type)
+
+        if research_session_id:
+            builder.where("research_session_id", research_session_id)
+
+        if is_archived is not None:
+            builder.where("is_archived", is_archived)
+
+        if is_promoted is not None:
+            if is_promoted:
+                builder.where_raw("promoted_to_experience_id IS NOT NULL", [])
+            else:
+                builder.where_raw("promoted_to_experience_id IS NULL", [])
 
         # 先获取总数
         count_sql, count_params = builder.build_count()
@@ -221,6 +253,150 @@ class NoteStore(BaseStore[Note]):
         with self._cursor() as cursor:
             cursor.execute('SELECT COUNT(*) as count FROM notes')
             return cursor.fetchone()['count']
+
+    # ==================== 研究轨迹操作 ====================
+
+    def get_research_trail(
+        self,
+        research_session_id: str,
+        include_archived: bool = False
+    ) -> List[Note]:
+        """
+        获取研究轨迹
+
+        根据研究会话 ID 获取该会话中的所有笔记，按时间排序。
+
+        Args:
+            research_session_id: 研究会话 ID
+            include_archived: 是否包含已归档的笔记
+
+        Returns:
+            按创建时间排序的笔记列表
+        """
+        with self._cursor() as cursor:
+            if include_archived:
+                cursor.execute(
+                    '''SELECT * FROM notes
+                    WHERE research_session_id = %s
+                    ORDER BY created_at ASC''',
+                    (research_session_id,)
+                )
+            else:
+                cursor.execute(
+                    '''SELECT * FROM notes
+                    WHERE research_session_id = %s AND is_archived = FALSE
+                    ORDER BY created_at ASC''',
+                    (research_session_id,)
+                )
+            return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+
+    def get_by_type(
+        self,
+        note_type: str,
+        limit: int = 50,
+        include_archived: bool = False
+    ) -> List[Note]:
+        """
+        按类型获取笔记
+
+        Args:
+            note_type: 笔记类型
+            limit: 限制数量
+            include_archived: 是否包含已归档的笔记
+
+        Returns:
+            笔记列表
+        """
+        with self._cursor() as cursor:
+            if include_archived:
+                cursor.execute(
+                    '''SELECT * FROM notes
+                    WHERE note_type = %s
+                    ORDER BY updated_at DESC
+                    LIMIT %s''',
+                    (note_type, limit)
+                )
+            else:
+                cursor.execute(
+                    '''SELECT * FROM notes
+                    WHERE note_type = %s AND is_archived = FALSE
+                    ORDER BY updated_at DESC
+                    LIMIT %s''',
+                    (note_type, limit)
+                )
+            return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+
+    def archive(self, note_id: int) -> bool:
+        """归档笔记"""
+        return self.update(note_id, is_archived=True)
+
+    def unarchive(self, note_id: int) -> bool:
+        """取消归档笔记"""
+        return self.update(note_id, is_archived=False)
+
+    def set_promoted(self, note_id: int, experience_id: int) -> bool:
+        """标记笔记已提炼为经验"""
+        return self.update(note_id, promoted_to_experience_id=experience_id)
+
+    def get_stats_extended(self) -> Dict[str, Any]:
+        """
+        获取扩展统计信息
+
+        Returns:
+            包含各类型笔记数量、归档数量等的统计字典
+        """
+        with self._cursor() as cursor:
+            # 总数
+            cursor.execute('SELECT COUNT(*) as count FROM notes')
+            total = cursor.fetchone()['count']
+
+            # 按类型统计
+            cursor.execute('''
+                SELECT note_type, COUNT(*) as count
+                FROM notes
+                GROUP BY note_type
+            ''')
+            type_counts = {row['note_type']: row['count'] for row in cursor.fetchall()}
+
+            # 归档统计
+            cursor.execute('''
+                SELECT is_archived, COUNT(*) as count
+                FROM notes
+                GROUP BY is_archived
+            ''')
+            archive_rows = cursor.fetchall()
+            archived_count = 0
+            active_count = 0
+            for row in archive_rows:
+                if row['is_archived']:
+                    archived_count = row['count']
+                else:
+                    active_count = row['count']
+
+            # 已提炼为经验的笔记数
+            cursor.execute('''
+                SELECT COUNT(*) as count
+                FROM notes
+                WHERE promoted_to_experience_id IS NOT NULL
+            ''')
+            promoted_count = cursor.fetchone()['count']
+
+            # 研究会话数
+            cursor.execute('''
+                SELECT COUNT(DISTINCT research_session_id) as count
+                FROM notes
+                WHERE research_session_id IS NOT NULL
+            ''')
+            session_count = cursor.fetchone()['count']
+
+        return {
+            "total": total,
+            "active_count": active_count,
+            "archived_count": archived_count,
+            "promoted_count": promoted_count,
+            "session_count": session_count,
+            "by_type": type_counts,
+        }
 
 
 # ==================== 单例管理 ====================

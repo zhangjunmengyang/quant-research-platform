@@ -14,8 +14,24 @@ import {
   Calendar,
   Trash2,
   Save,
+  Eye,
+  Lightbulb,
+  FlaskConical,
+  Archive,
+  ArchiveRestore,
+  Star,
+  ChevronDown,
 } from 'lucide-react'
-import { useNotes, useNoteMutations, useNoteTags } from '@/features/note'
+import {
+  useNotes,
+  useNoteMutations,
+  useNoteTags,
+  useRecordNote,
+  useNoteArchive,
+  NoteType,
+  NOTE_TYPE_LABELS,
+  NOTE_TYPE_COLORS,
+} from '@/features/note'
 import type { Note, NoteListParams } from '@/features/note'
 import { cn } from '@/lib/utils'
 import {
@@ -25,22 +41,67 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+
+// 归档状态筛选选项
+type ArchiveFilter = 'active' | 'archived' | 'all'
+
+const ARCHIVE_FILTER_LABELS: Record<ArchiveFilter, string> = {
+  active: '活跃笔记',
+  archived: '已归档',
+  all: '全部',
+}
+
+// 快速记录类型配置
+const QUICK_RECORD_TYPES = [
+  {
+    type: NoteType.OBSERVATION,
+    label: '记录观察',
+    icon: Eye,
+    description: '对数据或现象的客观记录',
+  },
+  {
+    type: NoteType.HYPOTHESIS,
+    label: '记录假设',
+    icon: Lightbulb,
+    description: '基于观察提出的待验证假设',
+  },
+  {
+    type: NoteType.FINDING,
+    label: '记录发现',
+    icon: FlaskConical,
+    description: '验证后的结论或发现',
+  },
+]
 
 export function Component() {
   const navigate = useNavigate()
   const [params, setParams] = useState<NoteListParams>({ page: 1, page_size: 20 })
   const [searchInput, setSearchInput] = useState('')
-  const { data, isLoading, isError, error } = useNotes(params)
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active')
+  const { data, isLoading, isError, error } = useNotes({
+    ...params,
+    is_archived: archiveFilter === 'all' ? undefined : archiveFilter === 'archived',
+  })
   const { data: tags = [] } = useNoteTags()
   const { createNote, deleteNote } = useNoteMutations()
+  const { recordObservation, recordHypothesis, recordFinding } = useRecordNote()
+  const { archive, unarchive } = useNoteArchive()
 
   // Dialog state for creating new note
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [dialogType, setDialogType] = useState<NoteType>(NoteType.GENERAL)
   const [newTitle, setNewTitle] = useState('')
   const [newTags, setNewTags] = useState('')
   const [newContent, setNewContent] = useState('')
 
-  const handleOpenDialog = () => {
+  const handleOpenDialog = (type: NoteType = NoteType.GENERAL) => {
+    setDialogType(type)
     setNewTitle('')
     setNewTags('')
     setNewContent('')
@@ -61,12 +122,30 @@ export function Component() {
     }
 
     try {
-      await createNote.mutateAsync({
+      const noteData = {
         title: newTitle.trim(),
         content: newContent,
         tags: newTags,
         source: 'manual',
-      })
+      }
+
+      // 根据类型调用不同的 API
+      switch (dialogType) {
+        case NoteType.OBSERVATION:
+          await recordObservation.mutateAsync(noteData)
+          break
+        case NoteType.HYPOTHESIS:
+          await recordHypothesis.mutateAsync(noteData)
+          break
+        case NoteType.FINDING:
+          await recordFinding.mutateAsync(noteData)
+          break
+        default:
+          await createNote.mutateAsync({
+            ...noteData,
+            note_type: dialogType,
+          })
+      }
       handleCloseDialog()
     } catch (err) {
       console.error('Create note failed:', err)
@@ -82,15 +161,34 @@ export function Component() {
     setParams({ ...params, tags: tag, page: 1 })
   }
 
+  const handleNoteTypeFilter = (noteType: NoteType | undefined) => {
+    setParams({ ...params, note_type: noteType, page: 1 })
+  }
+
+  const handleArchiveFilterChange = (filter: ArchiveFilter) => {
+    setArchiveFilter(filter)
+    setParams({ ...params, page: 1 })
+  }
+
   const handleClearFilter = () => {
     setParams({ page: 1, page_size: 20 })
     setSearchInput('')
+    setArchiveFilter('active')
   }
 
   const handleDelete = async (e: React.MouseEvent, note: Note) => {
     e.stopPropagation()
-    if (confirm(`确定要删除笔记「${note.title}」吗?`)) {
+    if (confirm(`确定要删除笔记"${note.title}"吗?`)) {
       await deleteNote.mutateAsync(note.id)
+    }
+  }
+
+  const handleArchiveToggle = async (e: React.MouseEvent, note: Note) => {
+    e.stopPropagation()
+    if (note.is_archived) {
+      await unarchive.mutateAsync(note.id)
+    } else {
+      await archive.mutateAsync(note.id)
     }
   }
 
@@ -103,6 +201,14 @@ export function Component() {
       day: '2-digit',
     })
   }
+
+  const isCreating =
+    createNote.isPending ||
+    recordObservation.isPending ||
+    recordHypothesis.isPending ||
+    recordFinding.isPending
+
+  const hasActiveFilters = params.search || params.tags || params.note_type || archiveFilter !== 'active'
 
   if (isLoading) {
     return (
@@ -131,13 +237,48 @@ export function Component() {
             共 {data?.total ?? 0} 条笔记
           </p>
         </div>
-        <button
-          onClick={handleOpenDialog}
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          新建笔记
-        </button>
+        <div className="flex items-center gap-2">
+          {/* 快速记录下拉菜单 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">
+                快速记录
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {QUICK_RECORD_TYPES.map((item) => {
+                const Icon = item.icon
+                const colors = NOTE_TYPE_COLORS[item.type]
+                return (
+                  <DropdownMenuItem
+                    key={item.type}
+                    onClick={() => handleOpenDialog(item.type)}
+                    className="flex flex-col items-start gap-1 py-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={cn('rounded p-1', colors.bg)}>
+                        <Icon className={cn('h-4 w-4', colors.text)} />
+                      </div>
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground pl-7">
+                      {item.description}
+                    </span>
+                  </DropdownMenuItem>
+                )
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button
+            onClick={() => handleOpenDialog(NoteType.GENERAL)}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            新建笔记
+          </button>
+        </div>
       </div>
 
       {/* Search and Filter */}
@@ -160,7 +301,7 @@ export function Component() {
           >
             搜索
           </button>
-          {(params.search || params.tags) && (
+          {hasActiveFilters && (
             <button
               onClick={handleClearFilter}
               className="rounded-md border px-4 py-2 text-sm hover:bg-muted"
@@ -168,6 +309,62 @@ export function Component() {
               清除筛选
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* 笔记类型筛选 */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">类型:</span>
+          <div className="flex gap-1">
+            <button
+              onClick={() => handleNoteTypeFilter(undefined)}
+              className={cn(
+                'rounded-md px-3 py-1 text-xs transition-colors',
+                !params.note_type
+                  ? 'bg-primary text-primary-foreground'
+                  : 'border hover:bg-muted'
+              )}
+            >
+              全部
+            </button>
+            {Object.values(NoteType).map((type) => (
+              <button
+                key={type}
+                onClick={() => handleNoteTypeFilter(type)}
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs transition-colors',
+                  params.note_type === type
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border hover:bg-muted'
+                )}
+              >
+                {NOTE_TYPE_LABELS[type]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 归档状态筛选 */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">状态:</span>
+          <div className="flex gap-1">
+            {(Object.keys(ARCHIVE_FILTER_LABELS) as ArchiveFilter[]).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => handleArchiveFilterChange(filter)}
+                className={cn(
+                  'rounded-md px-3 py-1 text-xs transition-colors',
+                  archiveFilter === filter
+                    ? 'bg-primary text-primary-foreground'
+                    : 'border hover:bg-muted'
+                )}
+              >
+                {ARCHIVE_FILTER_LABELS[filter]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -197,10 +394,10 @@ export function Component() {
           <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed">
             <FileText className="h-12 w-12 text-muted-foreground/50" />
             <p className="mt-4 text-muted-foreground">
-              {params.search || params.tags ? '没有匹配的笔记' : '还没有笔记'}
+              {hasActiveFilters ? '没有匹配的笔记' : '还没有笔记'}
             </p>
             <button
-              onClick={handleOpenDialog}
+              onClick={() => handleOpenDialog(NoteType.GENERAL)}
               className="mt-4 flex items-center gap-2 text-sm text-primary hover:underline"
             >
               <Plus className="h-4 w-4" />
@@ -208,41 +405,89 @@ export function Component() {
             </button>
           </div>
         ) : (
-          data?.items.map((note) => (
-            <div
-              key={note.id}
-              onClick={() => navigate(`/notes/${note.id}`)}
-              className="group cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium truncate">{note.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                    {note.content?.slice(0, 200) || '(空内容)'}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {note.tags && (
+          data?.items.map((note) => {
+            const typeColors = NOTE_TYPE_COLORS[note.note_type] || NOTE_TYPE_COLORS[NoteType.GENERAL]
+            return (
+              <div
+                key={note.id}
+                onClick={() => navigate(`/notes/${note.id}`)}
+                className={cn(
+                  'group cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50',
+                  note.is_archived && 'opacity-60'
+                )}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      {/* 笔记类型标签 */}
+                      <span
+                        className={cn(
+                          'inline-flex items-center rounded px-2 py-0.5 text-xs border',
+                          typeColors.bg,
+                          typeColors.text,
+                          typeColors.border
+                        )}
+                      >
+                        {NOTE_TYPE_LABELS[note.note_type] || NOTE_TYPE_LABELS[NoteType.GENERAL]}
+                      </span>
+                      {/* 已提炼为经验标记 */}
+                      {note.promoted_to_experience_id && (
+                        <span className="inline-flex items-center gap-1 rounded bg-yellow-50 px-2 py-0.5 text-xs text-yellow-700 border border-yellow-200">
+                          <Star className="h-3 w-3" />
+                          已提炼
+                        </span>
+                      )}
+                      {/* 归档标记 */}
+                      {note.is_archived && (
+                        <span className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                          <Archive className="h-3 w-3" />
+                          已归档
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="font-medium truncate">{note.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                      {note.content?.slice(0, 200) || '(空内容)'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      {note.tags && (
+                        <div className="flex items-center gap-1">
+                          <Tag className="h-3 w-3" />
+                          <span>{note.tags}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-1">
-                        <Tag className="h-3 w-3" />
-                        <span>{note.tags}</span>
+                        <Calendar className="h-3 w-3" />
+                        <span>{formatDate(note.updated_at)}</span>
                       </div>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{formatDate(note.updated_at)}</span>
                     </div>
                   </div>
+                  <div className="ml-4 flex items-center gap-1">
+                    {/* 归档/取消归档按钮 */}
+                    <button
+                      onClick={(e) => handleArchiveToggle(e, note)}
+                      className="rounded p-2 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                      title={note.is_archived ? '取消归档' : '归档'}
+                    >
+                      {note.is_archived ? (
+                        <ArchiveRestore className="h-4 w-4" />
+                      ) : (
+                        <Archive className="h-4 w-4" />
+                      )}
+                    </button>
+                    {/* 删除按钮 */}
+                    <button
+                      onClick={(e) => handleDelete(e, note)}
+                      className="rounded p-2 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                      title="删除"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={(e) => handleDelete(e, note)}
-                  className="ml-4 rounded p-2 opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                  title="删除"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -273,7 +518,21 @@ export function Component() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>新建笔记</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {dialogType !== NoteType.GENERAL && (
+                <span
+                  className={cn(
+                    'inline-flex items-center rounded px-2 py-0.5 text-sm border',
+                    NOTE_TYPE_COLORS[dialogType].bg,
+                    NOTE_TYPE_COLORS[dialogType].text,
+                    NOTE_TYPE_COLORS[dialogType].border
+                  )}
+                >
+                  {NOTE_TYPE_LABELS[dialogType]}
+                </span>
+              )}
+              {dialogType === NoteType.GENERAL ? '新建笔记' : `记录${NOTE_TYPE_LABELS[dialogType]}`}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -282,7 +541,7 @@ export function Component() {
                 type="text"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="输入笔记标题..."
+                placeholder={`输入${NOTE_TYPE_LABELS[dialogType]}标题...`}
                 className="w-full rounded-md border bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 autoFocus
               />
@@ -302,7 +561,7 @@ export function Component() {
               <textarea
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
-                placeholder="输入笔记内容..."
+                placeholder={`输入${NOTE_TYPE_LABELS[dialogType]}内容...`}
                 rows={10}
                 className="w-full resize-none rounded-md border bg-background px-4 py-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
@@ -317,10 +576,10 @@ export function Component() {
             </button>
             <button
               onClick={handleCreateNote}
-              disabled={createNote.isPending}
+              disabled={isCreating}
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              {createNote.isPending ? (
+              {isCreating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />

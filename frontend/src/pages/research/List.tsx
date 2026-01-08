@@ -3,7 +3,8 @@
  * 研报列表页 - 展示所有研报，支持上传和管理
  */
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FileText,
   Upload,
@@ -17,7 +18,8 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  MessageSquare,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react'
 import { useReports, useReportMutations, useProcessingStatus } from '@/features/research'
 import type { Report, ReportListParams, ReportStatus } from '@/features/research'
@@ -32,6 +34,7 @@ import {
 } from '@/components/ui/dialog'
 
 export function Component() {
+  const navigate = useNavigate()
   const [params, setParams] = useState<ReportListParams>({ page: 1, page_size: 20 })
   const [searchInput, setSearchInput] = useState('')
   const { data, isLoading, isError, error, refetch } = useReports(params)
@@ -186,6 +189,13 @@ export function Component() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => navigate('/research/search')}
+            className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted"
+          >
+            <Sparkles className="h-4 w-4" />
+            语义搜索
+          </button>
+          <button
             onClick={() => setIsScanOpen(true)}
             className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted"
           >
@@ -286,12 +296,16 @@ export function Component() {
           data?.items.map((report) => (
             <div
               key={report.id}
-              className="group rounded-lg border p-4 transition-colors hover:bg-muted/50"
+              onClick={() => navigate(`/research/${report.id}`)}
+              className="group cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3">
-                    <h3 className="font-medium truncate">{report.title}</h3>
+                    <h3 className="font-medium truncate flex items-center gap-1">
+                      {report.title}
+                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50" />
+                    </h3>
                     <span
                       className={cn(
                         'flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
@@ -330,7 +344,10 @@ export function Component() {
                 <div className="ml-4 flex items-center gap-2">
                   {(report.status === 'uploaded' || report.status === 'failed') && (
                     <button
-                      onClick={() => handleProcess(report)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleProcess(report)
+                      }}
                       disabled={process.isPending}
                       className="rounded p-2 hover:bg-primary/10 hover:text-primary"
                       title={report.status === 'failed' ? '重新处理' : '开始处理'}
@@ -340,17 +357,6 @@ export function Component() {
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
-                    </button>
-                  )}
-                  {report.status === 'ready' && (
-                    <button
-                      onClick={() => {
-                        window.location.href = `/research/${report.id}/chat`
-                      }}
-                      className="rounded p-2 hover:bg-primary/10 hover:text-primary"
-                      title="开始对话"
-                    >
-                      <MessageSquare className="h-4 w-4" />
                     </button>
                   )}
                   <button

@@ -8,6 +8,7 @@ import {
   FileText,
   FileTextIcon,
   FlaskConical,
+  Lightbulb,
   Play,
   Server,
   Sparkles,
@@ -55,9 +56,15 @@ const navigation: NavGroup[] = [
     ],
   },
   {
+    title: '笔记库',
+    items: [
+      { label: '笔记概览', href: '/notes', icon: BookOpen },
+    ],
+  },
+  {
     title: '经验库',
     items: [
-      { label: '经验概览', href: '/notes', icon: BookOpen },
+      { label: '经验概览', href: '/experiences', icon: Lightbulb },
     ],
   },
   {
