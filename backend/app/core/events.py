@@ -17,22 +17,22 @@ def create_start_handler() -> Callable:
     """Create startup event handler."""
 
     async def start_app() -> None:
-        logger.info("Starting Quant Platform API...")
+        logger.info("api_starting", component="api")
 
         # Initialize log store for PostgreSQL logging
         try:
             await init_log_store()
-            logger.info("Log store initialized")
+            logger.info("log_store_initialized", component="log_store")
         except Exception as e:
-            logger.warning(f"Log store init skipped: {e}")
+            logger.warning("log_store_init_skipped", component="log_store", error=str(e))
 
         # Initialize SSE task manager (background cleanup)
         try:
             task_manager = get_task_manager()
             await task_manager.start()
-            logger.info("SSE task manager initialized")
+            logger.info("sse_task_manager_initialized", component="sse")
         except Exception as e:
-            logger.warning(f"SSE task manager init skipped: {e}")
+            logger.warning("sse_task_manager_init_skipped", component="sse", error=str(e))
 
         # 注册并初始化核心服务
         try:
@@ -44,28 +44,42 @@ def create_start_handler() -> Callable:
             # Sync factor code from files to database
             sync_stats = factor_store.sync_code_from_files()
             logger.info(
-                f"Factor code synced: {sync_stats.get('created', 0)} created, "
-                f"{sync_stats.get('updated', 0)} updated, "
-                f"{sync_stats.get('unchanged', 0)} unchanged"
+                "factor_code_synced",
+                component="factor_store",
+                created=sync_stats.get("created", 0),
+                updated=sync_stats.get("updated", 0),
+                unchanged=sync_stats.get("unchanged", 0),
             )
 
             stats = factor_store.get_stats()
-            logger.info(f"Factor store initialized: {stats.get('total', 0)} factors")
+            logger.info(
+                "factor_store_initialized",
+                component="factor_store",
+                total_factors=stats.get("total", 0),
+            )
 
             # Initialize data loader (optional, may fail if data not present)
             try:
                 loader = registry.get("data_loader")
                 symbols = loader.get_symbols()
-                logger.info(f"Data loader initialized: {len(symbols)} symbols")
+                logger.info(
+                    "data_loader_initialized",
+                    component="data_loader",
+                    symbol_count=len(symbols),
+                )
             except Exception as e:
-                logger.warning(f"Data loader init skipped: {e}")
+                logger.warning("data_loader_init_skipped", component="data_loader", error=str(e))
 
-            logger.info(f"Services initialized: {registry.initialized_services}")
+            logger.info(
+                "services_initialized",
+                component="registry",
+                services=registry.initialized_services,
+            )
 
         except Exception as e:
-            logger.error(f"Service initialization error: {e}")
+            logger.error("service_initialization_error", component="registry", error=str(e))
 
-        logger.info("Quant Platform API started successfully")
+        logger.info("api_started", component="api", status="success")
 
     return start_app
 
@@ -74,30 +88,30 @@ def create_stop_handler() -> Callable:
     """Create shutdown event handler."""
 
     async def stop_app() -> None:
-        logger.info("Shutting down Quant Platform API...")
+        logger.info("api_stopping", component="api")
 
         # Stop SSE task manager
         try:
             task_manager = get_task_manager()
             await task_manager.stop()
-            logger.info("SSE task manager shutdown complete")
+            logger.info("sse_task_manager_stopped", component="sse")
         except Exception as e:
-            logger.warning(f"SSE task manager shutdown error: {e}")
+            logger.warning("sse_task_manager_stop_error", component="sse", error=str(e))
 
         # Shutdown log store (flush pending logs)
         try:
             await shutdown_log_store()
-            logger.info("Log store shutdown complete")
+            logger.info("log_store_stopped", component="log_store")
         except Exception as e:
-            logger.warning(f"Log store shutdown error: {e}")
+            logger.warning("log_store_stop_error", component="log_store", error=str(e))
 
         # 使用 ServiceRegistry 统一关闭所有服务
         try:
             registry = get_service_registry()
             await registry.shutdown()
         except Exception as e:
-            logger.warning(f"Service registry shutdown error: {e}")
+            logger.warning("service_registry_stop_error", component="registry", error=str(e))
 
-        logger.info("Quant Platform API shutdown complete")
+        logger.info("api_stopped", component="api", status="success")
 
     return stop_app

@@ -225,10 +225,10 @@ async def get_field_values(
 
     try:
         values = await store.get_field_values(topic=topic, field_name=field_name, limit=limit)
-        # values 是字符串列表
+        # values 现在是 [{"value": "xxx", "count": 10}, ...] 格式
         return LogFieldValues(
             field=field_name,
-            values=[{"value": v, "count": 1} for v in values],
+            values=values,
         )
     except Exception as e:
         logger.error("log_field_values_error", error=str(e), field=field_name)

@@ -14,6 +14,8 @@ Streamable HTTP 传输层
     run_streamable_http_server(server)
 """
 
+import json
+import time
 import logging
 import uuid
 from typing import Optional
@@ -30,6 +32,35 @@ import mcp.types as types
 
 from .server import BaseMCPServer
 from ..config import MCPConfig
+
+# 延迟导入日志模块（避免循环导入）
+_logger = None
+_mcp_logger = None
+
+
+def get_server_logger():
+    """获取服务器 logger (使用 structlog)"""
+    global _logger
+    if _logger is None:
+        try:
+            from ..logging import get_logger
+            _logger = get_logger(__name__)
+        except ImportError:
+            _logger = logging.getLogger(__name__)
+    return _logger
+
+
+def get_mcp_request_logger():
+    """获取 MCP 请求日志记录器"""
+    global _mcp_logger
+    if _mcp_logger is None:
+        try:
+            from ..observability.mcp_logger import get_mcp_logger
+            _mcp_logger = get_mcp_logger()
+        except ImportError:
+            _mcp_logger = None
+    return _mcp_logger
+
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +83,71 @@ class MCPServerAdapter:
         # 注册处理器
         self._register_handlers()
 
+    def _log_mcp_request(
+        self,
+        method: str,
+        tool_name: str = "",
+        tool_arguments: Optional[dict] = None,
+        resource_uri: str = "",
+        start_time: float = 0,
+        success: bool = True,
+        error_message: str = "",
+        response_data: Optional[dict] = None,
+    ):
+        """记录 MCP 请求日志"""
+        slog = get_server_logger()
+        duration_ms = (time.time() - start_time) * 1000 if start_time else 0
+
+        # 构造日志数据
+        log_data = {
+            "method": method,
+            "status": "success" if success else "failed",
+            "duration_ms": round(duration_ms, 2),
+            "server_name": self.config.server_name,
+            "server_port": self.config.port,
+            "client_ip": "",  # Streamable HTTP 没有直接的 request 对象
+            "tool_name": tool_name,
+            "tool_arguments": json.dumps(tool_arguments, ensure_ascii=False) if tool_arguments else "",
+            "resource_uri": resource_uri,
+            "error_message": error_message,
+        }
+
+        # 添加响应摘要
+        if response_data:
+            log_data["response_data"] = json.dumps(response_data, ensure_ascii=False)[:2000]
+            log_data["response_summary"] = self._make_response_summary(method, tool_name, response_data)
+
+        # 使用 structlog 记录
+        if success:
+            slog.info("mcp_request", **log_data)
+        else:
+            slog.warning("mcp_request", **log_data)
+
+    def _make_response_summary(self, method: str, tool_name: str, data: dict) -> str:
+        """生成响应摘要"""
+        if method == "tools/list":
+            tool_count = data.get("tool_count", 0)
+            return f"返回 {tool_count} 个工具"
+        elif method == "tools/call":
+            if "error" in data:
+                return f"工具调用失败: {data['error'][:100]}"
+            return f"工具 {tool_name} 执行成功"
+        elif method == "resources/list":
+            res_count = data.get("resource_count", 0)
+            return f"返回 {res_count} 个资源"
+        elif method == "resources/read":
+            return f"读取资源成功"
+        return "请求完成"
+
     def _register_handlers(self):
         """注册 MCP 协议处理器"""
 
         @self.mcp_server.list_tools()
         async def list_tools() -> list[types.Tool]:
             """列出所有可用工具"""
+            start_time = time.time()
             mcp_tools = self.base_server.tool_registry.get_mcp_tools()
-            return [
+            result = [
                 types.Tool(
                     name=t["name"],
                     description=t.get("description", ""),
@@ -68,15 +156,34 @@ class MCPServerAdapter:
                 for t in mcp_tools
             ]
 
+            # 记录日志
+            self._log_mcp_request(
+                method="tools/list",
+                start_time=start_time,
+                success=True,
+                response_data={"tool_count": len(result), "tool_names": [t["name"] for t in mcp_tools]},
+            )
+
+            return result
+
         @self.mcp_server.call_tool()
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             """调用工具"""
-            import json
+            start_time = time.time()
 
             try:
                 result = await self.base_server.tool_registry.execute(name, arguments)
 
                 if result.success:
+                    # 记录成功日志
+                    self._log_mcp_request(
+                        method="tools/call",
+                        tool_name=name,
+                        tool_arguments=arguments,
+                        start_time=start_time,
+                        success=True,
+                        response_data=result.data if isinstance(result.data, dict) else {"result": str(result.data)[:500]},
+                    )
                     return [
                         types.TextContent(
                             type="text",
@@ -84,6 +191,16 @@ class MCPServerAdapter:
                         )
                     ]
                 else:
+                    # 记录失败日志
+                    self._log_mcp_request(
+                        method="tools/call",
+                        tool_name=name,
+                        tool_arguments=arguments,
+                        start_time=start_time,
+                        success=False,
+                        error_message=result.error or "Unknown error",
+                        response_data={"error": result.error},
+                    )
                     return [
                         types.TextContent(
                             type="text",
@@ -91,6 +208,16 @@ class MCPServerAdapter:
                         )
                     ]
             except Exception as e:
+                # 记录异常日志
+                self._log_mcp_request(
+                    method="tools/call",
+                    tool_name=name,
+                    tool_arguments=arguments,
+                    start_time=start_time,
+                    success=False,
+                    error_message=str(e),
+                    response_data={"error": str(e)},
+                )
                 logger.exception(f"工具调用失败: {name}")
                 return [
                     types.TextContent(
@@ -105,8 +232,9 @@ class MCPServerAdapter:
             @self.mcp_server.list_resources()
             async def list_resources() -> list[types.Resource]:
                 """列出所有可用资源"""
+                start_time = time.time()
                 resources = self.base_server.resource_provider.list_resources()
-                return [
+                result = [
                     types.Resource(
                         uri=r.uri,
                         name=r.name,
@@ -116,13 +244,44 @@ class MCPServerAdapter:
                     for r in resources
                 ]
 
+                # 记录日志
+                self._log_mcp_request(
+                    method="resources/list",
+                    start_time=start_time,
+                    success=True,
+                    response_data={"resource_count": len(result)},
+                )
+
+                return result
+
             @self.mcp_server.read_resource()
             async def read_resource(uri: str) -> str:
                 """读取资源"""
-                content = await self.base_server.resource_provider.read_resource(uri)
-                if content is None:
-                    raise ValueError(f"资源不存在: {uri}")
-                return content.text if hasattr(content, 'text') else str(content)
+                start_time = time.time()
+                try:
+                    content = await self.base_server.resource_provider.read_resource(uri)
+                    if content is None:
+                        raise ValueError(f"资源不存在: {uri}")
+
+                    # 记录日志
+                    self._log_mcp_request(
+                        method="resources/read",
+                        resource_uri=uri,
+                        start_time=start_time,
+                        success=True,
+                        response_data={"uri": uri, "has_content": content is not None},
+                    )
+
+                    return content.text if hasattr(content, 'text') else str(content)
+                except Exception as e:
+                    self._log_mcp_request(
+                        method="resources/read",
+                        resource_uri=uri,
+                        start_time=start_time,
+                        success=False,
+                        error_message=str(e),
+                    )
+                    raise
 
         # 注册 Prompt 处理器（如果有）
         prompts = self.base_server.prompt_provider.list_prompts()
@@ -193,7 +352,18 @@ def create_streamable_http_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         """应用生命周期管理"""
-        logger.info(f"MCP Server {config.server_name} 启动中...")
+        # 初始化日志存储
+        try:
+            from ..logging.config import configure_logging, init_log_store, shutdown_log_store
+            configure_logging(service_name=f"mcp-{config.server_name}")
+            await init_log_store()
+            log_store_initialized = True
+        except Exception as e:
+            logger.warning(f"日志存储初始化失败: {e}")
+            log_store_initialized = False
+
+        slog = get_server_logger()
+        slog.info(f"MCP Server {config.server_name} 启动中...")
 
         # 启动 MCP 连接
         async with transport.connect() as (read_stream, write_stream):
@@ -213,7 +383,12 @@ def create_streamable_http_app(
             app.state.mcp_transport = transport
             app.state.mcp_task = task
 
-            logger.info(f"MCP Server {config.server_name} 已启动")
+            slog.info(
+                "mcp_server_started",
+                server_name=config.server_name,
+                port=config.port,
+                log_store=log_store_initialized,
+            )
 
             yield
 
@@ -224,7 +399,17 @@ def create_streamable_http_app(
             except asyncio.CancelledError:
                 pass
 
-            logger.info(f"MCP Server {config.server_name} 已关闭")
+            # 关闭日志存储
+            if log_store_initialized:
+                try:
+                    await shutdown_log_store()
+                except Exception as e:
+                    logger.warning(f"日志存储关闭失败: {e}")
+
+            slog.info(
+                "mcp_server_stopped",
+                server_name=config.server_name,
+            )
 
     app = FastAPI(
         title=f"{config.server_name} MCP Server",

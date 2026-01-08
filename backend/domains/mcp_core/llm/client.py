@@ -151,7 +151,7 @@ class LLMClient:
             max_tokens=actual_max_tokens,
             caller=caller,
             purpose=purpose,
-            provider="langchain",
+            provider=config.get("provider", "openai"),
         )
 
         start_time = time.time()
@@ -248,24 +248,40 @@ class LLMClient:
             max_tokens=config["max_tokens"],
             caller=caller,
             purpose=purpose,
-            provider="langchain",
+            provider=config.get("provider", "openai"),
         )
 
         start_time = time.time()
         full_content = ""
+        usage_metadata = None
 
         try:
             async for chunk in model.astream(lc_messages):
                 if hasattr(chunk, "content") and chunk.content:
                     full_content += chunk.content
+                # 尝试从最后一个 chunk 获取 usage_metadata
+                if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
+                    usage_metadata = chunk.usage_metadata
                 yield chunk
 
             duration_ms = (time.time() - start_time) * 1000
+
+            # 提取 token 使用信息
+            prompt_tokens = 0
+            completion_tokens = 0
+            total_tokens = 0
+            if usage_metadata:
+                prompt_tokens = usage_metadata.get("input_tokens", 0)
+                completion_tokens = usage_metadata.get("output_tokens", 0)
+                total_tokens = usage_metadata.get("total_tokens", 0)
 
             llm_logger.log_response(
                 call_id=call_id,
                 content=full_content,
                 finish_reason="stop",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
                 duration_ms=duration_ms,
                 success=True,
             )
@@ -322,7 +338,7 @@ class LLMClient:
             max_tokens=config["max_tokens"],
             caller=caller,
             purpose=purpose,
-            provider="langchain",
+            provider=config.get("provider", "openai"),
         )
 
         start_time = time.time()

@@ -128,6 +128,13 @@ class PostgreSQLHandler(logging.Handler):
         # MCP 相关 logger -> mcp 主题
         if "mcp_logger" in logger_name:
             topic = "mcp"
+        # MCP 服务的 streamable_http 日志 -> mcp 主题
+        elif "streamable_http" in logger_name:
+            # 如果包含 MCP 请求相关字段，归类为 mcp
+            if "tool_name" in data or "method" in data or "server_name" in data:
+                topic = "mcp"
+            else:
+                topic = "system"
         # LLM 相关 logger -> llm 主题
         elif "llm_logger" in logger_name:
             topic = "llm"

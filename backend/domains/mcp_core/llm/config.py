@@ -123,6 +123,7 @@ class LLMSettings(BaseSettings):
         base = self.get_model_config(model_key)
         return {
             "model": base.model,
+            "provider": base.provider,
             "temperature": temperature if temperature is not None else base.temperature,
             "max_tokens": max_tokens if max_tokens is not None else base.max_tokens,
         }

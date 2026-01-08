@@ -15,6 +15,7 @@
 import asyncio
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -33,6 +34,14 @@ FLUSH_TIMEOUT = 30  # flush 操作超时（秒）
 
 # 北京时区 UTC+8
 BEIJING_TZ = timezone(timedelta(hours=8))
+
+# 安全字段名正则表达式（只允许字母、数字、下划线，且不能以数字开头）
+SAFE_FIELD_NAME_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+
+def validate_field_name(field_name: str) -> bool:
+    """验证字段名是否安全（防止 SQL 注入）"""
+    return bool(SAFE_FIELD_NAME_PATTERN.match(field_name))
 
 
 @dataclass
@@ -423,6 +432,10 @@ class LogStore:
         if filters:
             for key, value in filters.items():
                 if value is not None and value != "":
+                    # 验证字段名安全性
+                    if not validate_field_name(key):
+                        logger.warning("invalid_filter_field", field=key)
+                        continue
                     conditions.append(f"l.data->>'{key}' = ${param_idx}")
                     params.append(str(value))
                     param_idx += 1
@@ -453,8 +466,16 @@ class LogStore:
                     column = base_fields[field]
                 elif field.startswith("data."):
                     json_key = field[5:]  # 去掉 "data." 前缀
+                    # 验证字段名安全性
+                    if not validate_field_name(json_key):
+                        logger.warning("invalid_filter_field", field=field)
+                        continue
                     column = f"l.data->>'{json_key}'"
                 else:
+                    # 验证字段名安全性
+                    if not validate_field_name(field):
+                        logger.warning("invalid_filter_field", field=field)
+                        continue
                     # 假设是 data 字段
                     column = f"l.data->>'{field}'"
 
@@ -500,6 +521,10 @@ class LogStore:
                         conditions.append(f"{column} IS NOT NULL AND {column} != ''")
                     else:
                         json_key = field[5:] if field.startswith("data.") else field
+                        # 验证字段名安全性
+                        if not validate_field_name(json_key):
+                            logger.warning("invalid_filter_field", field=field)
+                            continue
                         conditions.append(f"l.data ? '{json_key}'")
                 elif operator == "not_exist":
                     # 字段不存在或为空
@@ -507,6 +532,10 @@ class LogStore:
                         conditions.append(f"({column} IS NULL OR {column} = '')")
                     else:
                         json_key = field[5:] if field.startswith("data.") else field
+                        # 验证字段名安全性
+                        if not validate_field_name(json_key):
+                            logger.warning("invalid_filter_field", field=field)
+                            continue
                         conditions.append(f"NOT (l.data ? '{json_key}')")
 
         # 全文搜索
@@ -643,9 +672,9 @@ class LogStore:
         topic: Optional[str],
         field_name: str,
         limit: int = 100,
-    ) -> list[str]:
+    ) -> list[dict[str, Any]]:
         """
-        获取字段的可选值（用于筛选器下拉框）
+        获取字段的可选值及其出现次数（用于筛选器下拉框）
 
         Args:
             topic: 日志主题
@@ -653,34 +682,57 @@ class LogStore:
             limit: 返回数量限制
 
         Returns:
-            字段值列表
+            字段值和计数列表 [{"value": "xxx", "count": 10}, ...]
         """
         # 基础字段
         base_fields = ["level", "service", "logger", "trace_id"]
 
+        params = []
+        param_idx = 1
+
         if field_name in base_fields:
+            topic_filter = ""
+            if topic and topic in self._topic_cache:
+                topic_filter = f"AND l.topic_id = ${param_idx}"
+                params.append(self._topic_cache[topic])
+                param_idx += 1
+
             sql = f"""
-                SELECT DISTINCT {field_name} as value
+                SELECT {field_name} as value, COUNT(*) as count
                 FROM logs l
                 WHERE {field_name} IS NOT NULL AND {field_name} != ''
+                {topic_filter}
+                GROUP BY {field_name}
+                ORDER BY count DESC
+                LIMIT ${param_idx}
             """
-            if topic and topic in self._topic_cache:
-                sql += f" AND l.topic_id = {self._topic_cache[topic]}"
-            sql += f" ORDER BY value LIMIT {limit}"
+            params.append(limit)
         else:
-            # JSONB 字段
+            # JSONB 字段 - 验证字段名安全性
+            if not validate_field_name(field_name):
+                logger.warning("invalid_field_name", field=field_name)
+                return []
+
+            topic_filter = ""
+            if topic and topic in self._topic_cache:
+                topic_filter = f"AND l.topic_id = ${param_idx}"
+                params.append(self._topic_cache[topic])
+                param_idx += 1
+
             sql = f"""
-                SELECT DISTINCT l.data->>'{field_name}' as value
+                SELECT l.data->>'{field_name}' as value, COUNT(*) as count
                 FROM logs l
                 WHERE l.data->>'{field_name}' IS NOT NULL
+                {topic_filter}
+                GROUP BY l.data->>'{field_name}'
+                ORDER BY count DESC
+                LIMIT ${param_idx}
             """
-            if topic and topic in self._topic_cache:
-                sql += f" AND l.topic_id = {self._topic_cache[topic]}"
-            sql += f" ORDER BY value LIMIT {limit}"
+            params.append(limit)
 
         async with self._pool.acquire() as conn:
-            rows = await conn.fetch(sql)
-            return [row["value"] for row in rows if row["value"]]
+            rows = await conn.fetch(sql, *params)
+            return [{"value": row["value"], "count": row["count"]} for row in rows if row["value"]]
 
     async def get_stats(
         self,
@@ -692,44 +744,78 @@ class LogStore:
         获取日志统计信息
 
         Returns:
-            统计数据
+            统计数据，包含：
+            - total: 总日志数
+            - by_level: 按级别分组统计
+            - by_service: 按服务分组统计
+            - by_topic: 按主题分组统计
+            - time_range: 时间范围
         """
         conditions = []
         params = []
         param_idx = 1
 
         if topic and topic in self._topic_cache:
-            conditions.append(f"topic_id = ${param_idx}")
+            conditions.append(f"l.topic_id = ${param_idx}")
             params.append(self._topic_cache[topic])
             param_idx += 1
 
         if start_time:
-            conditions.append(f"timestamp >= ${param_idx}")
+            conditions.append(f"l.timestamp >= ${param_idx}")
             params.append(start_time)
             param_idx += 1
 
         if end_time:
-            conditions.append(f"timestamp <= ${param_idx}")
+            conditions.append(f"l.timestamp <= ${param_idx}")
             params.append(end_time)
             param_idx += 1
 
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
-        sql = f"""
+        # 总数和时间范围
+        total_sql = f"""
             SELECT
                 COUNT(*) as total,
-                COUNT(*) FILTER (WHERE level = 'error') as errors,
-                COUNT(*) FILTER (WHERE level = 'warning') as warnings,
-                COUNT(DISTINCT service) as services,
-                COUNT(DISTINCT trace_id) FILTER (WHERE trace_id != '') as traces,
-                MIN(timestamp) as earliest,
-                MAX(timestamp) as latest
-            FROM logs
+                MIN(l.timestamp) as earliest,
+                MAX(l.timestamp) as latest
+            FROM logs l
             WHERE {where_clause}
         """
 
+        # 按级别分组
+        by_level_sql = f"""
+            SELECT l.level, COUNT(*) as count
+            FROM logs l
+            WHERE {where_clause} AND l.level IS NOT NULL
+            GROUP BY l.level
+            ORDER BY count DESC
+        """
+
+        # 按服务分组
+        by_service_sql = f"""
+            SELECT l.service, COUNT(*) as count
+            FROM logs l
+            WHERE {where_clause} AND l.service IS NOT NULL AND l.service != ''
+            GROUP BY l.service
+            ORDER BY count DESC
+            LIMIT 20
+        """
+
+        # 按主题分组
+        by_topic_sql = f"""
+            SELECT t.name as topic, COUNT(*) as count
+            FROM logs l
+            JOIN log_topics t ON l.topic_id = t.id
+            WHERE {where_clause}
+            GROUP BY t.name
+            ORDER BY count DESC
+        """
+
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(sql, *params)
+            total_row = await conn.fetchrow(total_sql, *params)
+            level_rows = await conn.fetch(by_level_sql, *params)
+            service_rows = await conn.fetch(by_service_sql, *params)
+            topic_rows = await conn.fetch(by_topic_sql, *params)
 
         # 转换时间戳到北京时间
         def format_ts(ts):
@@ -740,11 +826,12 @@ class LogStore:
             return ts.astimezone(BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
         return {
-            "total": row["total"],
-            "errors": row["errors"],
-            "warnings": row["warnings"],
-            "services": row["services"],
-            "traces": row["traces"],
-            "earliest": format_ts(row["earliest"]),
-            "latest": format_ts(row["latest"]),
+            "total": total_row["total"],
+            "by_level": {row["level"]: row["count"] for row in level_rows},
+            "by_service": {row["service"]: row["count"] for row in service_rows},
+            "by_topic": {row["topic"]: row["count"] for row in topic_rows},
+            "time_range": {
+                "min": format_ts(total_row["earliest"]),
+                "max": format_ts(total_row["latest"]),
+            } if total_row["earliest"] else None,
         }
