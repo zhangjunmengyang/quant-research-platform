@@ -108,6 +108,8 @@ export function ExperienceFilters({ onSearch, searchValue = '' }: ExperienceFilt
         onChange={(value) =>
           setFilters({
             status: (value as ExperienceStatus) || undefined,
+            // 全部状态时需要包含已废弃的记录
+            include_deprecated: !value,
             page: 1,
           })
         }
