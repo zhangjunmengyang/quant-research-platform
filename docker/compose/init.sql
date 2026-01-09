@@ -145,7 +145,7 @@ CREATE TRIGGER update_factors_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- 经验概览表
+-- 经验概览表（研究草稿/临时记录层）
 CREATE TABLE IF NOT EXISTS notes (
     id SERIAL PRIMARY KEY,
     title VARCHAR(500) NOT NULL,
@@ -153,6 +153,16 @@ CREATE TABLE IF NOT EXISTS notes (
     tags VARCHAR(500) DEFAULT '',
     source VARCHAR(50) DEFAULT '',
     source_ref VARCHAR(255) DEFAULT '',
+
+    -- 笔记类型：observation(观察), hypothesis(假设), finding(发现), trail(轨迹), general(通用)
+    note_type VARCHAR(20) DEFAULT 'general',
+    -- 研究会话 ID，用于追踪同一研究过程中的多条笔记
+    research_session_id VARCHAR(36),
+    -- 已提炼为经验的 ID
+    promoted_to_experience_id INTEGER,
+    -- 是否已归档
+    is_archived BOOLEAN DEFAULT FALSE,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -161,6 +171,12 @@ CREATE TABLE IF NOT EXISTS notes (
 CREATE INDEX IF NOT EXISTS idx_notes_tags ON notes(tags);
 CREATE INDEX IF NOT EXISTS idx_notes_source ON notes(source);
 CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
+CREATE INDEX IF NOT EXISTS idx_notes_research_session_id ON notes(research_session_id);
+CREATE INDEX IF NOT EXISTS idx_notes_is_archived ON notes(is_archived);
+CREATE INDEX IF NOT EXISTS idx_notes_promoted ON notes(promoted_to_experience_id) WHERE promoted_to_experience_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notes_type_archived ON notes(note_type, is_archived);
+CREATE INDEX IF NOT EXISTS idx_notes_session_created ON notes(research_session_id, created_at) WHERE research_session_id IS NOT NULL;
 
 -- 笔记全文搜索索引
 CREATE INDEX IF NOT EXISTS idx_notes_search ON notes
@@ -407,61 +423,6 @@ USING GIN(to_tsvector('simple', content));
 
 -- 切块元数据索引
 CREATE INDEX IF NOT EXISTS idx_research_chunks_metadata ON research_chunks USING GIN(metadata);
-
-
--- ============================================
--- 研报对话表
--- ============================================
-
-CREATE TABLE IF NOT EXISTS research_conversations (
-    id SERIAL PRIMARY KEY,
-    uuid VARCHAR(36) UNIQUE NOT NULL,
-
-    -- 对话信息
-    title VARCHAR(500) DEFAULT '',         -- 对话标题（自动生成）
-    report_id INTEGER REFERENCES research_reports(id) ON DELETE SET NULL,  -- 可选关联研报
-
-    -- 时间戳
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 对话索引
-CREATE INDEX IF NOT EXISTS idx_research_conversations_uuid ON research_conversations(uuid);
-CREATE INDEX IF NOT EXISTS idx_research_conversations_report_id ON research_conversations(report_id);
-CREATE INDEX IF NOT EXISTS idx_research_conversations_updated_at ON research_conversations(updated_at DESC);
-
--- 更新时间触发器
-CREATE TRIGGER update_research_conversations_updated_at
-    BEFORE UPDATE ON research_conversations
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
-
--- ============================================
--- 研报对话消息表
--- ============================================
-
-CREATE TABLE IF NOT EXISTS research_messages (
-    id SERIAL PRIMARY KEY,
-    conversation_id INTEGER NOT NULL REFERENCES research_conversations(id) ON DELETE CASCADE,
-
-    -- 消息内容
-    role VARCHAR(20) NOT NULL,             -- user/assistant/system
-    content TEXT NOT NULL,
-
-    -- 来源引用（JSON 数组）
-    -- [{chunk_id, report_id, content_preview, score}]
-    sources JSONB DEFAULT '[]',
-
-    -- 时间戳
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 消息索引
-CREATE INDEX IF NOT EXISTS idx_research_messages_conversation_id ON research_messages(conversation_id);
-CREATE INDEX IF NOT EXISTS idx_research_messages_created_at ON research_messages(created_at);
-CREATE INDEX IF NOT EXISTS idx_research_messages_role ON research_messages(role);
 
 
 -- ============================================

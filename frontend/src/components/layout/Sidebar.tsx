@@ -1,108 +1,113 @@
-import { memo, useMemo } from 'react'
+/**
+ * Sidebar Component
+ * Design System: Unified sidebar with consistent spacing and interactions
+ *
+ * Note: Removed page-load animations to avoid visual delay
+ * Only keeping expand/collapse animations which provide value
+ */
+
+import { memo, useMemo, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
   BarChart3,
   BookOpen,
+  ChevronDown,
   Database,
   FileText,
   FileTextIcon,
   FlaskConical,
-  Play,
+  Lightbulb,
   Server,
-  Sparkles,
   Target,
-  TrendingUp,
 } from 'lucide-react'
 
 interface NavItem {
-  label: string
+  labelKey: string
   href: string
   icon: React.ComponentType<{ className?: string }>
   disabled?: boolean
 }
 
 interface NavGroup {
-  title: string
+  titleKey: string
   items: NavItem[]
+  defaultOpen?: boolean
 }
 
 const navigation: NavGroup[] = [
+  // Data Layer
   {
-    title: '数据库',
-    items: [{ label: '数据概览', href: '/data', icon: Database }],
+    titleKey: 'nav.data',
+    defaultOpen: true,
+    items: [{ labelKey: 'nav.dataOverview', href: '/data', icon: Database }],
   },
+  // Information Layer (Factor + Strategy)
   {
-    title: '因子库',
+    titleKey: 'nav.information',
+    defaultOpen: true,
     items: [
-      { label: '因子概览', href: '/factors', icon: FlaskConical },
-      { label: '因子分析', href: '/factors/analysis', icon: BarChart3 },
-      { label: '数据清洗', href: '/factors/pipeline', icon: Sparkles },
+      { labelKey: 'nav.factorOverview', href: '/factors', icon: FlaskConical },
+      { labelKey: 'nav.factorAnalysis', href: '/factors/analysis', icon: BarChart3 },
+      { labelKey: 'nav.strategyOverview', href: '/strategies', icon: Target },
+      { labelKey: 'nav.strategyAnalysis', href: '/strategies/analysis', icon: BarChart3 },
     ],
   },
+  // Knowledge Layer
   {
-    title: '策略库',
+    titleKey: 'nav.knowledge',
+    defaultOpen: true,
     items: [
-      { label: '策略概览', href: '/strategies', icon: Target },
-      { label: '回测队列', href: '/strategies/backtest', icon: Play },
-      { label: '策略分析', href: '/strategies/analysis', icon: BarChart3 },
+      { labelKey: 'nav.researchOverview', href: '/research', icon: FileTextIcon },
+      { labelKey: 'nav.noteOverview', href: '/notes', icon: BookOpen },
     ],
   },
+  // Wisdom Layer
   {
-    title: '研报库',
-    items: [
-      { label: '研报概览', href: '/research', icon: FileTextIcon },
-    ],
+    titleKey: 'nav.wisdom',
+    defaultOpen: true,
+    items: [{ labelKey: 'nav.experienceOverview', href: '/experiences', icon: Lightbulb }],
   },
+  // System
   {
-    title: '经验库',
+    titleKey: 'nav.system',
+    defaultOpen: true,
     items: [
-      { label: '经验概览', href: '/notes', icon: BookOpen },
-    ],
-  },
-  {
-    title: '实盘分析',
-    items: [
-      { label: '实盘监控', href: '/live', icon: TrendingUp, disabled: true },
-    ],
-  },
-  {
-    title: '系统',
-    items: [
-      { label: 'MCP 服务', href: '/mcp', icon: Server },
-      { label: '日志浏览', href: '/logs', icon: FileText },
+      { labelKey: 'nav.mcpService', href: '/mcp', icon: Server },
+      { labelKey: 'nav.logBrowser', href: '/logs', icon: FileText },
     ],
   },
 ]
 
-// 预计算所有 href 列表（只计算一次）
 const allHrefs = navigation.flatMap((g) => g.items.map((i) => i.href))
 
-// 检查是否有更精确的匹配
 function checkHasMoreSpecificMatch(itemHref: string, pathname: string): boolean {
   return allHrefs.some(
-    (href) =>
-      href !== itemHref &&
-      href.startsWith(itemHref + '/') &&
-      pathname.startsWith(href)
+    (href) => href !== itemHref && href.startsWith(itemHref + '/') && pathname.startsWith(href)
   )
 }
 
-// 使用 memo 优化的导航项组件
 const NavItemComponent = memo(function NavItemComponent({
   item,
   isActive,
 }: {
   item: NavItem
   isActive: boolean
+  index: number
 }) {
+  const { t } = useTranslation()
+
   if (item.disabled) {
     return (
       <li>
-        <span className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground/50 cursor-not-allowed">
+        <span className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-sidebar-foreground/40 cursor-not-allowed">
           <item.icon className="h-4 w-4" />
-          {item.label}
-          <span className="ml-auto text-xs">(开发中)</span>
+          <span className="flex-1">{t(item.labelKey)}</span>
+          <span className="text-2xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+            {t('common.developing')}
+          </span>
         </span>
       </li>
     )
@@ -113,23 +118,86 @@ const NavItemComponent = memo(function NavItemComponent({
       <NavLink
         to={item.href}
         className={cn(
-          'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+          'group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-all duration-150',
           isActive
-            ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-glow-sm'
+            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
         )}
       >
-        <item.icon className="h-4 w-4" />
-        {item.label}
+        <item.icon
+          className={cn(
+            'h-4 w-4 transition-transform duration-150',
+            !isActive && 'group-hover:scale-110'
+          )}
+        />
+        <span className="flex-1">{t(item.labelKey)}</span>
+        {isActive && (
+          <span className="w-1.5 h-1.5 rounded-full bg-sidebar-primary-foreground" />
+        )}
       </NavLink>
     </li>
   )
 })
 
+const NavGroupComponent = memo(function NavGroupComponent({
+  group,
+  activeStates,
+}: {
+  group: NavGroup
+  activeStates: Map<string, boolean>
+  groupIndex: number
+}) {
+  const { t } = useTranslation()
+  const [isOpen, setIsOpen] = useState(group.defaultOpen ?? true)
+  const hasActiveItem = group.items.some((item) => activeStates.get(item.href))
+
+  return (
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={cn(
+          'flex w-full items-center gap-2 px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors',
+          hasActiveItem ? 'text-sidebar-accent-foreground' : 'text-sidebar-foreground/50',
+          'hover:text-sidebar-accent-foreground'
+        )}
+      >
+        <span className="flex-1 text-left">{t(group.titleKey)}</span>
+        <ChevronDown
+          className={cn(
+            'h-3 w-3 transition-transform duration-150',
+            isOpen ? 'rotate-0' : '-rotate-90'
+          )}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.ul
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15, ease: 'easeInOut' }}
+            className="mt-1 space-y-0.5 overflow-hidden"
+          >
+            {group.items.map((item, index) => (
+              <NavItemComponent
+                key={item.href}
+                item={item}
+                isActive={activeStates.get(item.href) ?? false}
+                index={index}
+              />
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+})
+
 export function Sidebar() {
+  const { t } = useTranslation()
   const location = useLocation()
 
-  // 缓存当前路径的活动状态计算
   const activeStates = useMemo(() => {
     const states = new Map<string, boolean>()
     for (const href of allHrefs) {
@@ -143,37 +211,35 @@ export function Sidebar() {
   }, [location.pathname])
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r bg-card">
+    <aside className="flex h-full w-60 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2 border-b px-6">
-        <FlaskConical className="h-6 w-6 text-primary" />
-        <span className="text-lg font-semibold">Quant Platform</span>
+      <div className="flex h-14 items-center gap-2.5 border-b border-sidebar-border px-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-glow-sm">
+          <FlaskConical className="h-4 w-4" />
+        </div>
+        <span className="text-base font-bold tracking-tight text-foreground">
+          {t('nav.platformName')}
+        </span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-auto p-4">
-        {navigation.map((group) => (
-          <div key={group.title} className="mb-6">
-            <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {group.title}
-            </h3>
-            <ul className="space-y-1">
-              {group.items.map((item) => (
-                <NavItemComponent
-                  key={item.href}
-                  item={item}
-                  isActive={activeStates.get(item.href) ?? false}
-                />
-              ))}
-            </ul>
-          </div>
+      <nav className="flex-1 overflow-auto px-2.5 py-3">
+        {navigation.map((group, index) => (
+          <NavGroupComponent
+            key={group.titleKey}
+            group={group}
+            activeStates={activeStates}
+            groupIndex={index}
+          />
         ))}
       </nav>
 
       {/* Footer */}
-      <div className="border-t p-4">
-        <div className="text-xs text-muted-foreground">
-          <p>Version 2.0.0</p>
+      <div className="border-t border-sidebar-border px-4 py-3">
+        <div className="text-2xs text-sidebar-foreground/50">
+          <p>
+            {t('common.version')} 2.0.0
+          </p>
         </div>
       </div>
     </aside>

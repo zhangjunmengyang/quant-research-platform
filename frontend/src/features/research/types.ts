@@ -116,68 +116,108 @@ export interface ScanUploadResponse {
   reports: ReportUploadResponse[]
 }
 
-// 对话
-export interface Conversation {
-  id: number
-  uuid: string
-  title: string
-  report_id?: number
-  created_at?: string
-  updated_at?: string
-}
+// ==================== 切块相关 ====================
 
-// 消息
-export interface Message {
-  id?: number
-  role: 'user' | 'assistant'
+// 切块项
+export interface Chunk {
+  chunk_id: string
+  chunk_index: number
+  chunk_type: string
   content: string
-  sources?: string
-  created_at?: string
+  token_count: number
+  page_start?: number
+  page_end?: number
+  section_title: string
 }
 
-// 创建对话请求
-export interface CreateConversationRequest {
-  title?: string
+// 切块列表响应
+export interface ChunkListResponse {
+  report_id: number
+  total: number
+  page: number
+  page_size: number
+  chunks: Chunk[]
+}
+
+// ==================== 语义搜索 ====================
+
+// 搜索请求
+export interface SearchRequest {
+  query: string
+  top_k?: number
   report_id?: number
+  min_score?: number
 }
 
-// 聊天请求
-export interface ChatRequest {
-  message: string
-  report_id?: number
-  model_key?: string
-}
-
-// LLM 模型信息
-export interface LLMModel {
-  key: string
-  name: string
-  model: string
-  provider: string
-  is_default: boolean
-}
-
-// LLM 模型列表响应
-export interface LLMModelsResponse {
-  models: LLMModel[]
-  default_model: string
-}
-
-// 聊天响应
-export interface ChatResponse {
+// 搜索结果项
+export interface SearchResultItem {
+  chunk_id: string
   content: string
-  sources: string
-  metadata: {
-    retrieved_chunks?: number
-    reranked_chunks?: number
-    total_time?: number
-  }
+  score: number
+  report_id?: number
+  report_uuid: string
+  report_title: string
+  page_start?: number
+  section_title: string
 }
 
-// 流式聊天块
-export interface StreamChunk {
-  type: 'content' | 'done' | 'error'
-  content?: string
-  metadata?: Record<string, unknown>
-  error?: string
+// 搜索响应
+export interface SearchResponse {
+  query: string
+  count: number
+  results: SearchResultItem[]
+}
+
+// ==================== RAG 问答 ====================
+
+// 问答请求
+export interface AskRequest {
+  question: string
+  top_k?: number
+  report_id?: number
+}
+
+// 来源项
+export interface SourceItem {
+  chunk_id: string
+  content: string
+  page_number?: number
+  relevance: number
+  report_uuid: string
+  report_title: string
+}
+
+// 问答响应
+export interface AskResponse {
+  question: string
+  answer: string
+  sources: SourceItem[]
+  retrieved_chunks: number
+}
+
+// ==================== 相似切块 ====================
+
+// 相似切块请求
+export interface SimilarChunksRequest {
+  chunk_id: string
+  top_k?: number
+  exclude_same_report?: boolean
+}
+
+// 相似切块项
+export interface SimilarChunkItem {
+  chunk_id: string
+  content: string
+  score: number
+  report_id?: number
+  report_uuid: string
+  report_title: string
+  section_title: string
+}
+
+// 相似切块响应
+export interface SimilarChunksResponse {
+  reference_chunk_id: string
+  count: number
+  similar_chunks: SimilarChunkItem[]
 }

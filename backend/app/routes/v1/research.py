@@ -1,7 +1,8 @@
 """
 Research Hub API 端点
 
-提供研报管理和对话功能的 REST API。
+提供研报管理功能的 REST API。
+研报知识库的核心职责：解析、切块、向量化、索引。
 """
 
 import logging
@@ -9,16 +10,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
-from fastapi.responses import StreamingResponse, FileResponse
-from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from domains.research_hub.services import (
-    ChatBotService,
     ReportService,
-    get_chatbot_service,
     get_report_service,
+    RetrievalService,
+    get_retrieval_service,
 )
-from domains.mcp_core.llm import get_llm_settings
 
 logger = logging.getLogger(__name__)
 
@@ -76,89 +76,19 @@ class ProcessingStatusResponse(BaseModel):
     indexed_at: Optional[str]
 
 
-class ConversationResponse(BaseModel):
-    """对话响应"""
-    id: int
-    uuid: str
-    title: str
-    report_id: Optional[int]
-    created_at: Optional[str]
-    updated_at: Optional[str]
+class ScanUploadRequest(BaseModel):
+    """扫描上传请求"""
+    directory: str
+    pattern: str = "*.pdf"
+    recursive: bool = True
+    auto_process: bool = False
+    pipeline: Optional[str] = None
 
 
-class MessageResponse(BaseModel):
-    """消息响应"""
-    id: Optional[int]
-    role: str
-    content: str
-    sources: Optional[str]
-    created_at: Optional[str]
-
-
-class ChatRequest(BaseModel):
-    """对话请求"""
-    message: str
-    report_id: Optional[int] = None
-    model_key: Optional[str] = None
-
-
-class ChatResponse(BaseModel):
-    """对话响应"""
-    content: str
-    sources: str
-    metadata: Dict[str, Any]
-
-
-class CreateConversationRequest(BaseModel):
-    """创建对话请求"""
-    title: Optional[str] = None
-    report_id: Optional[int] = None
-
-
-class LLMModelInfo(BaseModel):
-    """LLM 模型信息"""
-    key: str
-    name: str
-    model: str
-    provider: str
-    is_default: bool = False
-
-
-class LLMModelsResponse(BaseModel):
-    """LLM 模型列表响应"""
-    models: List[LLMModelInfo]
-    default_model: str
-
-
-# ==================== LLM 配置 API ====================
-
-
-@router.get("/llm/models", response_model=LLMModelsResponse)
-async def get_llm_models():
-    """
-    获取可用的 LLM 模型列表
-
-    从 config/llm_models.yaml 读取配置，返回可用模型列表。
-    用于前端模型选择器展示。
-    """
-    settings = get_llm_settings()
-    models = []
-
-    for key, config in settings.models.items():
-        models.append(
-            LLMModelInfo(
-                key=key,
-                name=key.upper(),
-                model=config.model,
-                provider=config.provider,
-                is_default=(key == settings.default_model),
-            )
-        )
-
-    return LLMModelsResponse(
-        models=models,
-        default_model=settings.default_model,
-    )
+class ScanUploadResponse(BaseModel):
+    """扫描上传响应"""
+    uploaded: int
+    reports: List[ReportUploadResponse]
 
 
 # ==================== 研报管理 API ====================
@@ -354,21 +284,6 @@ async def delete_report(report_id: int):
     return {"message": "Report deleted", "report_id": report_id}
 
 
-class ScanUploadRequest(BaseModel):
-    """扫描上传请求"""
-    directory: str
-    pattern: str = "*.pdf"
-    recursive: bool = True
-    auto_process: bool = False
-    pipeline: Optional[str] = None
-
-
-class ScanUploadResponse(BaseModel):
-    """扫描上传响应"""
-    uploaded: int
-    reports: List[ReportUploadResponse]
-
-
 @router.post("/reports/scan", response_model=ScanUploadResponse)
 async def scan_and_upload(request: ScanUploadRequest):
     """
@@ -417,169 +332,238 @@ async def scan_and_upload(request: ScanUploadRequest):
         raise HTTPException(500, f"Scan upload failed: {str(e)}")
 
 
-# ==================== 对话 API ====================
+# ==================== 语义搜索 API ====================
 
 
-@router.post("/conversations", response_model=ConversationResponse)
-async def create_conversation(request: CreateConversationRequest):
-    """创建新对话"""
-    service = get_chatbot_service()
-    conv = await service.create_conversation(
-        title=request.title,
-        report_id=request.report_id,
-    )
-
-    return ConversationResponse(
-        id=conv.id,
-        uuid=conv.uuid,
-        title=conv.title,
-        report_id=conv.report_id,
-        created_at=conv.created_at.isoformat() if conv.created_at else None,
-        updated_at=conv.updated_at.isoformat() if conv.updated_at else None,
-    )
+class SearchRequest(BaseModel):
+    """语义搜索请求"""
+    query: str
+    top_k: int = 10
+    report_id: Optional[int] = None
+    min_score: float = 0.0
 
 
-@router.get("/conversations", response_model=List[ConversationResponse])
-async def list_conversations(
-    limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-):
-    """列出所有对话"""
-    service = get_chatbot_service()
-    conversations = await service.list_conversations(limit=limit, offset=offset)
-
-    return [
-        ConversationResponse(
-            id=conv.id,
-            uuid=conv.uuid,
-            title=conv.title,
-            report_id=conv.report_id,
-            created_at=conv.created_at.isoformat() if conv.created_at else None,
-            updated_at=conv.updated_at.isoformat() if conv.updated_at else None,
-        )
-        for conv in conversations
-    ]
+class SearchResultItem(BaseModel):
+    """搜索结果项"""
+    chunk_id: str
+    content: str
+    score: float
+    report_id: Optional[int]
+    report_uuid: str
+    report_title: str
+    page_start: Optional[int]
+    section_title: str
 
 
-@router.get("/conversations/{conv_id}", response_model=ConversationResponse)
-async def get_conversation(conv_id: int):
-    """获取对话详情"""
-    service = get_chatbot_service()
-    conv = await service.get_conversation(conv_id)
-
-    if not conv:
-        raise HTTPException(404, "Conversation not found")
-
-    return ConversationResponse(
-        id=conv.id,
-        uuid=conv.uuid,
-        title=conv.title,
-        report_id=conv.report_id,
-        created_at=conv.created_at.isoformat() if conv.created_at else None,
-        updated_at=conv.updated_at.isoformat() if conv.updated_at else None,
-    )
+class SearchResponse(BaseModel):
+    """搜索响应"""
+    query: str
+    count: int
+    results: List[SearchResultItem]
 
 
-@router.delete("/conversations/{conv_id}")
-async def delete_conversation(conv_id: int):
-    """删除对话"""
-    service = get_chatbot_service()
-    success = await service.delete_conversation(conv_id)
-
-    if not success:
-        raise HTTPException(404, "Conversation not found")
-
-    return {"message": "Conversation deleted", "conversation_id": conv_id}
+class AskRequest(BaseModel):
+    """RAG 问答请求"""
+    question: str
+    top_k: int = 5
+    report_id: Optional[int] = None
 
 
-@router.get("/conversations/{conv_id}/messages", response_model=List[MessageResponse])
-async def get_messages(
-    conv_id: int,
-    limit: int = Query(100, ge=1, le=500),
-):
-    """获取对话消息"""
-    service = get_chatbot_service()
-    messages = await service.get_messages(conv_id, limit=limit)
-
-    return [
-        MessageResponse(
-            id=msg.id,
-            role=msg.role,
-            content=msg.content,
-            sources=msg.sources,
-            created_at=msg.created_at.isoformat() if msg.created_at else None,
-        )
-        for msg in messages
-    ]
+class SourceItem(BaseModel):
+    """来源项"""
+    chunk_id: str
+    content: str
+    page_number: Optional[int]
+    relevance: float
+    report_uuid: str
+    report_title: str
 
 
-@router.post("/conversations/{conv_id}/chat", response_model=ChatResponse)
-async def chat(conv_id: int, request: ChatRequest):
+class AskResponse(BaseModel):
+    """问答响应"""
+    question: str
+    answer: str
+    sources: List[SourceItem]
+    retrieved_chunks: int
+
+
+@router.post("/search", response_model=SearchResponse)
+async def search_reports(request: SearchRequest):
     """
-    发送消息并获取回复
+    语义搜索研报内容
 
-    这是同步 API，会等待完整回复后返回。
-    对于流式响应，使用 /conversations/{conv_id}/chat/stream
+    使用向量相似度检索与查询语义相关的研报内容片段。
     """
-    service = get_chatbot_service()
-
-    # 检查对话是否存在
-    conv = await service.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(404, "Conversation not found")
+    service = get_retrieval_service()
 
     try:
-        response = await service.chat(
-            conv_id=conv_id,
-            message=request.message,
+        results = await service.search(
+            query=request.query,
+            top_k=request.top_k,
             report_id=request.report_id,
-            model_key=request.model_key,
+            min_score=request.min_score,
         )
 
-        return ChatResponse(
-            content=response["content"],
-            sources=response["sources"],
-            metadata=response["metadata"],
+        return SearchResponse(
+            query=request.query,
+            count=len(results),
+            results=[SearchResultItem(**r) for r in results],
         )
     except Exception as e:
-        logger.error(f"Chat failed: {e}", exc_info=True)
-        raise HTTPException(500, f"Chat failed: {str(e)}")
+        logger.error(f"Search failed: {e}")
+        raise HTTPException(500, f"Search failed: {str(e)}")
 
 
-@router.post("/conversations/{conv_id}/chat/stream")
-async def chat_stream(conv_id: int, request: ChatRequest):
+@router.post("/ask", response_model=AskResponse)
+async def ask_reports(request: AskRequest):
     """
-    流式对话
+    基于研报知识库进行问答
 
-    使用 Server-Sent Events (SSE) 返回增量响应。
+    使用 RAG (检索增强生成) 技术，先检索相关研报内容，
+    然后基于检索到的内容生成回答。
     """
-    service = get_chatbot_service()
+    service = get_retrieval_service()
 
-    # 检查对话是否存在
-    conv = await service.get_conversation(conv_id)
-    if not conv:
-        raise HTTPException(404, "Conversation not found")
+    try:
+        result = await service.ask(
+            question=request.question,
+            top_k=request.top_k,
+            report_id=request.report_id,
+        )
 
-    async def generate():
-        import json
-        try:
-            async for chunk in service.chat_stream(
-                conv_id=conv_id,
-                message=request.message,
-                report_id=request.report_id,
-                model_key=request.model_key,
-            ):
-                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
-        finally:
-            yield "data: [DONE]\n\n"
+        return AskResponse(
+            question=request.question,
+            answer=result["answer"],
+            sources=[SourceItem(**s) for s in result["sources"]],
+            retrieved_chunks=result["retrieved_chunks"],
+        )
+    except Exception as e:
+        logger.error(f"Ask failed: {e}")
+        raise HTTPException(500, f"Ask failed: {str(e)}")
 
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        },
-    )
+
+# ==================== 切块 API ====================
+
+
+class ChunkItem(BaseModel):
+    """切块项"""
+    chunk_id: str
+    chunk_index: int
+    chunk_type: str
+    content: str
+    token_count: int
+    page_start: Optional[int]
+    page_end: Optional[int]
+    section_title: str
+
+
+class ChunkListResponse(BaseModel):
+    """切块列表响应"""
+    report_id: int
+    total: int
+    page: int
+    page_size: int
+    chunks: List[ChunkItem]
+
+
+class SimilarChunksRequest(BaseModel):
+    """相似切块请求"""
+    chunk_id: str
+    top_k: int = 5
+    exclude_same_report: bool = False
+
+
+class SimilarChunkItem(BaseModel):
+    """相似切块项"""
+    chunk_id: str
+    content: str
+    score: float
+    report_id: Optional[int]
+    report_uuid: str
+    report_title: str
+    section_title: str
+
+
+class SimilarChunksResponse(BaseModel):
+    """相似切块响应"""
+    reference_chunk_id: str
+    count: int
+    similar_chunks: List[SimilarChunkItem]
+
+
+@router.get("/reports/{report_id}/chunks", response_model=ChunkListResponse)
+async def get_report_chunks(
+    report_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """
+    获取研报的所有切块
+
+    返回研报解析后的切块列表，包括内容、章节标题、页码等信息。
+    """
+    service = get_report_service()
+    report = await service.get_report(report_id)
+
+    if not report:
+        raise HTTPException(404, "Report not found")
+
+    if report.status not in ("chunked", "embedded", "indexing", "ready"):
+        raise HTTPException(400, f"Report not chunked yet, current status: {report.status}")
+
+    try:
+        chunks, total = await service.get_report_chunks(
+            report_id=report_id,
+            limit=page_size,
+            offset=(page - 1) * page_size,
+        )
+
+        return ChunkListResponse(
+            report_id=report_id,
+            total=total,
+            page=page,
+            page_size=page_size,
+            chunks=[
+                ChunkItem(
+                    chunk_id=c.chunk_id,
+                    chunk_index=c.chunk_index,
+                    chunk_type=c.chunk_type,
+                    content=c.content,
+                    token_count=c.token_count,
+                    page_start=c.page_start,
+                    page_end=c.page_end,
+                    section_title=c.section_title,
+                )
+                for c in chunks
+            ],
+        )
+    except Exception as e:
+        logger.error(f"Get chunks failed: {e}")
+        raise HTTPException(500, f"Get chunks failed: {str(e)}")
+
+
+@router.post("/chunks/similar", response_model=SimilarChunksResponse)
+async def get_similar_chunks(request: SimilarChunksRequest):
+    """
+    获取相似切块
+
+    根据指定切块，找到向量空间中最相似的其他切块。
+    用于发现相关内容和扩展阅读。
+    """
+    service = get_retrieval_service()
+
+    try:
+        results = await service.get_similar_chunks(
+            chunk_id=request.chunk_id,
+            top_k=request.top_k,
+            exclude_same_report=request.exclude_same_report,
+        )
+
+        return SimilarChunksResponse(
+            reference_chunk_id=request.chunk_id,
+            count=len(results),
+            similar_chunks=[SimilarChunkItem(**r) for r in results],
+        )
+    except Exception as e:
+        logger.error(f"Get similar chunks failed: {e}")
+        raise HTTPException(500, f"Get similar chunks failed: {str(e)}")

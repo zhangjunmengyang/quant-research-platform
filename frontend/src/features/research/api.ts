@@ -11,27 +11,18 @@ import type {
   ProcessingStatus,
   ScanUploadRequest,
   ScanUploadResponse,
-  Conversation,
-  Message,
-  CreateConversationRequest,
-  ChatRequest,
-  ChatResponse,
-  LLMModelsResponse,
+  ChunkListResponse,
+  SearchRequest,
+  SearchResponse,
+  AskRequest,
+  AskResponse,
+  SimilarChunksRequest,
+  SimilarChunksResponse,
 } from './types'
 
 const BASE_URL = '/research'
 
 export const researchApi = {
-  // ==================== LLM 配置 ====================
-
-  /**
-   * 获取可用的 LLM 模型列表
-   */
-  getModels: async (): Promise<LLMModelsResponse> => {
-    const { data } = await apiClient.get<LLMModelsResponse>(`${BASE_URL}/llm/models`)
-    return data
-  },
-
   /**
    * 获取 PDF 文件 URL
    */
@@ -114,135 +105,50 @@ export const researchApi = {
     return data
   },
 
-  // ==================== 对话管理 ====================
+  // ==================== 切块管理 ====================
 
   /**
-   * 创建对话
+   * 获取研报切块列表
    */
-  createConversation: async (request: CreateConversationRequest): Promise<Conversation> => {
-    const { data } = await apiClient.post<Conversation>(`${BASE_URL}/conversations`, request)
-    return data
-  },
-
-  /**
-   * 获取对话列表
-   */
-  listConversations: async (
-    limit = 50,
-    offset = 0
-  ): Promise<Conversation[]> => {
-    const { data } = await apiClient.get<Conversation[]>(`${BASE_URL}/conversations`, {
-      params: { limit, offset },
-    })
-    return data
-  },
-
-  /**
-   * 获取对话详情
-   */
-  getConversation: async (id: number): Promise<Conversation> => {
-    const { data } = await apiClient.get<Conversation>(`${BASE_URL}/conversations/${id}`)
-    return data
-  },
-
-  /**
-   * 删除对话
-   */
-  deleteConversation: async (id: number): Promise<void> => {
-    await apiClient.delete(`${BASE_URL}/conversations/${id}`)
-  },
-
-  /**
-   * 获取对话消息
-   */
-  getMessages: async (conversationId: number, limit = 100): Promise<Message[]> => {
-    const { data } = await apiClient.get<Message[]>(
-      `${BASE_URL}/conversations/${conversationId}/messages`,
-      { params: { limit } }
+  getReportChunks: async (
+    reportId: number,
+    params: { page?: number; page_size?: number } = {}
+  ): Promise<ChunkListResponse> => {
+    const { data } = await apiClient.get<ChunkListResponse>(
+      `${BASE_URL}/reports/${reportId}/chunks`,
+      { params }
     )
     return data
   },
 
   /**
-   * 发送消息 (同步)
+   * 获取相似切块
    */
-  chat: async (conversationId: number, request: ChatRequest): Promise<ChatResponse> => {
-    const { data } = await apiClient.post<ChatResponse>(
-      `${BASE_URL}/conversations/${conversationId}/chat`,
+  getSimilarChunks: async (request: SimilarChunksRequest): Promise<SimilarChunksResponse> => {
+    const { data } = await apiClient.post<SimilarChunksResponse>(
+      `${BASE_URL}/chunks/similar`,
       request
     )
     return data
   },
 
+  // ==================== 语义搜索 ====================
+
   /**
-   * 发送消息 (流式)
+   * 语义搜索研报内容
    */
-  chatStream: (
-    conversationId: number,
-    request: ChatRequest,
-    onChunk: (chunk: { type: string; content?: string; metadata?: Record<string, unknown> }) => void,
-    onError?: (error: Error) => void,
-    onDone?: () => void
-  ): (() => void) => {
-    const controller = new AbortController()
+  search: async (request: SearchRequest): Promise<SearchResponse> => {
+    const { data } = await apiClient.post<SearchResponse>(`${BASE_URL}/search`, request)
+    return data
+  },
 
-    const fetchStream = async () => {
-      try {
-        const response = await fetch(
-          `/api/v1${BASE_URL}/conversations/${conversationId}/chat/stream`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request),
-            signal: controller.signal,
-          }
-        )
+  // ==================== RAG 问答 ====================
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-
-        const reader = response.body?.getReader()
-        if (!reader) throw new Error('No reader available')
-
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim()
-              if (data === '[DONE]') {
-                onDone?.()
-                return
-              }
-              try {
-                const chunk = JSON.parse(data)
-                onChunk(chunk)
-              } catch {
-                // Ignore parse errors
-              }
-            }
-          }
-        }
-
-        onDone?.()
-      } catch (error) {
-        if (error instanceof Error && error.name !== 'AbortError') {
-          onError?.(error)
-        }
-      }
-    }
-
-    fetchStream()
-
-    return () => controller.abort()
+  /**
+   * 基于研报知识库问答
+   */
+  ask: async (request: AskRequest): Promise<AskResponse> => {
+    const { data } = await apiClient.post<AskResponse>(`${BASE_URL}/ask`, request)
+    return data
   },
 }

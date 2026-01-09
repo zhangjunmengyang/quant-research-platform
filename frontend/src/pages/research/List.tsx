@@ -3,11 +3,11 @@
  * 研报列表页 - 展示所有研报，支持上传和管理
  */
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FileText,
   Upload,
-  Search,
   Loader2,
   Calendar,
   Trash2,
@@ -17,12 +17,15 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  MessageSquare,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react'
 import { useReports, useReportMutations, useProcessingStatus } from '@/features/research'
 import type { Report, ReportListParams, ReportStatus } from '@/features/research'
 import { STATUS_LABELS, STATUS_COLORS } from '@/features/research'
 import { cn } from '@/lib/utils'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
 import {
   Dialog,
   DialogContent,
@@ -31,7 +34,17 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 
+// 状态筛选选项
+const STATUS_FILTER_OPTIONS: SelectOption[] = [
+  { value: '', label: '全部状态' },
+  { value: 'ready', label: STATUS_LABELS.ready },
+  { value: 'uploaded', label: STATUS_LABELS.uploaded },
+  { value: 'parsing', label: STATUS_LABELS.parsing },
+  { value: 'failed', label: STATUS_LABELS.failed },
+]
+
 export function Component() {
+  const navigate = useNavigate()
   const [params, setParams] = useState<ReportListParams>({ page: 1, page_size: 20 })
   const [searchInput, setSearchInput] = useState('')
   const { data, isLoading, isError, error, refetch } = useReports(params)
@@ -56,14 +69,16 @@ export function Component() {
     setParams({ ...params, search: searchInput, page: 1 })
   }
 
-  const handleStatusFilter = (status: string) => {
-    setParams({ ...params, status: params.status === status ? undefined : status, page: 1 })
+  const handleStatusFilter = (status: string | undefined) => {
+    setParams({ ...params, status: status as ReportStatus | undefined, page: 1 })
   }
 
   const handleClearFilter = () => {
     setParams({ page: 1, page_size: 20 })
     setSearchInput('')
   }
+
+  const hasActiveFilters = !!(params.search || params.status)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).filter((f) =>
@@ -186,6 +201,13 @@ export function Component() {
         </div>
         <div className="flex gap-2">
           <button
+            onClick={() => navigate('/research/search')}
+            className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted"
+          >
+            <Sparkles className="h-4 w-4" />
+            语义搜索
+          </button>
+          <button
             onClick={() => setIsScanOpen(true)}
             className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-muted"
           >
@@ -210,61 +232,24 @@ export function Component() {
         </div>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-wrap gap-4">
-        <div className="flex flex-1 gap-2">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="搜索研报..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full rounded-md border bg-background py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <button
-            onClick={handleSearch}
-            className="rounded-md bg-secondary px-4 py-2 text-sm hover:bg-secondary/80"
-          >
-            搜索
-          </button>
-          <button
-            onClick={() => refetch()}
-            className="rounded-md border px-3 py-2 hover:bg-muted"
-            title="刷新"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-          {(params.search || params.status) && (
-            <button
-              onClick={handleClearFilter}
-              className="rounded-md border px-4 py-2 text-sm hover:bg-muted"
-            >
-              清除筛选
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Status Filter */}
-      <div className="flex flex-wrap gap-2">
-        {(['ready', 'uploaded', 'parsing', 'failed'] as ReportStatus[]).map((status) => (
-          <button
-            key={status}
-            onClick={() => handleStatusFilter(status)}
-            className={cn(
-              'rounded-full px-3 py-1 text-xs border transition-colors',
-              params.status === status
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'hover:bg-muted'
-            )}
-          >
-            {STATUS_LABELS[status]}
-          </button>
-        ))}
-      </div>
+      {/* Filter Toolbar */}
+      <FilterToolbar
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearch={handleSearch}
+        searchPlaceholder="搜索研报..."
+        showRefresh
+        onRefresh={() => refetch()}
+        hasActiveFilters={hasActiveFilters}
+        onReset={handleClearFilter}
+      >
+        <FilterSelect
+          label="状态"
+          options={STATUS_FILTER_OPTIONS}
+          value={params.status}
+          onChange={handleStatusFilter}
+        />
+      </FilterToolbar>
 
       {/* Reports List */}
       <div className="space-y-4">
@@ -286,12 +271,16 @@ export function Component() {
           data?.items.map((report) => (
             <div
               key={report.id}
-              className="group rounded-lg border p-4 transition-colors hover:bg-muted/50"
+              onClick={() => navigate(`/research/${report.id}`)}
+              className="group cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3">
-                    <h3 className="font-medium truncate">{report.title}</h3>
+                    <h3 className="font-medium truncate flex items-center gap-1">
+                      {report.title}
+                      <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50" />
+                    </h3>
                     <span
                       className={cn(
                         'flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
@@ -330,7 +319,10 @@ export function Component() {
                 <div className="ml-4 flex items-center gap-2">
                   {(report.status === 'uploaded' || report.status === 'failed') && (
                     <button
-                      onClick={() => handleProcess(report)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleProcess(report)
+                      }}
                       disabled={process.isPending}
                       className="rounded p-2 hover:bg-primary/10 hover:text-primary"
                       title={report.status === 'failed' ? '重新处理' : '开始处理'}
@@ -340,17 +332,6 @@ export function Component() {
                       ) : (
                         <Play className="h-4 w-4" />
                       )}
-                    </button>
-                  )}
-                  {report.status === 'ready' && (
-                    <button
-                      onClick={() => {
-                        window.location.href = `/research/${report.id}/chat`
-                      }}
-                      className="rounded p-2 hover:bg-primary/10 hover:text-primary"
-                      title="开始对话"
-                    >
-                      <MessageSquare className="h-4 w-4" />
                     </button>
                   )}
                   <button

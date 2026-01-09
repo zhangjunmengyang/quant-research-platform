@@ -3,7 +3,18 @@
  */
 
 import { apiClient, type ApiResponse, type PaginatedResponse } from '@/lib/api/client'
-import type { Note, NoteCreate, NoteUpdate, NoteListParams, NoteStats } from './types'
+import type {
+  Note,
+  NoteCreate,
+  NoteUpdate,
+  NoteListParams,
+  NoteStats,
+  ObservationCreate,
+  HypothesisCreate,
+  FindingCreate,
+  PromoteRequest,
+  ResearchTrail,
+} from './types'
 
 const BASE_URL = '/notes'
 
@@ -82,6 +93,91 @@ export const noteApi = {
     const { data } = await apiClient.get<ApiResponse<string[]>>(`${BASE_URL}/tags`)
     if (!data.success || !data.data) {
       throw new Error(data.error || 'Failed to fetch tags')
+    }
+    return data.data
+  },
+
+  // ==================== 研究记录相关 API ====================
+
+  /**
+   * 记录观察
+   */
+  recordObservation: async (request: ObservationCreate): Promise<Note> => {
+    const { data } = await apiClient.post<ApiResponse<Note>>(`${BASE_URL}/observation`, request)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to record observation')
+    }
+    return data.data
+  },
+
+  /**
+   * 记录假设
+   */
+  recordHypothesis: async (request: HypothesisCreate): Promise<Note> => {
+    const { data } = await apiClient.post<ApiResponse<Note>>(`${BASE_URL}/hypothesis`, request)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to record hypothesis')
+    }
+    return data.data
+  },
+
+  /**
+   * 记录发现
+   */
+  recordFinding: async (request: FindingCreate): Promise<Note> => {
+    const { data } = await apiClient.post<ApiResponse<Note>>(`${BASE_URL}/finding`, request)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to record finding')
+    }
+    return data.data
+  },
+
+  /**
+   * 获取研究轨迹
+   */
+  getResearchTrail: async (sessionId: string, includeArchived = false): Promise<ResearchTrail> => {
+    const { data } = await apiClient.get<ApiResponse<ResearchTrail>>(
+      `${BASE_URL}/trail/${sessionId}`,
+      { params: { include_archived: includeArchived } }
+    )
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to fetch research trail')
+    }
+    return data.data
+  },
+
+  /**
+   * 归档笔记
+   */
+  archive: async (id: number): Promise<Note> => {
+    const { data } = await apiClient.post<ApiResponse<Note>>(`${BASE_URL}/${id}/archive`)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to archive note')
+    }
+    return data.data
+  },
+
+  /**
+   * 取消归档笔记
+   */
+  unarchive: async (id: number): Promise<Note> => {
+    const { data } = await apiClient.post<ApiResponse<Note>>(`${BASE_URL}/${id}/unarchive`)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to unarchive note')
+    }
+    return data.data
+  },
+
+  /**
+   * 提炼为经验
+   */
+  promoteToExperience: async (id: number, request: PromoteRequest): Promise<Note> => {
+    const { data } = await apiClient.post<ApiResponse<Note>>(
+      `${BASE_URL}/${id}/promote`,
+      request
+    )
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to promote note to experience')
     }
     return data.data
   },

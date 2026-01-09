@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# MCP 服务器配置（按显示顺序排列：数据 -> 因子 -> 策略 -> 笔记）
+# MCP 服务器配置（按显示顺序排列：数据 -> 因子 -> 策略 -> 笔记 -> 研报 -> 经验）
 MCP_SERVERS = {
     "data-hub": {
         "name": "data-hub",
@@ -69,11 +69,27 @@ MCP_SERVERS = {
     },
     "note-hub": {
         "name": "note-hub",
-        "display_name": "经验概览",
-        "description": "研究笔记和经验记录服务",
+        "display_name": "研究笔记",
+        "description": "研究笔记和临时记录服务",
         "host": "localhost",
         "port": 6792,
         "module": "domains.note_hub.api.mcp.server",
+    },
+    "research-hub": {
+        "name": "research-hub",
+        "display_name": "研报知识库",
+        "description": "外部研报上传、解析和RAG对话服务",
+        "host": "localhost",
+        "port": 6793,
+        "module": "domains.research_hub.api.mcp.server",
+    },
+    "experience-hub": {
+        "name": "experience-hub",
+        "display_name": "经验知识库",
+        "description": "结构化研究经验、语义检索和知识提炼服务",
+        "host": "localhost",
+        "port": 6794,
+        "module": "domains.experience_hub.api.mcp.server",
     },
 }
 

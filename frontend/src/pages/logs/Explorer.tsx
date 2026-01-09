@@ -222,18 +222,12 @@ function FieldSidebar({
   selectedFields,
   fieldOrder,
   onToggleField,
-  onSelectAll,
-  onDeselectAll,
-  onResetDefault,
   onReorderFields,
 }: {
   availableFields: string[]
   selectedFields: Set<string>
   fieldOrder: string[]
   onToggleField: (field: string) => void
-  onSelectAll: () => void
-  onDeselectAll: () => void
-  onResetDefault: () => void
   onReorderFields: (newOrder: string[]) => void
 }) {
   // 已选字段：按 fieldOrder 排序
@@ -278,19 +272,6 @@ function FieldSidebar({
 
   return (
     <div className="flex w-60 flex-shrink-0 flex-col border-r bg-card">
-      {/* Actions */}
-      <div className="flex gap-2 border-b px-4 py-2">
-        <Button variant="ghost" size="sm" onClick={onSelectAll} className="flex-1 h-8">
-          全选
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onDeselectAll} className="flex-1 h-8">
-          清空
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onResetDefault} className="flex-1 h-8">
-          重置
-        </Button>
-      </div>
-
       {/* Field list */}
       <div className="flex-1">
         {/* 已选字段 - 可拖动排序 */}
@@ -805,19 +786,6 @@ export function Component() {
     })
   }
 
-  const handleSelectAllFields = () => {
-    setSelectedFields(new Set(availableFields))
-  }
-
-  const handleDeselectAllFields = () => {
-    setSelectedFields(new Set())
-  }
-
-  const handleResetDefaultFields = () => {
-    setSelectedFields(new Set(DEFAULT_SELECTED_FIELDS))
-    setFieldOrder(DEFAULT_FIELD_ORDER)
-  }
-
   const handleReorderFields = useCallback((newOrder: string[]) => {
     setFieldOrder(newOrder)
   }, [])
@@ -1146,9 +1114,6 @@ export function Component() {
           selectedFields={selectedFields}
           fieldOrder={fieldOrder}
           onToggleField={handleToggleField}
-          onSelectAll={handleSelectAllFields}
-          onDeselectAll={handleDeselectAllFields}
-          onResetDefault={handleResetDefaultFields}
           onReorderFields={handleReorderFields}
         />
 

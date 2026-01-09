@@ -115,11 +115,13 @@ export function Component() {
           title="已验证"
           value={stats?.verified ?? 0}
           icon={<CheckCircle className="h-5 w-5" />}
+          valueColor="success"
         />
         <StatsCard
           title="平均夏普"
           value={stats?.avg_sharpe?.toFixed(2) ?? '-'}
           icon={<TrendingUp className="h-5 w-5" />}
+          valueColor={stats?.avg_sharpe && stats.avg_sharpe > 1 ? 'success' : stats?.avg_sharpe && stats.avg_sharpe > 0 ? 'warning' : 'default'}
         />
       </div>
 
@@ -229,8 +231,8 @@ function StrategyTable({ strategies, onDelete, isDeleting, deletingId }: Strateg
           <tr className="border-b bg-muted/50">
             <th className="px-3 py-3 text-left text-sm font-medium whitespace-nowrap">策略名称</th>
             <th className="px-3 py-3 text-left text-sm font-medium whitespace-nowrap">因子(参数)</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap text-green-600">多</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap text-red-600">空</th>
+            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap text-success">多</th>
+            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap text-destructive">空</th>
             <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">净值</th>
             <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">年化收益</th>
             <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">最大回撤</th>
@@ -267,12 +269,12 @@ function StrategyTable({ strategies, onDelete, isDeleting, deletingId }: Strateg
                   </p>
                 </td>
                 <td className="px-3 py-3 text-center">
-                  <span className="text-sm font-medium text-green-600">
+                  <span className="text-sm font-medium text-success">
                     {strategy.long_select_coin_num ?? strategy.select_coin_num}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-center">
-                  <span className="text-sm font-medium text-red-600">
+                  <span className="text-sm font-medium text-destructive">
                     {strategy.short_select_coin_num ?? 0}
                   </span>
                 </td>
@@ -281,8 +283,8 @@ function StrategyTable({ strategies, onDelete, isDeleting, deletingId }: Strateg
                     className={cn(
                       'font-medium',
                       strategy.cumulative_return && strategy.cumulative_return >= 1
-                        ? 'text-green-600'
-                        : 'text-red-600'
+                        ? 'text-success'
+                        : 'text-destructive'
                     )}
                   >
                     {strategy.cumulative_return?.toFixed(2) ?? '-'}
@@ -293,15 +295,15 @@ function StrategyTable({ strategies, onDelete, isDeleting, deletingId }: Strateg
                     className={cn(
                       'font-medium',
                       strategy.annual_return && strategy.annual_return > 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
+                        ? 'text-success'
+                        : 'text-destructive'
                     )}
                   >
                     {formatPercent(strategy.annual_return)}
                   </span>
                 </td>
                 <td className="px-3 py-3 text-center">
-                  <span className="text-red-600 font-medium">
+                  <span className="text-destructive font-medium">
                     {formatPercent(strategy.max_drawdown)}
                   </span>
                 </td>
@@ -310,8 +312,8 @@ function StrategyTable({ strategies, onDelete, isDeleting, deletingId }: Strateg
                     className={cn(
                       'font-medium',
                       strategy.sharpe_ratio && strategy.sharpe_ratio > 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
+                        ? 'text-success'
+                        : 'text-destructive'
                     )}
                   >
                     {strategy.sharpe_ratio?.toFixed(2) ?? '-'}

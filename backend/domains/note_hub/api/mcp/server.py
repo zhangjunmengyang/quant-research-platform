@@ -3,6 +3,13 @@ MCP Server - 笔记知识库 MCP 服务器
 
 基于 mcp_core 实现的 MCP 服务器。
 使用 Streamable HTTP 传输协议（MCP 2025-03-26 规范推荐）。
+
+Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
+- 基础 CRUD（create_note, get_note, list_notes, search_notes）
+- 研究记录（record_observation, record_hypothesis, record_finding）
+- 研究轨迹（get_research_trail）
+- 归档管理（archive_note, unarchive_note）
+- 提炼为经验（promote_to_experience）
 """
 
 import logging
@@ -18,10 +25,22 @@ from domains.mcp_core import (
 from domains.mcp_core.server.server import run_server as mcp_run_server
 
 from .tools.note_tools import (
+    # 基础 CRUD
     CreateNoteTool,
     SearchNotesTool,
     GetNoteTool,
     ListNotesTool,
+    # 研究记录
+    RecordObservationTool,
+    RecordHypothesisTool,
+    RecordFindingTool,
+    # 研究轨迹
+    GetResearchTrailTool,
+    # 归档管理
+    ArchiveNoteTool,
+    UnarchiveNoteTool,
+    # 提炼为经验
+    PromoteToExperienceTool,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,13 +59,28 @@ class NoteHubMCPServer(BaseMCPServer):
 
     def _register_tools(self) -> None:
         """注册笔记知识库工具"""
-        # 查询类工具
+        # 基础查询工具
         self.register_tool(ListNotesTool(), "query")
         self.register_tool(GetNoteTool(), "query")
         self.register_tool(SearchNotesTool(), "query")
 
-        # 修改类工具
+        # 基础创建工具
         self.register_tool(CreateNoteTool(), "mutation")
+
+        # 研究记录工具
+        self.register_tool(RecordObservationTool(), "mutation")
+        self.register_tool(RecordHypothesisTool(), "mutation")
+        self.register_tool(RecordFindingTool(), "mutation")
+
+        # 研究轨迹工具
+        self.register_tool(GetResearchTrailTool(), "query")
+
+        # 归档管理工具
+        self.register_tool(ArchiveNoteTool(), "mutation")
+        self.register_tool(UnarchiveNoteTool(), "mutation")
+
+        # 提炼为经验工具
+        self.register_tool(PromoteToExperienceTool(), "mutation")
 
         logger.info(f"注册了 {len(self.tool_registry)} 个笔记知识库工具")
 

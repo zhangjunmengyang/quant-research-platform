@@ -6,44 +6,34 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { researchApi } from './api'
 import type {
   ReportListParams,
-  CreateConversationRequest,
-  ChatRequest,
   ScanUploadRequest,
+  SearchRequest,
+  AskRequest,
+  SimilarChunksRequest,
 } from './types'
 
 // Query Keys
 export const researchKeys = {
   all: ['research'] as const,
-  // LLM
-  models: () => [...researchKeys.all, 'models'] as const,
   // 研报
   reports: () => [...researchKeys.all, 'reports'] as const,
   reportList: (params: ReportListParams) => [...researchKeys.reports(), 'list', params] as const,
   reportDetail: (id: number) => [...researchKeys.reports(), 'detail', id] as const,
   reportStatus: (id: number) => [...researchKeys.reports(), 'status', id] as const,
-  // 对话
-  conversations: () => [...researchKeys.all, 'conversations'] as const,
-  conversationList: () => [...researchKeys.conversations(), 'list'] as const,
-  conversationDetail: (id: number) => [...researchKeys.conversations(), 'detail', id] as const,
-  messages: (conversationId: number) =>
-    [...researchKeys.conversations(), conversationId, 'messages'] as const,
+  // 切块
+  chunks: () => [...researchKeys.all, 'chunks'] as const,
+  reportChunks: (reportId: number, params: { page?: number; page_size?: number }) =>
+    [...researchKeys.chunks(), 'report', reportId, params] as const,
+  similarChunks: (chunkId: string) => [...researchKeys.chunks(), 'similar', chunkId] as const,
+  // 搜索
+  search: () => [...researchKeys.all, 'search'] as const,
+  searchResults: (query: string) => [...researchKeys.search(), query] as const,
+  // 问答
+  ask: () => [...researchKeys.all, 'ask'] as const,
 }
 
 // 默认缓存时间: 5 分钟
 const DEFAULT_STALE_TIME = 5 * 60 * 1000
-
-// ==================== LLM Hooks ====================
-
-/**
- * 获取可用的 LLM 模型列表
- */
-export function useModels() {
-  return useQuery({
-    queryKey: researchKeys.models(),
-    queryFn: () => researchApi.getModels(),
-    staleTime: DEFAULT_STALE_TIME,
-  })
-}
 
 // ==================== 研报 Hooks ====================
 
@@ -140,96 +130,51 @@ export function useReportMutations() {
   }
 }
 
-// ==================== 对话 Hooks ====================
+// ==================== 切块 Hooks ====================
 
 /**
- * 获取对话列表
+ * 获取研报切块列表
  */
-export function useConversations(limit = 50, offset = 0) {
+export function useReportChunks(
+  reportId: number | null,
+  params: { page?: number; page_size?: number } = {}
+) {
   return useQuery({
-    queryKey: researchKeys.conversationList(),
-    queryFn: () => researchApi.listConversations(limit, offset),
+    queryKey: researchKeys.reportChunks(reportId ?? 0, params),
+    queryFn: () => researchApi.getReportChunks(reportId!, params),
+    enabled: reportId !== null && reportId > 0,
+    placeholderData: keepPreviousData,
     staleTime: DEFAULT_STALE_TIME,
   })
 }
 
 /**
- * 获取对话详情
+ * 获取相似切块 (mutation，按需调用)
  */
-export function useConversation(id: number | null) {
-  return useQuery({
-    queryKey: researchKeys.conversationDetail(id ?? 0),
-    queryFn: () => researchApi.getConversation(id!),
-    enabled: id !== null && id > 0,
-    staleTime: DEFAULT_STALE_TIME,
+export function useSimilarChunks() {
+  return useMutation({
+    mutationFn: (request: SimilarChunksRequest) => researchApi.getSimilarChunks(request),
   })
 }
 
+// ==================== 语义搜索 Hooks ====================
+
 /**
- * 获取对话消息
+ * 语义搜索 (mutation，按需调用)
  */
-export function useMessages(conversationId: number | null, limit = 100) {
-  return useQuery({
-    queryKey: researchKeys.messages(conversationId ?? 0),
-    queryFn: () => researchApi.getMessages(conversationId!, limit),
-    enabled: conversationId !== null && conversationId > 0,
-    staleTime: 60 * 1000, // 消息缓存 1 分钟（用户可能正在聊天）
+export function useSearch() {
+  return useMutation({
+    mutationFn: (request: SearchRequest) => researchApi.search(request),
   })
 }
 
-/**
- * 对话操作 mutations
- */
-export function useConversationMutations() {
-  const queryClient = useQueryClient()
-
-  const invalidateConversations = () => {
-    queryClient.invalidateQueries({ queryKey: researchKeys.conversations() })
-  }
-
-  // 创建对话
-  const createMutation = useMutation({
-    mutationFn: (request: CreateConversationRequest) => researchApi.createConversation(request),
-    onSuccess: () => {
-      invalidateConversations()
-    },
-  })
-
-  // 删除对话
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => researchApi.deleteConversation(id),
-    onSuccess: () => {
-      invalidateConversations()
-    },
-  })
-
-  // 发送消息 (同步)
-  const chatMutation = useMutation({
-    mutationFn: ({ conversationId, request }: { conversationId: number; request: ChatRequest }) =>
-      researchApi.chat(conversationId, request),
-    onSuccess: (_, { conversationId }) => {
-      queryClient.invalidateQueries({ queryKey: researchKeys.messages(conversationId) })
-    },
-  })
-
-  return {
-    create: createMutation,
-    delete: deleteMutation,
-    chat: chatMutation,
-  }
-}
+// ==================== RAG 问答 Hooks ====================
 
 /**
- * 综合研报管理 hook
+ * RAG 问答 (mutation，按需调用)
  */
-export function useResearchManager() {
-  const reportMutations = useReportMutations()
-  const conversationMutations = useConversationMutations()
-
-  return {
-    ...reportMutations,
-    createConversation: conversationMutations.create,
-    deleteConversation: conversationMutations.delete,
-    chat: conversationMutations.chat,
-  }
+export function useAsk() {
+  return useMutation({
+    mutationFn: (request: AskRequest) => researchApi.ask(request),
+  })
 }

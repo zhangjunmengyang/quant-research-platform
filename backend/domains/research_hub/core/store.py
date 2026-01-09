@@ -1,7 +1,7 @@
 """
 研报存储层 - PostgreSQL 数据源
 
-提供研报、切块、对话的持久化存储和查询功能。
+提供研报、切块的持久化存储和查询功能。
 继承 mcp_core.BaseStore，复用连接管理和通用 CRUD。
 """
 
@@ -21,8 +21,6 @@ from domains.mcp_core.database.query_builder import QueryBuilder
 from .models import (
     ResearchReport,
     ResearchChunk,
-    Conversation,
-    Message,
     ProcessingStatus,
 )
 
@@ -339,14 +337,43 @@ class ChunkStore(BaseStore[ResearchChunk]):
             logger.error(f"批量添加切块失败: {e}")
             return 0
 
-    def get_by_report(self, report_id: int) -> List[ResearchChunk]:
-        """获取研报的所有切块"""
+    def get_by_report(
+        self,
+        report_id: int,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> Tuple[List[ResearchChunk], int]:
+        """获取研报的切块(支持分页)
+
+        Args:
+            report_id: 研报ID
+            limit: 返回数量限制，None表示返回全部
+            offset: 偏移量
+
+        Returns:
+            (切块列表, 总数)
+        """
         with self._cursor() as cursor:
+            # 获取总数
             cursor.execute(
-                f'SELECT * FROM {self.table_name} WHERE report_id = %s ORDER BY chunk_index',
+                f'SELECT COUNT(*) as count FROM {self.table_name} WHERE report_id = %s',
                 (report_id,)
             )
-            return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+            total = cursor.fetchone()['count']
+
+            # 获取切块
+            if limit is not None:
+                cursor.execute(
+                    f'SELECT * FROM {self.table_name} WHERE report_id = %s ORDER BY chunk_index LIMIT %s OFFSET %s',
+                    (report_id, limit, offset)
+                )
+            else:
+                cursor.execute(
+                    f'SELECT * FROM {self.table_name} WHERE report_id = %s ORDER BY chunk_index',
+                    (report_id,)
+                )
+            chunks = [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+            return chunks, total
 
     def delete_by_report(self, report_id: int) -> int:
         """删除研报的所有切块"""
@@ -367,130 +394,6 @@ class ChunkStore(BaseStore[ResearchChunk]):
             return cursor.fetchone()['count']
 
 
-class ConversationStore(BaseStore[Conversation]):
-    """
-    对话存储层
-
-    提供对话和消息的 CRUD 操作。
-    """
-
-    table_name = "research_conversations"
-
-    allowed_columns = {
-        'id', 'uuid', 'title', 'report_id',
-        'created_at', 'updated_at'
-    }
-
-    numeric_fields = {'id', 'report_id'}
-
-    def _row_to_entity(self, row: Dict[str, Any]) -> Conversation:
-        """将数据库行转换为 Conversation 对象"""
-        valid_fields = {k: v for k, v in row.items() if k in Conversation.__dataclass_fields__}
-        return Conversation(**valid_fields)
-
-    def add(self, conv: Conversation) -> Optional[int]:
-        """添加对话"""
-        conv.created_at = datetime.now()
-        conv.updated_at = datetime.now()
-
-        try:
-            with self._cursor() as cursor:
-                cursor.execute(f'''
-                    INSERT INTO {self.table_name} (
-                        uuid, title, report_id,
-                        created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id
-                ''', (
-                    conv.uuid, conv.title, conv.report_id,
-                    conv.created_at, conv.updated_at
-                ))
-                result = cursor.fetchone()
-                return result['id'] if result else None
-        except psycopg2.IntegrityError as e:
-            logger.error(f"添加对话失败: {e}")
-            return None
-
-    def get(self, conv_id: int) -> Optional[Conversation]:
-        """获取对话"""
-        with self._cursor() as cursor:
-            cursor.execute(
-                f'SELECT * FROM {self.table_name} WHERE id = %s',
-                (conv_id,)
-            )
-            row = cursor.fetchone()
-            if row:
-                return self._row_to_entity(dict(row))
-        return None
-
-    def get_all(self, limit: int = 50, offset: int = 0) -> List[Conversation]:
-        """获取所有对话"""
-        with self._cursor() as cursor:
-            cursor.execute(
-                f'SELECT * FROM {self.table_name} ORDER BY updated_at DESC LIMIT %s OFFSET %s',
-                (limit, offset)
-            )
-            return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
-
-    def delete(self, conv_id: int) -> bool:
-        """删除对话（消息会级联删除）"""
-        with self._cursor() as cursor:
-            cursor.execute(f'DELETE FROM {self.table_name} WHERE id = %s', (conv_id,))
-            return cursor.rowcount > 0
-
-    def update_title(self, conv_id: int, title: str) -> bool:
-        """更新对话标题"""
-        with self._cursor() as cursor:
-            cursor.execute(
-                f'UPDATE {self.table_name} SET title = %s, updated_at = %s WHERE id = %s',
-                (title, datetime.now(), conv_id)
-            )
-            return cursor.rowcount > 0
-
-    # ==================== 消息操作 ====================
-
-    def add_message(self, message: Message) -> Optional[int]:
-        """添加消息"""
-        message.created_at = datetime.now()
-
-        try:
-            with self._cursor() as cursor:
-                cursor.execute('''
-                    INSERT INTO research_messages (
-                        conversation_id, role, content, sources, created_at
-                    ) VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id
-                ''', (
-                    message.conversation_id, message.role, message.content,
-                    message.sources, message.created_at
-                ))
-                result = cursor.fetchone()
-
-                # 更新对话的 updated_at
-                if result and message.conversation_id:
-                    cursor.execute(
-                        f'UPDATE {self.table_name} SET updated_at = %s WHERE id = %s',
-                        (datetime.now(), message.conversation_id)
-                    )
-
-                return result['id'] if result else None
-        except psycopg2.IntegrityError as e:
-            logger.error(f"添加消息失败: {e}")
-            return None
-
-    def get_messages(self, conv_id: int, limit: int = 100) -> List[Message]:
-        """获取对话的消息"""
-        with self._cursor() as cursor:
-            cursor.execute(
-                '''SELECT * FROM research_messages
-                   WHERE conversation_id = %s
-                   ORDER BY created_at ASC
-                   LIMIT %s''',
-                (conv_id, limit)
-            )
-            return [Message.from_dict(dict(row)) for row in cursor.fetchall()]
-
-
 # ==================== 单例管理 ====================
 
 def get_research_store(database_url: Optional[str] = None) -> ResearchStore:
@@ -503,11 +406,6 @@ def get_chunk_store(database_url: Optional[str] = None) -> ChunkStore:
     return get_store_instance(ChunkStore, "ChunkStore", database_url=database_url)
 
 
-def get_conversation_store(database_url: Optional[str] = None) -> ConversationStore:
-    """获取对话存储层单例"""
-    return get_store_instance(ConversationStore, "ConversationStore", database_url=database_url)
-
-
 def reset_research_store():
     """重置存储层单例（用于测试）"""
     reset_store_instance("ResearchStore")
@@ -516,8 +414,3 @@ def reset_research_store():
 def reset_chunk_store():
     """重置存储层单例（用于测试）"""
     reset_store_instance("ChunkStore")
-
-
-def reset_conversation_store():
-    """重置存储层单例（用于测试）"""
-    reset_store_instance("ConversationStore")
