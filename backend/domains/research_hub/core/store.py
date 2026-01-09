@@ -337,14 +337,43 @@ class ChunkStore(BaseStore[ResearchChunk]):
             logger.error(f"批量添加切块失败: {e}")
             return 0
 
-    def get_by_report(self, report_id: int) -> List[ResearchChunk]:
-        """获取研报的所有切块"""
+    def get_by_report(
+        self,
+        report_id: int,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> Tuple[List[ResearchChunk], int]:
+        """获取研报的切块(支持分页)
+
+        Args:
+            report_id: 研报ID
+            limit: 返回数量限制，None表示返回全部
+            offset: 偏移量
+
+        Returns:
+            (切块列表, 总数)
+        """
         with self._cursor() as cursor:
+            # 获取总数
             cursor.execute(
-                f'SELECT * FROM {self.table_name} WHERE report_id = %s ORDER BY chunk_index',
+                f'SELECT COUNT(*) as count FROM {self.table_name} WHERE report_id = %s',
                 (report_id,)
             )
-            return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+            total = cursor.fetchone()['count']
+
+            # 获取切块
+            if limit is not None:
+                cursor.execute(
+                    f'SELECT * FROM {self.table_name} WHERE report_id = %s ORDER BY chunk_index LIMIT %s OFFSET %s',
+                    (report_id, limit, offset)
+                )
+            else:
+                cursor.execute(
+                    f'SELECT * FROM {self.table_name} WHERE report_id = %s ORDER BY chunk_index',
+                    (report_id,)
+                )
+            chunks = [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+            return chunks, total
 
     def delete_by_report(self, report_id: int) -> int:
         """删除研报的所有切块"""

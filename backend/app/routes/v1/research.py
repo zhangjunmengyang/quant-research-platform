@@ -525,14 +525,14 @@ async def get_report_chunks(
             page_size=page_size,
             chunks=[
                 ChunkItem(
-                    chunk_id=c.get("chunk_id", ""),
-                    chunk_index=c.get("chunk_index", 0),
-                    chunk_type=c.get("chunk_type", "text"),
-                    content=c.get("content", ""),
-                    token_count=c.get("token_count", 0),
-                    page_start=c.get("page_start"),
-                    page_end=c.get("page_end"),
-                    section_title=c.get("section_title", ""),
+                    chunk_id=c.chunk_id,
+                    chunk_index=c.chunk_index,
+                    chunk_type=c.chunk_type,
+                    content=c.content,
+                    token_count=c.token_count,
+                    page_start=c.page_start,
+                    page_end=c.page_end,
+                    section_title=c.section_title,
                 )
                 for c in chunks
             ],

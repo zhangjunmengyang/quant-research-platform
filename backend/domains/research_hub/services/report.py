@@ -563,9 +563,20 @@ class ReportService:
     async def get_report_chunks(
         self,
         report_id: int,
-    ) -> List[ResearchChunk]:
-        """获取研报的所有切块"""
-        return self.chunk_store.get_by_report(report_id)
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> Tuple[List[ResearchChunk], int]:
+        """获取研报的切块(支持分页)
+
+        Args:
+            report_id: 研报ID
+            limit: 返回数量限制，None表示返回全部
+            offset: 偏移量
+
+        Returns:
+            (切块列表, 总数)
+        """
+        return self.chunk_store.get_by_report(report_id, limit=limit, offset=offset)
 
     async def get_processing_status(
         self,

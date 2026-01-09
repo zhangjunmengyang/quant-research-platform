@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 import {
   X,
@@ -443,6 +444,7 @@ export function ExperienceDetailPanel({
 
 /**
  * 包装组件，使用 store 管理状态
+ * 使用 createPortal 渲染到 document.body，确保侧栏覆盖全屏高度
  */
 export function ExperienceDetailPanelWrapper() {
   const { selectedExperience, detailPanelOpen, closeDetailPanel } = useExperienceStore()
@@ -451,9 +453,18 @@ export function ExperienceDetailPanelWrapper() {
     return null
   }
 
-  return (
-    <div className="fixed right-0 top-0 z-50 h-screen w-[480px] border-l shadow-lg">
-      <ExperienceDetailPanel experience={selectedExperience} onClose={closeDetailPanel} />
-    </div>
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-black/50"
+        onClick={closeDetailPanel}
+      />
+      {/* Panel */}
+      <div className="fixed inset-y-0 right-0 z-50 w-[480px] border-l bg-background shadow-lg">
+        <ExperienceDetailPanel experience={selectedExperience} onClose={closeDetailPanel} />
+      </div>
+    </>,
+    document.body
   )
 }

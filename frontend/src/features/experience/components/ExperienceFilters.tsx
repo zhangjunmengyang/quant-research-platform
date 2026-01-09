@@ -1,12 +1,12 @@
 /**
  * Experience Filters Component
  *
- * 经验列表过滤器组件
+ * 经验列表过滤器组件 - 使用统一的 FilterToolbar 和 FilterSelect
  */
 
 import { useMemo } from 'react'
-import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
-import { Search, RotateCcw } from 'lucide-react'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
 import { useExperienceStore, useExperienceStats } from '../'
 import {
   EXPERIENCE_LEVEL_LABELS,
@@ -72,100 +72,75 @@ export function ExperienceFilters({ onSearch, searchValue = '' }: ExperienceFilt
     [stats?.categories]
   )
 
+  // 检查是否有活跃筛选
+  const hasActiveFilters = !!(
+    searchValue ||
+    filters.experience_level ||
+    filters.status ||
+    filters.category ||
+    filters.source_type ||
+    filters.market_regime
+  )
+
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-card p-4">
-      {/* 搜索框 */}
-      <div className="flex-1 min-w-[200px] max-w-md">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="搜索经验..."
-            defaultValue={searchValue}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 pl-10 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onChange={(e) => onSearch?.(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* 层级筛选 */}
-      <div className="min-w-[120px]">
-        <SearchableSelect
-          options={LEVEL_OPTIONS}
-          value={filters.experience_level || ''}
-          onChange={(value) =>
-            setFilters({
-              experience_level: (value as ExperienceLevel) || undefined,
-              page: 1,
-            })
-          }
-        />
-      </div>
-
-      {/* 状态筛选 */}
-      <div className="min-w-[120px]">
-        <SearchableSelect
-          options={STATUS_OPTIONS}
-          value={filters.status || ''}
-          onChange={(value) =>
-            setFilters({
-              status: (value as ExperienceStatus) || undefined,
-              page: 1,
-            })
-          }
-        />
-      </div>
-
-      {/* 分类筛选 */}
-      <div className="min-w-[150px]">
-        <SearchableSelect
-          options={categoryOptions}
-          value={filters.category || ''}
-          onChange={(value) => setFilters({ category: value || undefined, page: 1 })}
-          searchPlaceholder="搜索分类..."
-        />
-      </div>
-
-      {/* 来源筛选 */}
-      <div className="min-w-[120px]">
-        <SearchableSelect
-          options={SOURCE_TYPE_OPTIONS}
-          value={filters.source_type || ''}
-          onChange={(value) =>
-            setFilters({
-              source_type: (value as SourceType) || undefined,
-              page: 1,
-            })
-          }
-        />
-      </div>
-
-      {/* 市场环境筛选 */}
-      <div className="min-w-[100px]">
-        <SearchableSelect
-          options={MARKET_REGIME_OPTIONS}
-          value={filters.market_regime || ''}
-          onChange={(value) => setFilters({ market_regime: value || undefined, page: 1 })}
-        />
-      </div>
-
-      {/* 排序 */}
-      <div className="min-w-[140px]">
-        <SearchableSelect
-          options={ORDER_BY_OPTIONS}
-          value={filters.order_by || 'updated_at'}
-          onChange={(value) => setFilters({ order_by: value, page: 1 })}
-        />
-      </div>
-
-      {/* 重置按钮 */}
-      <button
-        onClick={resetFilters}
-        className="flex items-center gap-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-      >
-        <RotateCcw className="h-4 w-4" />
-        重置
-      </button>
-    </div>
+    <FilterToolbar
+      searchValue={searchValue}
+      onSearchChange={onSearch}
+      searchPlaceholder="搜索经验..."
+      hasActiveFilters={hasActiveFilters}
+      onReset={resetFilters}
+    >
+      <FilterSelect
+        label="层级"
+        options={LEVEL_OPTIONS}
+        value={filters.experience_level}
+        onChange={(value) =>
+          setFilters({
+            experience_level: (value as ExperienceLevel) || undefined,
+            page: 1,
+          })
+        }
+      />
+      <FilterSelect
+        label="状态"
+        options={STATUS_OPTIONS}
+        value={filters.status}
+        onChange={(value) =>
+          setFilters({
+            status: (value as ExperienceStatus) || undefined,
+            page: 1,
+          })
+        }
+      />
+      <FilterSelect
+        label="分类"
+        options={categoryOptions}
+        value={filters.category}
+        onChange={(value) => setFilters({ category: value || undefined, page: 1 })}
+      />
+      <FilterSelect
+        label="来源"
+        options={SOURCE_TYPE_OPTIONS}
+        value={filters.source_type}
+        onChange={(value) =>
+          setFilters({
+            source_type: (value as SourceType) || undefined,
+            page: 1,
+          })
+        }
+      />
+      <FilterSelect
+        label="市场"
+        options={MARKET_REGIME_OPTIONS}
+        value={filters.market_regime}
+        onChange={(value) => setFilters({ market_regime: value || undefined, page: 1 })}
+      />
+      <FilterSelect
+        label="排序"
+        options={ORDER_BY_OPTIONS}
+        value={filters.order_by || 'updated_at'}
+        onChange={(value) => setFilters({ order_by: value, page: 1 })}
+      />
+    </FilterToolbar>
   )
 }

@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileText,
   Plus,
-  Search,
   Loader2,
   Tag,
   Calendar,
@@ -34,6 +33,8 @@ import {
 } from '@/features/note'
 import type { Note, NoteListParams } from '@/features/note'
 import { cn } from '@/lib/utils'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
 import {
   Dialog,
   DialogContent,
@@ -51,11 +52,20 @@ import {
 // 归档状态筛选选项
 type ArchiveFilter = 'active' | 'archived' | 'all'
 
-const ARCHIVE_FILTER_LABELS: Record<ArchiveFilter, string> = {
-  active: '活跃笔记',
-  archived: '已归档',
-  all: '全部',
-}
+const ARCHIVE_FILTER_OPTIONS: SelectOption[] = [
+  { value: '', label: '全部状态' },
+  { value: 'active', label: '活跃笔记' },
+  { value: 'archived', label: '已归档' },
+]
+
+// 笔记类型筛选选项
+const NOTE_TYPE_OPTIONS: SelectOption[] = [
+  { value: '', label: '全部类型' },
+  ...Object.values(NoteType).map((type) => ({
+    value: type,
+    label: NOTE_TYPE_LABELS[type],
+  })),
+]
 
 // 快速记录类型配置
 const QUICK_RECORD_TYPES = [
@@ -83,10 +93,10 @@ export function Component() {
   const navigate = useNavigate()
   const [params, setParams] = useState<NoteListParams>({ page: 1, page_size: 20 })
   const [searchInput, setSearchInput] = useState('')
-  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active')
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter | undefined>(undefined)
   const { data, isLoading, isError, error } = useNotes({
     ...params,
-    is_archived: archiveFilter === 'all' ? undefined : archiveFilter === 'archived',
+    is_archived: archiveFilter === undefined ? false : archiveFilter === 'archived',
   })
   const { data: tags = [] } = useNoteTags()
   const { createNote, deleteNote } = useNoteMutations()
@@ -99,6 +109,12 @@ export function Component() {
   const [newTitle, setNewTitle] = useState('')
   const [newTags, setNewTags] = useState('')
   const [newContent, setNewContent] = useState('')
+
+  // 动态生成标签选项
+  const tagOptions: SelectOption[] = [
+    { value: '', label: '全部标签' },
+    ...tags.map((tag) => ({ value: tag, label: tag })),
+  ]
 
   const handleOpenDialog = (type: NoteType = NoteType.GENERAL) => {
     setDialogType(type)
@@ -157,23 +173,24 @@ export function Component() {
     setParams({ ...params, search: searchInput, page: 1 })
   }
 
-  const handleTagFilter = (tag: string) => {
+  const handleTagFilter = (tag: string | undefined) => {
     setParams({ ...params, tags: tag, page: 1 })
   }
 
-  const handleNoteTypeFilter = (noteType: NoteType | undefined) => {
-    setParams({ ...params, note_type: noteType, page: 1 })
+  const handleNoteTypeFilter = (noteType: string | undefined) => {
+    setParams({ ...params, note_type: noteType as NoteType | undefined, page: 1 })
   }
 
-  const handleArchiveFilterChange = (filter: ArchiveFilter) => {
-    setArchiveFilter(filter)
+  const handleArchiveFilterChange = (filter: string | undefined) => {
+    const value = filter as ArchiveFilter | undefined
+    setArchiveFilter(value)
     setParams({ ...params, page: 1 })
   }
 
   const handleClearFilter = () => {
     setParams({ page: 1, page_size: 20 })
     setSearchInput('')
-    setArchiveFilter('active')
+    setArchiveFilter(undefined)
   }
 
   const handleDelete = async (e: React.MouseEvent, note: Note) => {
@@ -208,7 +225,7 @@ export function Component() {
     recordHypothesis.isPending ||
     recordFinding.isPending
 
-  const hasActiveFilters = params.search || params.tags || params.note_type || archiveFilter !== 'active'
+  const hasActiveFilters = !!(params.search || params.tags || params.note_type || archiveFilter !== undefined)
 
   if (isLoading) {
     return (
@@ -281,112 +298,36 @@ export function Component() {
         </div>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-wrap gap-4">
-        <div className="flex flex-1 gap-2">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="搜索笔记..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full rounded-md border bg-background py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <button
-            onClick={handleSearch}
-            className="rounded-md bg-secondary px-4 py-2 text-sm hover:bg-secondary/80"
-          >
-            搜索
-          </button>
-          {hasActiveFilters && (
-            <button
-              onClick={handleClearFilter}
-              className="rounded-md border px-4 py-2 text-sm hover:bg-muted"
-            >
-              清除筛选
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-4">
-        {/* 笔记类型筛选 */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">类型:</span>
-          <div className="flex gap-1">
-            <button
-              onClick={() => handleNoteTypeFilter(undefined)}
-              className={cn(
-                'rounded-md px-3 py-1 text-xs transition-colors',
-                !params.note_type
-                  ? 'bg-primary text-primary-foreground'
-                  : 'border hover:bg-muted'
-              )}
-            >
-              全部
-            </button>
-            {Object.values(NoteType).map((type) => (
-              <button
-                key={type}
-                onClick={() => handleNoteTypeFilter(type)}
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs transition-colors',
-                  params.note_type === type
-                    ? 'bg-primary text-primary-foreground'
-                    : 'border hover:bg-muted'
-                )}
-              >
-                {NOTE_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 归档状态筛选 */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">状态:</span>
-          <div className="flex gap-1">
-            {(Object.keys(ARCHIVE_FILTER_LABELS) as ArchiveFilter[]).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => handleArchiveFilterChange(filter)}
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs transition-colors',
-                  archiveFilter === filter
-                    ? 'bg-primary text-primary-foreground'
-                    : 'border hover:bg-muted'
-                )}
-              >
-                {ARCHIVE_FILTER_LABELS[filter]}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Tags */}
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => handleTagFilter(tag)}
-              className={cn(
-                'rounded-full px-3 py-1 text-xs border transition-colors',
-                params.tags === tag
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'hover:bg-muted'
-              )}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Filter Toolbar */}
+      <FilterToolbar
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearch={handleSearch}
+        searchPlaceholder="搜索笔记..."
+        hasActiveFilters={hasActiveFilters}
+        onReset={handleClearFilter}
+      >
+        <FilterSelect
+          label="类型"
+          options={NOTE_TYPE_OPTIONS}
+          value={params.note_type}
+          onChange={handleNoteTypeFilter}
+        />
+        <FilterSelect
+          label="状态"
+          options={ARCHIVE_FILTER_OPTIONS}
+          value={archiveFilter}
+          onChange={handleArchiveFilterChange}
+        />
+        {tags.length > 0 && (
+          <FilterSelect
+            label="标签"
+            options={tagOptions}
+            value={params.tags}
+            onChange={handleTagFilter}
+          />
+        )}
+      </FilterToolbar>
 
       {/* Notes List */}
       <div className="space-y-4">

@@ -4,11 +4,12 @@
 
 ## Features
 
-- **因子知识库**
-- **策略回测**
-- **研报知识库**
-- **数据服务**
-- **MCP 协议**
+- **因子知识库** - 因子管理、评分、分析
+- **策略回测** - 策略管理、参数搜索
+- **研报知识库** - PDF 上传、RAG 对话
+- **经验知识库** - 结构化研究经验、语义检索、知识提炼
+- **数据服务** - K线数据、因子计算
+- **MCP 协议** - LLM 直接访问量化知识库
 
 ## Quick Start
 
@@ -102,6 +103,8 @@ cd backend; $env:PYTHONPATH=".;.."; $env:PYTHONUTF8="1"
 ..\.venv\Scripts\python -m domains.data_hub.api.mcp.server        # Data Hub MCP
 ..\.venv\Scripts\python -m domains.strategy_hub.api.mcp.server    # Strategy Hub MCP
 ..\.venv\Scripts\python -m domains.note_hub.api.mcp.server        # Note Hub MCP
+..\.venv\Scripts\python -m domains.research_hub.api.mcp.server    # Research Hub MCP
+..\.venv\Scripts\python -m domains.experience_hub.api.mcp.server  # Experience Hub MCP
 ```
 
 **Windows 停止服务：**
@@ -139,6 +142,12 @@ docker compose -f docker/compose/docker-compose.infra.yml down
     },
     "note-hub": {
       "url": "http://localhost:6792/mcp"
+    },
+    "research-hub": {
+      "url": "http://localhost:6793/mcp"
+    },
+    "experience-hub": {
+      "url": "http://localhost:6794/mcp"
     }
   }
 }
@@ -158,6 +167,7 @@ quant-research-platform/
 │       ├── factor_hub/      # 因子知识库
 │       ├── strategy_hub/    # 策略回测
 │       ├── research_hub/    # 研报 RAG
+│       ├── experience_hub/  # 经验知识库
 │       ├── data_hub/        # 数据服务
 │       └── note_hub/        # 笔记管理
 ├── frontend/

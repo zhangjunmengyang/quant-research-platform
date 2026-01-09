@@ -295,13 +295,13 @@ export function KlineChart({
         {
           type: 'inside',
           xAxisIndex: showVolume ? [0, 1] : [0],
-          start: 70,
+          start: 0,
           end: 100,
         },
         {
           type: 'slider',
           xAxisIndex: showVolume ? [0, 1] : [0],
-          start: 70,
+          start: 0,
           end: 100,
           top: '88%',
           height: 20,

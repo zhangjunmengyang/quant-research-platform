@@ -1,10 +1,13 @@
 /**
  * Factor List Filters Component
+ *
+ * 因子列表过滤器组件 - 使用统一的 FilterToolbar 和 FilterSelect
  */
 
 import { useMemo } from 'react'
 import { useFactorStyles, useFactorStore } from '../'
-import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
 import { FACTOR_TYPE_LABELS, type FactorType, type ExcludedFilter } from '../types'
 
 // 因子类型选项
@@ -40,9 +43,10 @@ const ORDER_BY_OPTIONS: SelectOption[] = [
 
 interface FactorFiltersProps {
   onSearch?: (query: string) => void
+  searchValue?: string
 }
 
-export function FactorFilters({ onSearch }: FactorFiltersProps) {
+export function FactorFilters({ onSearch, searchValue = '' }: FactorFiltersProps) {
   const { data: styles = [] } = useFactorStyles()
   const { filters, setFilters, resetFilters } = useFactorStore()
 
@@ -55,86 +59,68 @@ export function FactorFilters({ onSearch }: FactorFiltersProps) {
     [styles]
   )
 
+  // 检查是否有活跃筛选
+  const hasActiveFilters = !!(
+    searchValue ||
+    filters.factor_type ||
+    filters.style ||
+    filters.verified !== undefined ||
+    (filters.excluded && filters.excluded !== 'active')
+  )
+
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-lg border bg-card p-4">
-      {/* Search */}
-      <div className="flex-1 min-w-[200px]">
-        <input
-          type="text"
-          placeholder="搜索因子名称..."
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onChange={(e) => onSearch?.(e.target.value)}
-        />
-      </div>
-
-      {/* Factor Type Filter */}
-      <div className="min-w-[100px]">
-        <SearchableSelect
-          options={FACTOR_TYPE_OPTIONS}
-          value={filters.factor_type || ''}
-          onChange={(value) =>
-            setFilters({
-              factor_type: (value as FactorType) || undefined,
-              page: 1,
-            })
-          }
-        />
-      </div>
-
-      {/* Style Filter */}
-      <div className="min-w-[150px]">
-        <SearchableSelect
-          options={styleOptions}
-          value={filters.style || ''}
-          onChange={(value) => setFilters({ style: value || undefined, page: 1 })}
-          searchPlaceholder="搜索风格..."
-        />
-      </div>
-
-      {/* Verified Filter */}
-      <div className="min-w-[120px]">
-        <SearchableSelect
-          options={VERIFIED_OPTIONS}
-          value={filters.verified === undefined ? '' : String(filters.verified)}
-          onChange={(value) =>
-            setFilters({
-              verified: value === '' ? undefined : value === 'true',
-              page: 1,
-            })
-          }
-        />
-      </div>
-
-      {/* Excluded Filter */}
-      <div className="min-w-[100px]">
-        <SearchableSelect
-          options={EXCLUDED_OPTIONS}
-          value={filters.excluded || 'active'}
-          onChange={(value) =>
-            setFilters({
-              excluded: (value as ExcludedFilter) || 'active',
-              page: 1,
-            })
-          }
-        />
-      </div>
-
-      {/* Order By */}
-      <div className="min-w-[140px]">
-        <SearchableSelect
-          options={ORDER_BY_OPTIONS}
-          value={filters.order_by || 'filename'}
-          onChange={(value) => setFilters({ order_by: value, page: 1 })}
-        />
-      </div>
-
-      {/* Reset Button */}
-      <button
-        onClick={resetFilters}
-        className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
-      >
-        重置
-      </button>
-    </div>
+    <FilterToolbar
+      searchValue={searchValue}
+      onSearchChange={onSearch}
+      searchPlaceholder="搜索因子名称..."
+      hasActiveFilters={hasActiveFilters}
+      onReset={resetFilters}
+    >
+      <FilterSelect
+        label="类型"
+        options={FACTOR_TYPE_OPTIONS}
+        value={filters.factor_type}
+        onChange={(value) =>
+          setFilters({
+            factor_type: (value as FactorType) || undefined,
+            page: 1,
+          })
+        }
+      />
+      <FilterSelect
+        label="风格"
+        options={styleOptions}
+        value={filters.style}
+        onChange={(value) => setFilters({ style: value || undefined, page: 1 })}
+      />
+      <FilterSelect
+        label="校验"
+        options={VERIFIED_OPTIONS}
+        value={filters.verified === undefined ? undefined : String(filters.verified)}
+        onChange={(value) =>
+          setFilters({
+            verified: value === undefined ? undefined : value === 'true',
+            page: 1,
+          })
+        }
+      />
+      <FilterSelect
+        label="状态"
+        options={EXCLUDED_OPTIONS}
+        value={filters.excluded || 'active'}
+        onChange={(value) =>
+          setFilters({
+            excluded: (value as ExcludedFilter) || 'active',
+            page: 1,
+          })
+        }
+      />
+      <FilterSelect
+        label="排序"
+        options={ORDER_BY_OPTIONS}
+        value={filters.order_by || 'filename'}
+        onChange={(value) => setFilters({ order_by: value, page: 1 })}
+      />
+    </FilterToolbar>
   )
 }

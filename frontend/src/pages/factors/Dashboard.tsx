@@ -117,13 +117,11 @@ export function Component() {
           title="已校验"
           value={stats?.verified ?? 0}
           icon={<CheckCircle className="h-5 w-5" />}
-          description={stats?.total ? `${Math.round(((stats.verified ?? 0) / stats.total) * 100)}%` : undefined}
         />
         <StatsCard
           title="已排除"
           value={stats?.excluded ?? 0}
           icon={<XCircle className="h-5 w-5" />}
-          description={stats?.total ? `共 ${(stats.total ?? 0) + (stats.excluded ?? 0)} 个因子` : undefined}
         />
       </div>
 
@@ -191,7 +189,7 @@ export function Component() {
                     </span>
                     <div className="flex-1 h-6 bg-muted rounded-md overflow-hidden">
                       <div
-                        className="h-full bg-blue-500 transition-all"
+                        className="h-full bg-info transition-all"
                         style={{
                           width: `${Math.min(((count as number) / (stats.total || 1)) * 100, 100)}%`,
                         }}
@@ -226,7 +224,7 @@ export function Component() {
                     </span>
                     <div className="flex-1 h-6 bg-muted rounded-md overflow-hidden">
                       <div
-                        className="h-full bg-green-500 transition-all"
+                        className="h-full bg-success transition-all"
                         style={{ width: `${rate}%` }}
                       />
                     </div>
@@ -248,7 +246,7 @@ export function Component() {
         <h2 className="text-lg font-semibold">因子库</h2>
 
         {/* Filters */}
-        <FactorFilters onSearch={setSearchQuery} />
+        <FactorFilters onSearch={setSearchQuery} searchValue={searchQuery} />
 
         {/* Toolbar */}
         <div className="flex items-center justify-between">
@@ -366,8 +364,8 @@ function FactorTable({
                 className={cn(
                   'rounded-full px-2 py-1 text-xs font-medium',
                   value === 'cross_section'
-                    ? 'bg-orange-100 text-orange-800'
-                    : 'bg-blue-100 text-blue-800'
+                    ? 'bg-warning-muted text-warning'
+                    : 'bg-info-muted text-info'
                 )}
               >
                 {FACTOR_TYPE_LABELS[value as FactorType] || '时序'}
@@ -384,7 +382,7 @@ function FactorTable({
                   {styles.map((style, i) => (
                     <span
                       key={i}
-                      className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800"
+                      className="rounded-full bg-primary-muted px-2 py-0.5 text-xs font-medium text-primary"
                     >
                       {style.trim()}
                     </span>
@@ -403,7 +401,7 @@ function FactorTable({
                   {tags.map((tag, i) => (
                     <span
                       key={i}
-                      className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700"
+                      className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
                     >
                       {tag.trim()}
                     </span>
@@ -428,10 +426,10 @@ function FactorTable({
                   className={cn(
                     'rounded-full px-2 py-1 text-xs font-medium',
                     score >= 4
-                      ? 'bg-green-100 text-green-800'
+                      ? 'bg-success-muted text-success'
                       : score >= 3
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-warning-muted text-warning'
+                        : 'bg-destructive-muted text-destructive'
                   )}
                 >
                   {score}
@@ -445,9 +443,9 @@ function FactorTable({
             column.render = (value) => (
               <div className="flex items-center justify-center">
                 {value ? (
-                  <Check className="h-4 w-4 text-green-600" />
+                  <Check className="h-4 w-4 text-success" />
                 ) : (
-                  <X className="h-4 w-4 text-gray-400" />
+                  <X className="h-4 w-4 text-muted-foreground/50" />
                 )}
               </div>
             )

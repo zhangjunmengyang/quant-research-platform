@@ -17,37 +17,7 @@ import {
   ExperienceCreateDialog,
 } from '@/features/experience'
 import type { ExperienceListParams } from '@/features/experience'
-import { cn } from '@/lib/utils'
-
-// 统计卡片组件
-function StatsCard({
-  title,
-  value,
-  icon: Icon,
-  description,
-  colorClass,
-}: {
-  title: string
-  value: number | string
-  icon: React.ComponentType<{ className?: string }>
-  description?: string
-  colorClass?: string
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-4">
-      <div className="flex items-center gap-3">
-        <div className={cn('rounded-lg p-2', colorClass || 'bg-primary/10')}>
-          <Icon className={cn('h-5 w-5', colorClass ? 'text-white' : 'text-primary')} />
-        </div>
-        <div>
-          <p className="text-2xl font-bold">{value}</p>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          {description && <p className="text-xs text-muted-foreground">{description}</p>}
-        </div>
-      </div>
-    </div>
-  )
-}
+import { StatsCard } from '@/features/factor/components/StatsCard'
 
 export function Component() {
   const { filters, setFilters, openDetailPanel } = useExperienceStore()
@@ -134,24 +104,25 @@ export function Component() {
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatsCard title="总经验" value={stats.total} icon={BarChart3} />
+          <StatsCard
+            title="总经验"
+            value={stats.total}
+            icon={<BarChart3 className="h-5 w-5" />}
+          />
           <StatsCard
             title="战略级"
             value={stats.by_level?.strategic || 0}
-            icon={Target}
-            colorClass="bg-purple-500"
+            icon={<Target className="h-5 w-5" />}
           />
           <StatsCard
             title="战术级"
             value={stats.by_level?.tactical || 0}
-            icon={Lightbulb}
-            colorClass="bg-blue-500"
+            icon={<Lightbulb className="h-5 w-5" />}
           />
           <StatsCard
             title="已验证"
             value={stats.by_status?.validated || 0}
-            icon={CheckCircle2}
-            colorClass="bg-green-500"
+            icon={<CheckCircle2 className="h-5 w-5" />}
           />
         </div>
       )}

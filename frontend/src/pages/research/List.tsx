@@ -8,7 +8,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileText,
   Upload,
-  Search,
   Loader2,
   Calendar,
   Trash2,
@@ -25,6 +24,8 @@ import { useReports, useReportMutations, useProcessingStatus } from '@/features/
 import type { Report, ReportListParams, ReportStatus } from '@/features/research'
 import { STATUS_LABELS, STATUS_COLORS } from '@/features/research'
 import { cn } from '@/lib/utils'
+import { FilterToolbar } from '@/components/ui/filter-toolbar'
+import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +33,15 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+
+// 状态筛选选项
+const STATUS_FILTER_OPTIONS: SelectOption[] = [
+  { value: '', label: '全部状态' },
+  { value: 'ready', label: STATUS_LABELS.ready },
+  { value: 'uploaded', label: STATUS_LABELS.uploaded },
+  { value: 'parsing', label: STATUS_LABELS.parsing },
+  { value: 'failed', label: STATUS_LABELS.failed },
+]
 
 export function Component() {
   const navigate = useNavigate()
@@ -59,14 +69,16 @@ export function Component() {
     setParams({ ...params, search: searchInput, page: 1 })
   }
 
-  const handleStatusFilter = (status: string) => {
-    setParams({ ...params, status: params.status === status ? undefined : status, page: 1 })
+  const handleStatusFilter = (status: string | undefined) => {
+    setParams({ ...params, status: status as ReportStatus | undefined, page: 1 })
   }
 
   const handleClearFilter = () => {
     setParams({ page: 1, page_size: 20 })
     setSearchInput('')
   }
+
+  const hasActiveFilters = !!(params.search || params.status)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).filter((f) =>
@@ -220,61 +232,24 @@ export function Component() {
         </div>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-wrap gap-4">
-        <div className="flex flex-1 gap-2">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="搜索研报..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full rounded-md border bg-background py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <button
-            onClick={handleSearch}
-            className="rounded-md bg-secondary px-4 py-2 text-sm hover:bg-secondary/80"
-          >
-            搜索
-          </button>
-          <button
-            onClick={() => refetch()}
-            className="rounded-md border px-3 py-2 hover:bg-muted"
-            title="刷新"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
-          {(params.search || params.status) && (
-            <button
-              onClick={handleClearFilter}
-              className="rounded-md border px-4 py-2 text-sm hover:bg-muted"
-            >
-              清除筛选
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Status Filter */}
-      <div className="flex flex-wrap gap-2">
-        {(['ready', 'uploaded', 'parsing', 'failed'] as ReportStatus[]).map((status) => (
-          <button
-            key={status}
-            onClick={() => handleStatusFilter(status)}
-            className={cn(
-              'rounded-full px-3 py-1 text-xs border transition-colors',
-              params.status === status
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'hover:bg-muted'
-            )}
-          >
-            {STATUS_LABELS[status]}
-          </button>
-        ))}
-      </div>
+      {/* Filter Toolbar */}
+      <FilterToolbar
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearch={handleSearch}
+        searchPlaceholder="搜索研报..."
+        showRefresh
+        onRefresh={() => refetch()}
+        hasActiveFilters={hasActiveFilters}
+        onReset={handleClearFilter}
+      >
+        <FilterSelect
+          label="状态"
+          options={STATUS_FILTER_OPTIONS}
+          value={params.status}
+          onChange={handleStatusFilter}
+        />
+      </FilterToolbar>
 
       {/* Reports List */}
       <div className="space-y-4">

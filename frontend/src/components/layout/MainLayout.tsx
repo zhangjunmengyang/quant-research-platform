@@ -1,3 +1,11 @@
+/**
+ * MainLayout Component
+ * Design System: Main application layout with sidebar and header
+ *
+ * Note: Removed page transition animations to avoid visual delay
+ * The content should appear immediately for better UX
+ */
+
 import type { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
@@ -13,7 +21,9 @@ export function MainLayout({ children }: MainLayoutProps) {
       <Sidebar />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-6 bg-background-subtle">
+          {children}
+        </main>
       </div>
       <Toaster />
     </div>

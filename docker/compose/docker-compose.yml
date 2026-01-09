@@ -97,6 +97,8 @@ services:
       - "6790:6790"   # data-hub
       - "6791:6791"   # strategy-hub
       - "6792:6792"   # note-hub
+      - "6793:6793"   # research-hub
+      - "6794:6794"   # experience-hub
     depends_on:
       postgres:
         condition: service_healthy

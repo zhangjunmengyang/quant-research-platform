@@ -336,8 +336,8 @@ export function Component() {
                   onClick={() => handleSymbolClick(selectedSymbol, 'spot')}
                   className={`rounded-full px-2 py-1 text-xs font-medium transition-colors ${
                     viewDataType === 'spot'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                      ? 'bg-warning text-warning-foreground'
+                      : 'bg-warning-muted text-warning hover:bg-warning/20'
                   }`}
                 >
                   现货
@@ -348,8 +348,8 @@ export function Component() {
                   onClick={() => handleSymbolClick(selectedSymbol, 'swap')}
                   className={`rounded-full px-2 py-1 text-xs font-medium transition-colors ${
                     viewDataType === 'swap'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                      ? 'bg-info text-info-foreground'
+                      : 'bg-info-muted text-info hover:bg-info/20'
                   }`}
                 >
                   合约
@@ -437,38 +437,33 @@ export function Component() {
         {/* Stats */}
         {klineStats && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">最新价</p>
-              <p className="text-xl font-semibold">{klineStats.latest.toFixed(4)}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">区间涨跌</p>
-              <p
-                className={`flex items-center gap-1 text-xl font-semibold ${
-                  klineStats.change >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {klineStats.change >= 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
-                )}
-                {klineStats.change >= 0 ? '+' : ''}
-                {klineStats.change.toFixed(2)}%
-              </p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">最高价</p>
-              <p className="text-xl font-semibold">{klineStats.high.toFixed(4)}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">最低价</p>
-              <p className="text-xl font-semibold">{klineStats.low.toFixed(4)}</p>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <p className="text-sm text-muted-foreground">数据点数</p>
-              <p className="text-xl font-semibold">{klineStats.dataPoints}</p>
-            </div>
+            <StatsCard
+              title="最新价"
+              value={klineStats.latest.toFixed(4)}
+              variant="compact"
+            />
+            <StatsCard
+              title="区间涨跌"
+              value={`${klineStats.change >= 0 ? '+' : ''}${klineStats.change.toFixed(2)}%`}
+              valueColor={klineStats.change >= 0 ? 'success' : 'destructive'}
+              icon={klineStats.change >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+              variant="compact"
+            />
+            <StatsCard
+              title="最高价"
+              value={klineStats.high.toFixed(4)}
+              variant="compact"
+            />
+            <StatsCard
+              title="最低价"
+              value={klineStats.low.toFixed(4)}
+              variant="compact"
+            />
+            <StatsCard
+              title="数据点数"
+              value={klineStats.dataPoints}
+              variant="compact"
+            />
           </div>
         )}
 
@@ -630,7 +625,6 @@ export function Component() {
         <StatsCard
           title="币种总数"
           value={overview?.total_symbols ?? 0}
-          description="现货与合约去重后"
           icon={<Coins className="h-5 w-5" />}
         />
         <StatsCard
@@ -650,8 +644,8 @@ export function Component() {
       {/* Spot & Swap Stats */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Spot Stats */}
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="mb-4 font-semibold text-orange-600">现货数据</h3>
+        <div className="rounded-lg border bg-card p-6 shadow-depth-1">
+          <h3 className="mb-4 font-semibold text-warning">现货数据</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">币种数</p>
@@ -679,8 +673,8 @@ export function Component() {
         </div>
 
         {/* Swap Stats */}
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="mb-4 font-semibold text-blue-600">合约数据</h3>
+        <div className="rounded-lg border bg-card p-6 shadow-depth-1">
+          <h3 className="mb-4 font-semibold text-info">合约数据</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">币种数</p>
@@ -821,12 +815,12 @@ export function Component() {
                     <td className="px-4 py-3 text-center">
                       <div className="flex justify-center gap-1">
                         {symbol.has_spot && (
-                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-800">
+                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-muted text-warning">
                             现货
                           </span>
                         )}
                         {symbol.has_swap && (
-                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-info-muted text-info">
                             合约
                           </span>
                         )}
