@@ -41,9 +41,5 @@ export {
   useEquityCorrelation,
 } from './hooks'
 
-// Convenience aliases for backwards compatibility
-export { useStrategyMutations as useVerifyStrategy } from './hooks'
-export { useStrategyMutations as useSetStrategyOnline } from './hooks'
-
 // Store
-export { useStrategyStore } from './store'
+export { useStrategyStore, DEFAULT_STRATEGY_FILTERS } from './store'

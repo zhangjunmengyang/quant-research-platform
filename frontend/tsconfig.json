@@ -14,12 +14,13 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting - 放宽检查以兼容现有代码 */
-    "strict": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    /* Linting - 启用严格模式 */
+    "strict": true,
+    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": false,
+    "noUncheckedIndexedAccess": true,
 
     /* Path alias */
     "baseUrl": ".",

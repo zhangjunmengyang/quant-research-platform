@@ -506,54 +506,54 @@ export function Component() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm" style={{ minWidth: '1200px' }}>
                 <thead className="sticky top-0 bg-card z-10">
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-3 py-2 text-left font-medium whitespace-nowrap">时间</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">开盘</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">最高</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">最低</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">收盘</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">成交量</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">成交额</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">成交笔数</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">主动买量</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">主动买额</th>
+                  <tr className="border-b bg-background">
+                    <th className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">时间</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">开盘</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">最高</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">最低</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">收盘</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">成交量</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">成交额</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">成交笔数</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">主动买量</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">主动买额</th>
                     {viewDataType === 'swap' && (
-                      <th className="px-3 py-2 text-right font-medium whitespace-nowrap">资金费率</th>
+                      <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">资金费率</th>
                     )}
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">1m均价</th>
-                    <th className="px-3 py-2 text-right font-medium whitespace-nowrap">5m均价</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">1m均价</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground whitespace-nowrap">5m均价</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {paginatedKlineData.map((row, i) => (
-                    <tr key={i} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-3 py-2 whitespace-nowrap">{row.time}</td>
-                      <td className="px-3 py-2 text-right">{row.open.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-right">{row.high.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-right">{row.low.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-right">{row.close.toFixed(4)}</td>
-                      <td className="px-3 py-2 text-right">{row.volume.toFixed(2)}</td>
-                      <td className="px-3 py-2 text-right">
+                    <tr key={i} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-3 py-2 bg-background whitespace-nowrap">{row.time}</td>
+                      <td className="px-3 py-2 bg-background text-right">{row.open.toFixed(4)}</td>
+                      <td className="px-3 py-2 bg-background text-right">{row.high.toFixed(4)}</td>
+                      <td className="px-3 py-2 bg-background text-right">{row.low.toFixed(4)}</td>
+                      <td className="px-3 py-2 bg-background text-right">{row.close.toFixed(4)}</td>
+                      <td className="px-3 py-2 bg-background text-right">{row.volume.toFixed(2)}</td>
+                      <td className="px-3 py-2 bg-background text-right">
                         {row.quote_volume?.toFixed(2) ?? '-'}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 bg-background text-right">
                         {row.trade_num ?? '-'}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 bg-background text-right">
                         {row.taker_buy_base_asset_volume?.toFixed(2) ?? '-'}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 bg-background text-right">
                         {row.taker_buy_quote_asset_volume?.toFixed(2) ?? '-'}
                       </td>
                       {viewDataType === 'swap' && (
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-3 py-2 bg-background text-right">
                           {row.funding_fee != null ? `${(row.funding_fee * 100).toFixed(4)}%` : '-'}
                         </td>
                       )}
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 bg-background text-right">
                         {row.avg_price_1m?.toFixed(4) ?? '-'}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-2 bg-background text-right">
                         {row.avg_price_5m?.toFixed(4) ?? '-'}
                       </td>
                     </tr>
@@ -754,9 +754,9 @@ export function Component() {
           <div className="overflow-x-auto">
             <table className="w-full" style={{ minWidth: '800px' }}>
               <thead className="sticky top-0 bg-card z-10">
-                <tr className="border-b bg-muted/50">
+                <tr className="border-b bg-background">
                   <th
-                    className="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted"
+                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('symbol')}
                   >
                     <div className="flex items-center gap-2">
@@ -765,7 +765,7 @@ export function Component() {
                     </div>
                   </th>
                   <th
-                    className="px-4 py-3 text-center text-sm font-medium cursor-pointer hover:bg-muted"
+                    className="px-4 py-3 text-center text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('type')}
                   >
                     <div className="flex items-center justify-center gap-2">
@@ -774,7 +774,7 @@ export function Component() {
                     </div>
                   </th>
                   <th
-                    className="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted"
+                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('first_candle_time')}
                   >
                     <div className="flex items-center gap-2">
@@ -783,7 +783,7 @@ export function Component() {
                     </div>
                   </th>
                   <th
-                    className="px-4 py-3 text-left text-sm font-medium cursor-pointer hover:bg-muted"
+                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('last_candle_time')}
                   >
                     <div className="flex items-center gap-2">
@@ -792,7 +792,7 @@ export function Component() {
                     </div>
                   </th>
                   <th
-                    className="px-4 py-3 text-right text-sm font-medium cursor-pointer hover:bg-muted"
+                    className="px-4 py-3 text-right text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('kline_count')}
                   >
                     <div className="flex items-center justify-end gap-2">
@@ -806,13 +806,13 @@ export function Component() {
                 {paginatedSymbols.map((symbol, index) => (
                   <tr
                     key={`${symbol.symbol}-${index}`}
-                    className="hover:bg-muted/50 transition-colors cursor-pointer"
+                    className="hover:bg-muted/30 transition-colors cursor-pointer"
                     onClick={() => handleSymbolClick(symbol)}
                   >
-                    <td className="px-4 py-3 font-medium text-primary hover:underline">
+                    <td className="px-4 py-3 bg-background font-medium text-primary hover:underline">
                       {symbol.symbol}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 bg-background text-center">
                       <div className="flex justify-center gap-1">
                         {symbol.has_spot && (
                           <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-muted text-warning">
@@ -826,13 +826,13 @@ export function Component() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                    <td className="px-4 py-3 bg-background text-sm text-muted-foreground whitespace-nowrap">
                       {symbol.first_candle_time?.slice(0, 10) ?? '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                    <td className="px-4 py-3 bg-background text-sm text-muted-foreground whitespace-nowrap">
                       {symbol.last_candle_time?.slice(0, 10) ?? '-'}
                     </td>
-                    <td className="px-4 py-3 text-right text-sm">
+                    <td className="px-4 py-3 bg-background text-right text-sm">
                       {symbol.kline_count?.toLocaleString() ?? '-'}
                     </td>
                   </tr>

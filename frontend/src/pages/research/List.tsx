@@ -26,6 +26,7 @@ import { STATUS_LABELS, STATUS_COLORS } from '@/features/research'
 import { cn } from '@/lib/utils'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
+import { Pagination } from '@/components/ui/pagination'
 import {
   Dialog,
   DialogContent,
@@ -272,7 +273,7 @@ export function Component() {
             <div
               key={report.id}
               onClick={() => navigate(`/research/${report.id}`)}
-              className="group cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50"
+              className="group cursor-pointer rounded-lg border bg-card p-4 transition-colors hover:bg-muted/30"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
@@ -350,25 +351,13 @@ export function Component() {
 
       {/* Pagination */}
       {data && data.total > data.page_size && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setParams({ ...params, page: (params.page ?? 1) - 1 })}
-            disabled={(params.page ?? 1) <= 1}
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          >
-            上一页
-          </button>
-          <span className="text-sm text-muted-foreground">
-            第 {params.page ?? 1} / {Math.ceil(data.total / data.page_size)} 页
-          </span>
-          <button
-            onClick={() => setParams({ ...params, page: (params.page ?? 1) + 1 })}
-            disabled={(params.page ?? 1) >= Math.ceil(data.total / data.page_size)}
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          >
-            下一页
-          </button>
-        </div>
+        <Pagination
+          page={params.page ?? 1}
+          pageSize={data.page_size}
+          total={data.total}
+          onPageChange={(page) => setParams({ ...params, page })}
+          position="center"
+        />
       )}
 
       {/* Upload Dialog */}

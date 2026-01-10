@@ -1,19 +1,15 @@
 /**
  * Strategy UI State Store (Zustand)
+ * 只存储 UI 状态，不存储 filters（filters 由 URL search params 管理）
  */
 
 import { create } from 'zustand'
-import type { Strategy, StrategyListParams } from './types'
+import type { Strategy } from './types'
 
 interface StrategyUIState {
   // Selected strategy for detail
   selectedStrategy: Strategy | null
   setSelectedStrategy: (strategy: Strategy | null) => void
-
-  // List filters
-  filters: StrategyListParams
-  setFilters: (filters: Partial<StrategyListParams>) => void
-  resetFilters: () => void
 
   // Backtest form state
   backtestFormOpen: boolean
@@ -21,27 +17,20 @@ interface StrategyUIState {
   closeBacktestForm: () => void
 }
 
-const defaultFilters: StrategyListParams = {
-  page: 1,
-  page_size: 50,
-  order_by: 'created_at',
-}
-
 export const useStrategyStore = create<StrategyUIState>((set) => ({
   // Selected strategy
   selectedStrategy: null,
   setSelectedStrategy: (strategy) => set({ selectedStrategy: strategy }),
-
-  // Filters
-  filters: defaultFilters,
-  setFilters: (newFilters) =>
-    set((state) => ({
-      filters: { ...state.filters, ...newFilters },
-    })),
-  resetFilters: () => set({ filters: defaultFilters }),
 
   // Backtest form
   backtestFormOpen: false,
   openBacktestForm: () => set({ backtestFormOpen: true }),
   closeBacktestForm: () => set({ backtestFormOpen: false }),
 }))
+
+// 默认 filters 配置（供组件使用）
+export const DEFAULT_STRATEGY_FILTERS = {
+  page: 1,
+  page_size: 50,
+  order_by: 'created_at',
+} as const

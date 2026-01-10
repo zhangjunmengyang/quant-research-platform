@@ -1,9 +1,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { App } from './App'
+import { AlertCircle, RefreshCw } from 'lucide-react'
 
 // Lazy load pages for code splitting
 const FactorsDashboard = () => import('@/pages/factors/Dashboard')
-const FactorsAnalysis = () => import('@/pages/factors/Analysis')
+const FactorsAnalysis = () => import('@/pages/factors/analysis')
 const FactorsPipeline = () => import('@/pages/factors/Pipeline')
 
 const StrategiesBrowser = () => import('@/pages/strategies/Browser')
@@ -27,10 +28,31 @@ const ExperiencesDashboard = () => import('@/pages/experiences/Dashboard')
 
 const LogsExplorer = () => import('@/pages/logs/Explorer')
 
+// Error element for routes
+function ErrorBoundaryElement() {
+  return (
+    <div className="flex h-64 flex-col items-center justify-center gap-4 text-destructive">
+      <AlertCircle className="h-12 w-12" />
+      <div className="text-center">
+        <p className="font-medium">出现错误</p>
+        <p className="text-sm text-muted-foreground">页面加载失败</p>
+      </div>
+      <button
+        onClick={() => window.location.reload()}
+        className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
+      >
+        <RefreshCw className="h-4 w-4" />
+        重新加载
+      </button>
+    </div>
+  )
+}
+
 export const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
+    errorElement: ErrorBoundaryElement(),
     children: [
       // Default redirect to data overview
       {

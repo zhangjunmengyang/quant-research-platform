@@ -174,7 +174,7 @@ export function Component() {
       </div>
 
       {/* Content */}
-      <div className="rounded-lg border p-6">
+      <div className="rounded-lg border bg-card p-6">
         {isEditing ? (
           <div className="space-y-4">
             {/* Title */}

@@ -1,10 +1,11 @@
 /**
  * Factor UI State Store (Zustand)
+ * 只存储 UI 状态，不存储 filters（filters 由 URL search params 管理）
  */
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Factor, FactorListParams } from './types'
+import type { Factor } from './types'
 import { DEFAULT_VISIBLE_COLUMNS, FACTOR_COLUMNS } from './types'
 
 // 默认列宽配置
@@ -22,11 +23,6 @@ interface FactorUIState {
   detailPanelOpen: boolean
   openDetailPanel: (factor: Factor) => void
   closeDetailPanel: () => void
-
-  // List filters
-  filters: FactorListParams
-  setFilters: (filters: Partial<FactorListParams>) => void
-  resetFilters: () => void
 
   // View mode
   viewMode: 'table' | 'grid'
@@ -50,13 +46,6 @@ interface FactorUIState {
   resetColumnConfig: () => void
 }
 
-const defaultFilters: FactorListParams = {
-  page: 1,
-  page_size: 50,
-  order_by: 'filename',
-  excluded: 'active',  // 默认只显示有效因子
-}
-
 export const useFactorStore = create<FactorUIState>()(
   persist(
     (set) => ({
@@ -68,14 +57,6 @@ export const useFactorStore = create<FactorUIState>()(
       detailPanelOpen: false,
       openDetailPanel: (factor) => set({ selectedFactor: factor, detailPanelOpen: true }),
       closeDetailPanel: () => set({ detailPanelOpen: false }),
-
-      // Filters
-      filters: defaultFilters,
-      setFilters: (newFilters) =>
-        set((state) => ({
-          filters: { ...state.filters, ...newFilters },
-        })),
-      resetFilters: () => set({ filters: defaultFilters }),
 
       // View mode
       viewMode: 'table',
@@ -121,3 +102,11 @@ export const useFactorStore = create<FactorUIState>()(
     }
   )
 )
+
+// 默认 filters 配置（供组件使用）
+export const DEFAULT_FACTOR_FILTERS = {
+  page: 1,
+  page_size: 50,
+  order_by: 'filename',
+  excluded: 'active',
+} as const

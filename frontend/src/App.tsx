@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { FlaskConical } from 'lucide-react'
+import { useTheme } from '@/lib/theme'
 
 function PageLoading() {
   return (
@@ -48,11 +49,15 @@ function PageLoading() {
 }
 
 export function App() {
+  const { fontSizeMode } = useTheme()
+
   return (
-    <MainLayout>
-      <Suspense fallback={<PageLoading />}>
-        <Outlet />
-      </Suspense>
-    </MainLayout>
+    <div data-size-mode={fontSizeMode}>
+      <MainLayout>
+        <Suspense fallback={<PageLoading />}>
+          <Outlet />
+        </Suspense>
+      </MainLayout>
+    </div>
   )
 }
