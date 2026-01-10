@@ -3,15 +3,19 @@
  * 策略浏览页 - 展示策略列表和统计
  */
 
-import { useState } from 'react'
-import { Loader2, TrendingUp, CheckCircle, Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
-import { useStrategies, useStrategyStats, useStrategyStore, useStrategyMutations } from '@/features/strategy'
+import { useState, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Loader2, TrendingUp, CheckCircle, Plus, Trash2 } from 'lucide-react'
+import { useStrategies, useStrategyStats, useStrategyMutations } from '@/features/strategy'
+import type { Strategy, StrategyListParams } from '@/features/strategy'
 import { StatsCard } from '@/features/factor/components/StatsCard'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Pagination } from '@/components/ui/pagination'
+import { ResizableTable } from '@/components/ui/ResizableTable'
+import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
+import { paramsToStrategyFilters, strategyFiltersToParams } from '@/lib/url-params'
 import { cn, formatPercent } from '@/lib/utils'
 import { Link } from 'react-router-dom'
-import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
-import type { Strategy } from '@/features/strategy'
 
 // 验证状态选项
 const VERIFIED_OPTIONS: SelectOption[] = [
@@ -42,7 +46,7 @@ function formatFactorWithParams(strategy: Strategy): string {
 
   if (factorList.length === 0) return '-'
 
-  return factorList.map(name => {
+  return factorList.map((name) => {
     const param = factorParams[name]
     const isAsc = sortDirections[name]
     const direction = isAsc !== undefined ? (isAsc ? '\u2191' : '\u2193') : ''
@@ -61,9 +65,210 @@ function formatDate(dateStr: string | undefined | null): string {
   return date || '-'
 }
 
+/**
+ * 策略表格列定义
+ */
+function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: boolean, deletingId?: string) {
+  return [
+    {
+      key: 'name',
+      label: '策略名称',
+      width: 180,
+      minWidth: 120,
+      render: (_: unknown, row: Strategy) => (
+        <div className="max-w-[180px]">
+          <Link
+            to={`/strategies/${row.id}`}
+            className="font-medium hover:text-primary block truncate"
+          >
+            {row.name}
+          </Link>
+          {row.description && (
+            <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+              {row.description}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'factor_list',
+      label: '因子(参数)',
+      width: 250,
+      minWidth: 150,
+      render: (_: unknown, row: Strategy) => {
+        const factorDisplay = formatFactorWithParams(row)
+        return (
+          <p
+            className="text-sm text-muted-foreground line-clamp-1 font-mono"
+            title={factorDisplay}
+          >
+            {factorDisplay}
+          </p>
+        )
+      },
+    },
+    {
+      key: 'long_select_coin_num',
+      label: '多',
+      width: 60,
+      minWidth: 50,
+      align: 'center' as const,
+      render: (_: unknown, row: Strategy) => (
+        <span className="text-sm font-medium text-success">
+          {row.long_select_coin_num ?? row.select_coin_num}
+        </span>
+      ),
+    },
+    {
+      key: 'short_select_coin_num',
+      label: '空',
+      width: 60,
+      minWidth: 50,
+      align: 'center' as const,
+      render: (_: unknown, row: Strategy) => (
+        <span className="text-sm font-medium text-destructive">
+          {row.short_select_coin_num ?? 0}
+        </span>
+      ),
+    },
+    {
+      key: 'cumulative_return',
+      label: '净值',
+      width: 80,
+      minWidth: 70,
+      align: 'center' as const,
+      render: (value: unknown) => (
+        <span
+          className={cn(
+            'font-medium',
+            value && value >= 1 ? 'text-success' : 'text-destructive'
+          )}
+        >
+          {value ? Number(value).toFixed(2) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'annual_return',
+      label: '年化收益',
+      width: 90,
+      minWidth: 80,
+      align: 'center' as const,
+      render: (value: unknown) => (
+        <span
+          className={cn(
+            'font-medium',
+            value && value > 0 ? 'text-success' : 'text-destructive'
+          )}
+        >
+          {formatPercent(value as number | undefined)}
+        </span>
+      ),
+    },
+    {
+      key: 'max_drawdown',
+      label: '最大回撤',
+      width: 90,
+      minWidth: 80,
+      align: 'center' as const,
+      render: (value: unknown) => (
+        <span className="text-destructive font-medium">
+          {formatPercent(value as number | undefined)}
+        </span>
+      ),
+    },
+    {
+      key: 'sharpe_ratio',
+      label: '收益回撤比',
+      width: 90,
+      minWidth: 80,
+      align: 'center' as const,
+      render: (value: unknown) => (
+        <span
+          className={cn(
+            'font-medium',
+            value && value > 0 ? 'text-success' : 'text-destructive'
+          )}
+        >
+          {value ? Number(value).toFixed(2) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'backtest_range',
+      label: '回测区间',
+      width: 160,
+      minWidth: 120,
+      align: 'center' as const,
+      render: (_: unknown, row: Strategy) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {row.start_date && row.end_date
+            ? `${row.start_date} ~ ${row.end_date}`
+            : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'created_at',
+      label: '创建时间',
+      width: 100,
+      minWidth: 80,
+      align: 'center' as const,
+      render: (value: unknown) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {formatDate(value as string)}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      label: '操作',
+      width: 60,
+      minWidth: 60,
+      align: 'center' as const,
+      render: (_: unknown, row: Strategy) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onDelete(row)
+          }}
+          disabled={isDeleting && deletingId === row.id}
+          className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          title="删除策略"
+        >
+          {isDeleting && deletingId === row.id ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </button>
+      ),
+    },
+  ] as const
+}
 
 export function Component() {
-  const { filters, setFilters } = useStrategyStore()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // 从 URL 读取 filters
+  const filters = useMemo(() => paramsToStrategyFilters(searchParams), [searchParams])
+
+  // 更新 filters 并同步到 URL
+  const setFilters = useCallback((newFilters: Partial<StrategyListParams>) => {
+    const updatedFilters = { ...filters, ...newFilters }
+    const params = strategyFiltersToParams(updatedFilters)
+    // 移除空值参数
+    Object.keys(params).forEach((key) => {
+      if (params[key] === '' || params[key] === 'undefined') {
+        delete params[key]
+      }
+    })
+    setSearchParams(params)
+  }, [filters, setSearchParams])
+
   const { data: stats, isLoading: statsLoading } = useStrategyStats()
   const { data, isLoading, isError, error } = useStrategies(filters)
   const { deleteStrategy } = useStrategyMutations()
@@ -87,6 +292,12 @@ export function Component() {
       })
     }
   }
+
+  // 动态生成列配置
+  const columns = useMemo(
+    () => getStrategyColumns(handleDeleteClick, deleteStrategy.isPending, strategyToDelete?.id),
+    [handleDeleteClick, deleteStrategy.isPending, strategyToDelete?.id]
+  )
 
   if (isError) {
     return (
@@ -121,7 +332,13 @@ export function Component() {
           title="平均夏普"
           value={stats?.avg_sharpe?.toFixed(2) ?? '-'}
           icon={<TrendingUp className="h-5 w-5" />}
-          valueColor={stats?.avg_sharpe && stats.avg_sharpe > 1 ? 'success' : stats?.avg_sharpe && stats.avg_sharpe > 0 ? 'warning' : 'default'}
+          valueColor={
+            stats?.avg_sharpe && stats.avg_sharpe > 1
+              ? 'success'
+              : stats?.avg_sharpe && stats.avg_sharpe > 0
+                ? 'warning'
+                : 'default'
+          }
         />
       </div>
 
@@ -155,11 +372,11 @@ export function Component() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <StrategyTable
-          strategies={data?.items || []}
-          onDelete={handleDeleteClick}
-          isDeleting={deleteStrategy.isPending}
-          deletingId={strategyToDelete?.id}
+        <ResizableTable
+          columns={columns}
+          data={data?.items || []}
+          rowKey="id"
+          emptyText="暂无策略"
         />
       )}
 
@@ -178,183 +395,16 @@ export function Component() {
 
       {/* Pagination */}
       {data && data.total > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            显示 {(data.page - 1) * data.page_size + 1}-
-            {Math.min(data.page * data.page_size, data.total)} / 共 {data.total} 条
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setFilters({ page: data.page - 1 })}
-              disabled={data.page <= 1}
-              className="rounded-md border p-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="px-3 text-sm">
-              {data.page} / {data.total_pages}
-            </span>
-            <button
-              onClick={() => setFilters({ page: data.page + 1 })}
-              disabled={data.page >= data.total_pages}
-              className="rounded-md border p-2 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        <Pagination
+          page={data.page}
+          pageSize={data.page_size}
+          total={data.total}
+          totalPages={data.total_pages}
+          onPageChange={(page) => setFilters({ page })}
+          variant="range"
+          position="between"
+        />
       )}
-    </div>
-  )
-}
-
-interface StrategyTableProps {
-  strategies: Strategy[]
-  onDelete: (strategy: Strategy) => void
-  isDeleting: boolean
-  deletingId?: string
-}
-
-function StrategyTable({ strategies, onDelete, isDeleting, deletingId }: StrategyTableProps) {
-  if (strategies.length === 0) {
-    return (
-      <div className="flex h-32 items-center justify-center rounded-lg border text-muted-foreground">
-        暂无策略
-      </div>
-    )
-  }
-
-  return (
-    <div className="rounded-lg border overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="px-3 py-3 text-left text-sm font-medium whitespace-nowrap">策略名称</th>
-            <th className="px-3 py-3 text-left text-sm font-medium whitespace-nowrap">因子(参数)</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap text-success">多</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap text-destructive">空</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">净值</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">年化收益</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">最大回撤</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">收益回撤比</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">回测区间</th>
-            <th className="px-3 py-3 text-center text-sm font-medium whitespace-nowrap">创建时间</th>
-            <th className="px-3 py-3 text-center text-sm font-medium w-16">操作</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {strategies.map((strategy) => {
-            const factorDisplay = formatFactorWithParams(strategy)
-            return (
-              <tr key={strategy.id} className="hover:bg-muted/50 transition-colors">
-                <td className="px-3 py-3">
-                  <Link
-                    to={`/strategies/${strategy.id}`}
-                    className="font-medium hover:text-primary"
-                  >
-                    {strategy.name}
-                  </Link>
-                  {strategy.description && (
-                    <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
-                      {strategy.description}
-                    </p>
-                  )}
-                </td>
-                <td className="px-3 py-3 max-w-[250px]">
-                  <p
-                    className="text-sm text-muted-foreground line-clamp-1 font-mono"
-                    title={factorDisplay}
-                  >
-                    {factorDisplay}
-                  </p>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span className="text-sm font-medium text-success">
-                    {strategy.long_select_coin_num ?? strategy.select_coin_num}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span className="text-sm font-medium text-destructive">
-                    {strategy.short_select_coin_num ?? 0}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span
-                    className={cn(
-                      'font-medium',
-                      strategy.cumulative_return && strategy.cumulative_return >= 1
-                        ? 'text-success'
-                        : 'text-destructive'
-                    )}
-                  >
-                    {strategy.cumulative_return?.toFixed(2) ?? '-'}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span
-                    className={cn(
-                      'font-medium',
-                      strategy.annual_return && strategy.annual_return > 0
-                        ? 'text-success'
-                        : 'text-destructive'
-                    )}
-                  >
-                    {formatPercent(strategy.annual_return)}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span className="text-destructive font-medium">
-                    {formatPercent(strategy.max_drawdown)}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span
-                    className={cn(
-                      'font-medium',
-                      strategy.sharpe_ratio && strategy.sharpe_ratio > 0
-                        ? 'text-success'
-                        : 'text-destructive'
-                    )}
-                  >
-                    {strategy.sharpe_ratio?.toFixed(2) ?? '-'}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {strategy.start_date && strategy.end_date
-                      ? `${strategy.start_date} ~ ${strategy.end_date}`
-                      : '-'}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatDate(strategy.created_at)}
-                  </span>
-                </td>
-                <td className="px-3 py-3 text-center">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      onDelete(strategy)
-                    }}
-                    disabled={isDeleting && deletingId === strategy.id}
-                    className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-red-50 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title="删除策略"
-                  >
-                    {isDeleting && deletingId === strategy.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
     </div>
   )
 }

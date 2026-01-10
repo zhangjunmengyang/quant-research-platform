@@ -5,7 +5,8 @@
  */
 
 import { useMemo } from 'react'
-import { useFactorStyles, useFactorStore } from '../'
+import { useFactorStyles } from '../'
+import type { FactorListParams } from '../types'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
 import { FACTOR_TYPE_LABELS, type FactorType, type ExcludedFilter } from '../types'
@@ -42,13 +43,15 @@ const ORDER_BY_OPTIONS: SelectOption[] = [
 ]
 
 interface FactorFiltersProps {
+  filters: Partial<FactorListParams>
+  setFilters: (filters: Partial<FactorListParams>) => void
+  resetFilters: () => void
   onSearch?: (query: string) => void
   searchValue?: string
 }
 
-export function FactorFilters({ onSearch, searchValue = '' }: FactorFiltersProps) {
+export function FactorFilters({ filters, setFilters, resetFilters, onSearch, searchValue = '' }: FactorFiltersProps) {
   const { data: styles = [] } = useFactorStyles()
-  const { filters, setFilters, resetFilters } = useFactorStore()
 
   // 风格选项
   const styleOptions: SelectOption[] = useMemo(

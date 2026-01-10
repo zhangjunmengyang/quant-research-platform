@@ -12,17 +12,30 @@ import {
   useExperienceStats,
   useExperienceStore,
   ExperienceCard,
-  ExperienceFilters,
   ExperienceDetailPanelWrapper,
   ExperienceCreateDialog,
 } from '@/features/experience'
+import { ExperienceFilters } from '@/features/experience/components/ExperienceFilters'
 import type { ExperienceListParams } from '@/features/experience'
 import { StatsCard } from '@/features/factor/components/StatsCard'
+import { Pagination } from '@/components/ui/pagination'
+
+const DEFAULT_FILTERS: Partial<ExperienceListParams> = {
+  page: 1,
+  page_size: 20,
+  order_by: 'updated_at',
+  order_desc: true,
+}
 
 export function Component() {
-  const { filters, setFilters, openDetailPanel } = useExperienceStore()
-  const [searchQuery, setSearchQuery] = useState('')
+  // UI 状态（保留在 store 中）
+  const { openDetailPanel } = useExperienceStore()
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+
+  // 筛选状态使用组件 state 管理
+  const [searchInput, setSearchInput] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filters, setFilters] = useState<Partial<ExperienceListParams>>(DEFAULT_FILTERS)
 
   // 防抖搜索
   const debouncedSearch = useDebounce(searchQuery, 300)
@@ -31,9 +44,9 @@ export function Component() {
   const queryParams: ExperienceListParams = useMemo(
     () => ({
       ...filters,
-      // 搜索功能可以通过后端支持或前端过滤实现
+      search: debouncedSearch || undefined,
     }),
-    [filters]
+    [filters, debouncedSearch]
   )
 
   // 获取数据
@@ -43,22 +56,44 @@ export function Component() {
   // 处理搜索
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query)
+    setFilters((prev) => ({ ...prev, page: 1 }))
+  }, [])
+
+  // 处理筛选变更
+  const handleFilterChange = useCallback((newFilters: Partial<ExperienceListParams>) => {
+    setFilters((prev) => ({ ...prev, ...newFilters }))
+  }, [])
+
+  // 处理重置筛选
+  const handleResetFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS)
+    setSearchQuery('')
+    setSearchInput('')
   }, [])
 
   // 处理分页
-  const handlePageChange = useCallback(
-    (page: number) => {
-      setFilters({ page })
-    },
-    [setFilters]
-  )
+  const handlePageChange = useCallback((page: number) => {
+    setFilters((prev) => ({ ...prev, page }))
+  }, [])
 
   // 处理创建成功
   const handleCreateSuccess = useCallback(() => {
     // 可以添加 toast 提示
   }, [])
 
-  // 过滤搜索结果（前端过滤）
+  // 检查是否有活跃筛选
+  const hasActiveFilters = useMemo(() => {
+    return !!(
+      searchQuery ||
+      filters.experience_level ||
+      filters.status ||
+      filters.category ||
+      filters.source_type ||
+      filters.market_regime
+    )
+  }, [searchQuery, filters])
+
+  // 过滤搜索结果（前端过滤，待后端支持搜索后可移除）
   const filteredItems = useMemo(() => {
     if (!data?.items) return []
     if (!debouncedSearch) return data.items
@@ -128,7 +163,16 @@ export function Component() {
       )}
 
       {/* Filters */}
-      <ExperienceFilters onSearch={handleSearch} searchValue={searchQuery} />
+      <ExperienceFilters
+        filters={filters}
+        setFilters={handleFilterChange}
+        resetFilters={handleResetFilters}
+        onSearch={handleSearch}
+        searchValue={searchQuery}
+        onSearchInputChange={(value) => setSearchInput(value)}
+        searchInputValue={searchInput}
+        hasActiveFilters={hasActiveFilters}
+      />
 
       {/* Experience List */}
       {isLoading ? (
@@ -139,7 +183,7 @@ export function Component() {
         <div className="flex h-48 flex-col items-center justify-center rounded-lg border border-dashed">
           <FileText className="h-12 w-12 text-muted-foreground/50" />
           <p className="mt-4 text-muted-foreground">
-            {debouncedSearch ? '没有匹配的经验' : '还没有经验记录'}
+            {hasActiveFilters ? '没有匹配的经验' : '还没有经验记录'}
           </p>
           <button
             onClick={() => setIsCreateDialogOpen(true)}
@@ -163,25 +207,14 @@ export function Component() {
 
       {/* Pagination */}
       {data && data.total_pages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => handlePageChange((filters.page ?? 1) - 1)}
-            disabled={!data.has_prev}
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          >
-            上一页
-          </button>
-          <span className="text-sm text-muted-foreground">
-            第 {data.page} / {data.total_pages} 页
-          </span>
-          <button
-            onClick={() => handlePageChange((filters.page ?? 1) + 1)}
-            disabled={!data.has_next}
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          >
-            下一页
-          </button>
-        </div>
+        <Pagination
+          page={data.page}
+          pageSize={data.page_size}
+          total={data.total}
+          totalPages={data.total_pages}
+          onPageChange={handlePageChange}
+          position="center"
+        />
       )}
 
       {/* Detail Panel */}

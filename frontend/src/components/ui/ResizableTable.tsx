@@ -170,7 +170,7 @@ export function ResizableTable<T>({
   return (
     <div
       ref={tableRef}
-      className={cn('rounded-lg border overflow-hidden', className)}
+      className={cn('rounded-lg border overflow-hidden bg-background', className)}
       style={{ maxHeight }}
     >
       <div className="overflow-auto" style={{ maxHeight: maxHeight ? '100%' : undefined }}>
@@ -185,14 +185,14 @@ export function ResizableTable<T>({
             ))}
           </colgroup>
 
-          {/* 表头 */}
+          {/* 表头 - 白色背景 */}
           <thead className={cn(stickyHeader && 'sticky top-0 z-10')}>
-            <tr className={cn('border-b bg-muted/50', headerClassName)}>
+            <tr className={cn('border-b bg-background', headerClassName)}>
               {columns.map((col) => (
                 <th
                   key={col.key}
                   className={cn(
-                    'relative px-3 py-3 text-sm font-medium select-none',
+                    'relative px-3 py-3 text-sm font-medium text-muted-foreground select-none',
                     col.align === 'center' && 'text-center',
                     col.align === 'right' && 'text-right',
                     !col.align && 'text-left'
@@ -227,7 +227,7 @@ export function ResizableTable<T>({
                 <tr
                   key={getRowKey(row)}
                   className={cn(
-                    'hover:bg-muted/50 transition-colors',
+                    'hover:bg-muted/30 transition-colors border-b last:border-b-0',
                     onRowClick && 'cursor-pointer',
                     getRowClassName(row, index)
                   )}
@@ -237,7 +237,7 @@ export function ResizableTable<T>({
                     <td
                       key={col.key}
                       className={cn(
-                        'px-3 py-3 text-sm',
+                        'px-3 py-3 text-sm bg-background',
                         col.align === 'center' && 'text-center',
                         col.align === 'right' && 'text-right'
                       )}

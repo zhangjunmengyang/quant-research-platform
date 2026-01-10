@@ -22,4 +22,4 @@ export {
 } from './hooks'
 
 // Store
-export { useFactorStore } from './store'
+export { useFactorStore, DEFAULT_FACTOR_FILTERS } from './store'

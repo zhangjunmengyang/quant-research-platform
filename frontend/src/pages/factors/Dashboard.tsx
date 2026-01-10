@@ -3,51 +3,38 @@
  * 因子概览页 - 展示统计信息和完整因子列表
  */
 
-import { useState, useMemo } from 'react'
-import {
-  BarChart3,
-  CheckCircle,
-  FlaskConical,
-  XCircle,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  Check,
-  X,
-  RotateCcw,
-} from 'lucide-react'
+import { useState, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { useFactorStats, useFactors, useFactorStyles, useFactorStore } from '@/features/factor'
+import {
+  useFactorStats,
+  useFactors,
+  useFactorStore,
+  DEFAULT_FACTOR_FILTERS,
+} from '@/features/factor'
+import type { FactorListParams } from '@/features/factor/types'
 import { pipelineApi } from '@/features/factor/pipeline-api'
-import { StatsCard } from '@/features/factor/components/StatsCard'
 import { FactorFilters } from '@/features/factor/components/FactorFilters'
 import { FactorDetailPanelWrapper } from '@/features/factor/components/FactorDetailPanel'
 import { ResizableTable, type TableColumn } from '@/components/ui/ResizableTable'
 import { ColumnSelector } from '@/components/ui/ColumnSelector'
+import { Pagination } from '@/components/ui/pagination'
 import { cn, stripPyExtension } from '@/lib/utils'
 import type { Factor } from '@/features/factor'
-import { FACTOR_TYPE_LABELS, FACTOR_COLUMNS, type FactorType } from '@/features/factor/types'
-
-// 字段标签映射
-const FIELD_LABELS: Record<string, string> = {
-  style: '风格分类',
-  formula: '计算公式',
-  input_data: '输入数据',
-  value_range: '值域范围',
-  description: '因子描述',
-  analysis: '因子分析',
-  llm_score: 'LLM评分',
-}
-
-// 字段顺序
-const FIELD_ORDER = ['style', 'formula', 'input_data', 'value_range', 'description', 'analysis', 'llm_score']
+import {
+  FACTOR_TYPE_LABELS,
+  FACTOR_COLUMNS,
+  type FactorType,
+} from '@/features/factor/types'
+import { paramsToFactorFilters, factorFiltersToParams } from '@/lib/url-params'
+import { FactorStatsCards } from './components/FactorStatsCards'
+import { FactorCharts } from './components/FactorCharts'
 
 export function Component() {
-  const { data: stats, isLoading: statsLoading } = useFactorStats()
-  const { data: styles = [] } = useFactorStyles()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { data: stats, isLoading: statsLoading, isError: statsError } = useFactorStats()
   const {
-    filters,
-    setFilters,
     openDetailPanel,
     visibleColumns,
     setVisibleColumns,
@@ -56,6 +43,28 @@ export function Component() {
     resetColumnConfig,
   } = useFactorStore()
   const [searchQuery, setSearchQuery] = useState('')
+
+  // 从 URL 读取 filters
+  const filters = useMemo(
+    () => paramsToFactorFilters(searchParams),
+    [searchParams]
+  )
+
+  // 更新 filters 并同步到 URL
+  const setFilters = useCallback(
+    (newFilters: Partial<FactorListParams>) => {
+      const updatedFilters = { ...filters, ...newFilters }
+      const params = factorFiltersToParams(updatedFilters)
+      // 移除空值参数
+      Object.keys(params).forEach((key) => {
+        if (params[key] === '' || params[key] === 'undefined') {
+          delete params[key]
+        }
+      })
+      setSearchParams(params)
+    },
+    [filters, setSearchParams]
+  )
 
   const { data, isLoading: factorsLoading, isError, error } = useFactors(filters)
 
@@ -81,6 +90,12 @@ export function Component() {
     setFilters({ page })
   }
 
+  // 重置 filters 到默认值
+  const resetFilters = useCallback(() => {
+    const params = factorFiltersToParams(DEFAULT_FACTOR_FILTERS)
+    setSearchParams(params)
+  }, [setSearchParams])
+
   if (statsLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -89,164 +104,44 @@ export function Component() {
     )
   }
 
+  if (statsError) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-4">
+        <p className="text-destructive">加载统计数据失败</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground"
+        >
+          重试
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Metrics Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="有效因子"
-          value={stats?.total ?? 0}
-          icon={<FlaskConical className="h-5 w-5" />}
-        />
-        <StatsCard
-          title="平均填充率"
-          value={(() => {
-            if (!pipelineStatus?.field_coverage) return '-'
-            let totalFilled = 0
-            let totalCount = 0
-            FIELD_ORDER.forEach((field) => {
-              const coverage = pipelineStatus.field_coverage[field]
-              totalFilled += coverage?.filled ?? 0
-              totalCount += (coverage?.filled ?? 0) + (coverage?.empty ?? 0)
-            })
-            return totalCount > 0 ? `${Math.round((totalFilled / totalCount) * 100)}%` : '-'
-          })()}
-          icon={<BarChart3 className="h-5 w-5" />}
-        />
-        <StatsCard
-          title="已校验"
-          value={stats?.verified ?? 0}
-          icon={<CheckCircle className="h-5 w-5" />}
-        />
-        <StatsCard
-          title="已排除"
-          value={stats?.excluded ?? 0}
-          icon={<XCircle className="h-5 w-5" />}
-        />
-      </div>
+      <FactorStatsCards
+        stats={stats}
+        statsLoading={statsLoading}
+        pipelineStatus={pipelineStatus}
+      />
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Score Distribution */}
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="mb-4 font-semibold">评分分布</h3>
-          <div className="space-y-3">
-            {stats?.score_distribution ? (
-              // 显示所有评分区间（包括计数为0的）
-              (() => {
-                // 定义分数段：0-1.5 合并，其余每 0.5 分一档
-                const scoreRanges: { label: string; keys: string[] }[] = [
-                  { label: '0-1.5', keys: ['0-0.5', '0.5-1', '1-1.5'] },
-                  { label: '1.5-2', keys: ['1.5-2'] },
-                  { label: '2-2.5', keys: ['2-2.5'] },
-                  { label: '2.5-3', keys: ['2.5-3'] },
-                  { label: '3-3.5', keys: ['3-3.5'] },
-                  { label: '3.5-4', keys: ['3.5-4'] },
-                  { label: '4-4.5', keys: ['4-4.5'] },
-                  { label: '4.5-5', keys: ['4.5-5'] },
-                ]
-                return scoreRanges.map(({ label, keys }) => {
-                  const count = keys.reduce(
-                    (sum, key) => sum + ((stats.score_distribution[key] as number) || 0),
-                    0
-                  )
-                  return (
-                    <div key={label} className="flex items-center gap-3">
-                      <span className="w-12 truncate text-sm text-muted-foreground">{label}</span>
-                      <div className="flex-1 h-6 bg-muted rounded-md overflow-hidden">
-                        <div
-                          className="h-full bg-primary transition-all"
-                          style={{
-                            width: `${Math.min((count / (stats.total || 1)) * 100, 100)}%`,
-                          }}
-                        />
-                      </div>
-                      <span className="w-12 text-right text-sm font-medium">{count}</span>
-                    </div>
-                  )
-                })
-              })()
-            ) : (
-              <div className="flex h-48 items-center justify-center text-muted-foreground">
-                暂无评分数据
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Style Distribution */}
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="mb-4 font-semibold">风格分布</h3>
-          <div className="space-y-3">
-            {stats?.style_distribution ? (
-              Object.entries(stats.style_distribution)
-                .sort(([, a], [, b]) => (b as number) - (a as number))
-                .slice(0, 8)
-                .map(([style, count]) => (
-                  <div key={style} className="flex items-center gap-3">
-                    <span className="w-20 truncate text-sm text-muted-foreground" title={style}>
-                      {style}
-                    </span>
-                    <div className="flex-1 h-6 bg-muted rounded-md overflow-hidden">
-                      <div
-                        className="h-full bg-info transition-all"
-                        style={{
-                          width: `${Math.min(((count as number) / (stats.total || 1)) * 100, 100)}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="w-12 text-right text-sm font-medium">{count as number}</span>
-                  </div>
-                ))
-            ) : (
-              <div className="flex h-48 items-center justify-center text-muted-foreground">
-                暂无风格数据
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Field Coverage */}
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="mb-4 font-semibold">字段填充率</h3>
-          <div className="space-y-3">
-            {pipelineStatus?.field_coverage ? (
-              FIELD_ORDER.map((field) => {
-                const coverage = pipelineStatus.field_coverage[field]
-                const filled = coverage?.filled ?? 0
-                const empty = coverage?.empty ?? 0
-                const total = filled + empty
-                const rate = total > 0 ? (filled / total) * 100 : 0
-                return (
-                  <div key={field} className="flex items-center gap-3">
-                    <span className="w-16 truncate text-sm text-muted-foreground" title={FIELD_LABELS[field]}>
-                      {FIELD_LABELS[field]}
-                    </span>
-                    <div className="flex-1 h-6 bg-muted rounded-md overflow-hidden">
-                      <div
-                        className="h-full bg-success transition-all"
-                        style={{ width: `${rate}%` }}
-                      />
-                    </div>
-                    <span className="w-16 text-right text-sm font-medium">{rate.toFixed(0)}%</span>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="flex h-48 items-center justify-center text-muted-foreground">
-                暂无填充数据
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <FactorCharts stats={stats} pipelineStatus={pipelineStatus} />
 
       {/* Factor Library Section */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">因子库</h2>
 
         {/* Filters */}
-        <FactorFilters onSearch={setSearchQuery} searchValue={searchQuery} />
+        <FactorFilters
+          filters={filters}
+          setFilters={setFilters}
+          resetFilters={resetFilters}
+          onSearch={setSearchQuery}
+          searchValue={searchQuery}
+        />
 
         {/* Toolbar */}
         <div className="flex items-center justify-between">
@@ -321,19 +216,21 @@ export function Component() {
 /**
  * Factor Table View - 使用 ResizableTable 组件
  */
+interface FactorTableProps {
+  factors: Factor[]
+  onSelect: (factor: Factor) => void
+  visibleColumns: string[]
+  columnWidths: Record<string, number>
+  onColumnWidthChange: (columnKey: string, width: number) => void
+}
+
 function FactorTable({
   factors,
   onSelect,
   visibleColumns,
   columnWidths,
   onColumnWidthChange,
-}: {
-  factors: Factor[]
-  onSelect: (factor: Factor) => void
-  visibleColumns: string[]
-  columnWidths: Record<string, number>
-  onColumnWidthChange: (columnKey: string, width: number) => void
-}) {
+}: FactorTableProps) {
   // 构建表格列配置
   const tableColumns = useMemo<TableColumn<Factor>[]>(() => {
     return visibleColumns
@@ -376,7 +273,7 @@ function FactorTable({
           case 'style':
             column.render = (value) => {
               if (!value) return null
-              const styles = (value as string).split(',').filter(s => s.trim())
+              const styles = (value as string).split(',').filter((s) => s.trim())
               return (
                 <div className="flex flex-wrap gap-1">
                   {styles.map((style, i) => (
@@ -440,15 +337,20 @@ function FactorTable({
 
           case 'verified':
             column.align = 'center'
-            column.render = (value) => (
-              <div className="flex items-center justify-center">
-                {value ? (
-                  <Check className="h-4 w-4 text-success" />
-                ) : (
-                  <X className="h-4 w-4 text-muted-foreground/50" />
-                )}
-              </div>
-            )
+            column.render = (value) => {
+              // 使用 Check 和 X 图标
+              const Check = require('lucide-react').Check
+              const X = require('lucide-react').X
+              return (
+                <div className="flex items-center justify-center">
+                  {value ? (
+                    <Check className="h-4 w-4 text-success" />
+                  ) : (
+                    <X className="h-4 w-4 text-muted-foreground/50" />
+                  )}
+                </div>
+              )
+            }
             break
 
           case 'ic':
@@ -505,59 +407,5 @@ function FactorTable({
       onColumnWidthChange={onColumnWidthChange}
       emptyText="暂无因子"
     />
-  )
-}
-
-/**
- * Pagination Component
- */
-function Pagination({
-  page,
-  pageSize,
-  total,
-  totalPages,
-  onPageChange,
-  onPageSizeChange,
-}: {
-  page: number
-  pageSize: number
-  total: number
-  totalPages: number
-  onPageChange: (page: number) => void
-  onPageSizeChange: (size: number) => void
-}) {
-  return (
-    <div className="flex items-center justify-end gap-3 text-sm">
-      <button
-        onClick={() => onPageChange(page - 1)}
-        disabled={page <= 1}
-        className="p-1.5 rounded hover:bg-accent disabled:opacity-30"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
-      <span className="text-muted-foreground">{page} / {totalPages}</span>
-      <button
-        onClick={() => onPageChange(page + 1)}
-        disabled={page >= totalPages}
-        className="p-1.5 rounded hover:bg-accent disabled:opacity-30"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </button>
-
-      <select
-        value={pageSize}
-        onChange={(e) => onPageSizeChange(Number(e.target.value))}
-        className="h-8 px-2 rounded border bg-background text-sm"
-      >
-        <option value={20}>20条/页</option>
-        <option value={50}>50条/页</option>
-        <option value={100}>100条/页</option>
-        <option value={200}>200条/页</option>
-      </select>
-
-      <span className="text-muted-foreground">
-        共 {total} 条
-      </span>
-    </div>
   )
 }

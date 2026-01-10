@@ -2,12 +2,13 @@
  * Experience Filters Component
  *
  * 经验列表过滤器组件 - 使用统一的 FilterToolbar 和 FilterSelect
+ * 通过 props 接收筛选状态，支持多种状态管理方式（URL params 或 store）
  */
 
 import { useMemo } from 'react'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
-import { useExperienceStore, useExperienceStats } from '../'
+import { useExperienceStats } from '../'
 import {
   EXPERIENCE_LEVEL_LABELS,
   EXPERIENCE_STATUS_LABELS,
@@ -17,6 +18,7 @@ import {
   type ExperienceStatus,
   type SourceType,
 } from '../types'
+import type { ExperienceListParams } from '../types'
 
 // 层级选项
 const LEVEL_OPTIONS: SelectOption[] = [
@@ -55,13 +57,27 @@ const ORDER_BY_OPTIONS: SelectOption[] = [
 ]
 
 interface ExperienceFiltersProps {
+  filters: Partial<ExperienceListParams>
+  setFilters: (filters: Partial<ExperienceListParams>) => void
+  resetFilters: () => void
   onSearch?: (query: string) => void
   searchValue?: string
+  onSearchInputChange?: (value: string) => void
+  searchInputValue?: string
+  hasActiveFilters?: boolean
 }
 
-export function ExperienceFilters({ onSearch, searchValue = '' }: ExperienceFiltersProps) {
+export function ExperienceFilters({
+  filters,
+  setFilters,
+  resetFilters,
+  onSearch,
+  searchValue = '',
+  onSearchInputChange,
+  searchInputValue,
+  hasActiveFilters: hasActiveFiltersProp,
+}: ExperienceFiltersProps) {
   const { data: stats } = useExperienceStats()
-  const { filters, setFilters, resetFilters } = useExperienceStore()
 
   // 分类选项（从统计数据获取）
   const categoryOptions: SelectOption[] = useMemo(
@@ -72,20 +88,35 @@ export function ExperienceFilters({ onSearch, searchValue = '' }: ExperienceFilt
     [stats?.categories]
   )
 
-  // 检查是否有活跃筛选
-  const hasActiveFilters = !!(
-    searchValue ||
-    filters.experience_level ||
-    filters.status ||
-    filters.category ||
-    filters.source_type ||
-    filters.market_regime
-  )
+  // 检查是否有活跃筛选（如果外部传入则使用外部值）
+  const hasActiveFilters =
+    hasActiveFiltersProp ??
+    !!(
+      searchValue ||
+      filters.experience_level ||
+      filters.status ||
+      filters.category ||
+      filters.source_type ||
+      filters.market_regime
+    )
+
+  // 同步搜索框输入和搜索值
+  const handleSearchChange = onSearchInputChange
+    ? (value: string) => {
+        onSearchInputChange(value)
+        if (value === '') {
+          onSearch?.('')
+        }
+      }
+    : undefined
+
+  const handleSearchSubmit = onSearch ? () => onSearch(searchInputValue ?? searchValue) : undefined
 
   return (
     <FilterToolbar
-      searchValue={searchValue}
-      onSearchChange={onSearch}
+      searchValue={searchInputValue ?? searchValue}
+      onSearchChange={handleSearchChange}
+      onSearch={handleSearchSubmit}
       searchPlaceholder="搜索经验..."
       hasActiveFilters={hasActiveFilters}
       onReset={resetFilters}

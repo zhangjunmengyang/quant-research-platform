@@ -9,13 +9,12 @@ import { motion } from 'framer-motion'
 import { Check, Globe, Moon, Sun, Monitor, User } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
+import { FontSizeSelector } from '@/components/ui/FontSizeSelector'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 
 const pageTitles: Record<string, string> = {
@@ -34,8 +33,8 @@ const pageTitles: Record<string, string> = {
 }
 
 const languages = [
-  { code: 'zh-CN', label: '简体中文', flag: '🇨🇳' },
-  { code: 'en-US', label: 'English', flag: '🇺🇸' },
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'en-US', label: 'English' },
 ]
 
 export function Header() {
@@ -45,8 +44,6 @@ export function Header() {
 
   const titleKey = pageTitles[location.pathname] || 'page.quantPlatform'
   const title = t(titleKey)
-
-  const currentLanguage = languages.find((l) => l.code === i18n.language) || languages[0]
 
   const handleLanguageChange = (langCode: string) => {
     i18n.changeLanguage(langCode)
@@ -85,6 +82,9 @@ export function Header() {
 
       {/* Actions */}
       <div className="flex items-center gap-1">
+        {/* Font Size Selector */}
+        <FontSizeSelector />
+
         {/* Theme Toggle - Direct click to cycle: light -> dark -> system */}
         <button
           type="button"
@@ -92,7 +92,7 @@ export function Header() {
           className={cn(
             'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
             'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+            'focus-visible:outline-none'
           )}
           aria-label={t('header.theme')}
           title={getThemeTitle()}
@@ -113,31 +113,23 @@ export function Header() {
             <button
               type="button"
               className={cn(
-                'flex h-8 items-center gap-1.5 rounded-md px-2 transition-colors',
+                'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
                 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                'focus-visible:outline-none'
               )}
               aria-label={t('header.language')}
             >
               <Globe className="h-4 w-4" />
-              <span className="text-sm">{currentLanguage.flag}</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-36">
-            <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
-              {t('header.language')}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
             {languages.map((lang) => (
               <DropdownMenuItem
                 key={lang.code}
                 onClick={() => handleLanguageChange(lang.code)}
                 className="flex items-center justify-between text-sm"
               >
-                <div className="flex items-center gap-2">
-                  <span>{lang.flag}</span>
-                  <span>{lang.label}</span>
-                </div>
+                <span>{lang.label}</span>
                 {i18n.language === lang.code && <Check className="h-4 w-4 text-primary" />}
               </DropdownMenuItem>
             ))}
@@ -152,7 +144,7 @@ export function Header() {
               className={cn(
                 'flex h-8 w-8 items-center justify-center rounded-md transition-colors',
                 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+                'focus-visible:outline-none'
               )}
               aria-label={t('header.user')}
             >
@@ -160,10 +152,6 @@ export function Header() {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
-              {t('header.user')}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuItem disabled className="text-sm">
               <span className="text-muted-foreground">{t('common.developing')}</span>
             </DropdownMenuItem>

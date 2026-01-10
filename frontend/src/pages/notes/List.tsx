@@ -3,7 +3,7 @@
  * 笔记列表页 - 展示所有经验概览
  */
 
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FileText,
@@ -35,6 +35,7 @@ import type { Note, NoteListParams } from '@/features/note'
 import { cn } from '@/lib/utils'
 import { FilterToolbar } from '@/components/ui/filter-toolbar'
 import { FilterSelect, type SelectOption } from '@/components/ui/filter-select'
+import { Pagination } from '@/components/ui/pagination'
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+
+const DEFAULT_FILTERS: NoteListParams = {
+  page: 1,
+  page_size: 20,
+  is_archived: false,
+}
 
 // 归档状态筛选选项
 type ArchiveFilter = 'active' | 'archived' | 'all'
@@ -91,13 +98,21 @@ const QUICK_RECORD_TYPES = [
 
 export function Component() {
   const navigate = useNavigate()
-  const [params, setParams] = useState<NoteListParams>({ page: 1, page_size: 20 })
+  const [filters, setFilters] = useState<NoteListParams>(DEFAULT_FILTERS)
   const [searchInput, setSearchInput] = useState('')
-  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter | undefined>(undefined)
-  const { data, isLoading, isError, error } = useNotes({
-    ...params,
-    is_archived: archiveFilter === undefined ? false : archiveFilter === 'archived',
-  })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>('active')
+
+  const queryParams = useMemo(
+    () => ({
+      ...filters,
+      search: searchQuery || undefined,
+      is_archived: archiveFilter === undefined ? false : archiveFilter === 'archived',
+    }),
+    [filters, searchQuery, archiveFilter]
+  )
+
+  const { data, isLoading, isError, error } = useNotes(queryParams)
   const { data: tags = [] } = useNoteTags()
   const { createNote, deleteNote } = useNoteMutations()
   const { recordObservation, recordHypothesis, recordFinding } = useRecordNote()
@@ -111,10 +126,13 @@ export function Component() {
   const [newContent, setNewContent] = useState('')
 
   // 动态生成标签选项
-  const tagOptions: SelectOption[] = [
-    { value: '', label: '全部标签' },
-    ...tags.map((tag) => ({ value: tag, label: tag })),
-  ]
+  const tagOptions: SelectOption[] = useMemo(
+    () => [
+      { value: '', label: '全部标签' },
+      ...tags.map((tag) => ({ value: tag, label: tag })),
+    ],
+    [tags]
+  )
 
   const handleOpenDialog = (type: NoteType = NoteType.GENERAL) => {
     setDialogType(type)
@@ -170,27 +188,40 @@ export function Component() {
   }
 
   const handleSearch = () => {
-    setParams({ ...params, search: searchInput, page: 1 })
+    setSearchQuery(searchInput)
+    setFilters((prev) => ({ ...prev, page: 1 }))
+  }
+
+  const handleSearchInputChange = (value: string) => {
+    setSearchInput(value)
+    if (value === '') {
+      setSearchQuery('')
+    }
   }
 
   const handleTagFilter = (tag: string | undefined) => {
-    setParams({ ...params, tags: tag, page: 1 })
+    setFilters((prev) => ({ ...prev, tags: tag, page: 1 }))
   }
 
   const handleNoteTypeFilter = (noteType: string | undefined) => {
-    setParams({ ...params, note_type: noteType as NoteType | undefined, page: 1 })
+    setFilters((prev) => ({ ...prev, note_type: noteType as NoteType | undefined, page: 1 }))
   }
 
   const handleArchiveFilterChange = (filter: string | undefined) => {
     const value = filter as ArchiveFilter | undefined
-    setArchiveFilter(value)
-    setParams({ ...params, page: 1 })
+    setArchiveFilter(value ?? 'active')
+    setFilters((prev) => ({ ...prev, page: 1 }))
   }
 
-  const handleClearFilter = () => {
-    setParams({ page: 1, page_size: 20 })
+  const handleResetFilters = () => {
+    setFilters(DEFAULT_FILTERS)
+    setSearchQuery('')
     setSearchInput('')
-    setArchiveFilter(undefined)
+    setArchiveFilter('active')
+  }
+
+  const handlePageChange = (page: number) => {
+    setFilters((prev) => ({ ...prev, page }))
   }
 
   const handleDelete = async (e: React.MouseEvent, note: Note) => {
@@ -225,7 +256,12 @@ export function Component() {
     recordHypothesis.isPending ||
     recordFinding.isPending
 
-  const hasActiveFilters = !!(params.search || params.tags || params.note_type || archiveFilter !== undefined)
+  const hasActiveFilters = !!(
+    searchQuery ||
+    filters.tags ||
+    filters.note_type ||
+    archiveFilter !== 'active'
+  )
 
   if (isLoading) {
     return (
@@ -301,16 +337,16 @@ export function Component() {
       {/* Filter Toolbar */}
       <FilterToolbar
         searchValue={searchInput}
-        onSearchChange={setSearchInput}
+        onSearchChange={handleSearchInputChange}
         onSearch={handleSearch}
         searchPlaceholder="搜索笔记..."
         hasActiveFilters={hasActiveFilters}
-        onReset={handleClearFilter}
+        onReset={handleResetFilters}
       >
         <FilterSelect
           label="类型"
           options={NOTE_TYPE_OPTIONS}
-          value={params.note_type}
+          value={filters.note_type}
           onChange={handleNoteTypeFilter}
         />
         <FilterSelect
@@ -323,7 +359,7 @@ export function Component() {
           <FilterSelect
             label="标签"
             options={tagOptions}
-            value={params.tags}
+            value={filters.tags}
             onChange={handleTagFilter}
           />
         )}
@@ -353,7 +389,7 @@ export function Component() {
                 key={note.id}
                 onClick={() => navigate(`/notes/${note.id}`)}
                 className={cn(
-                  'group cursor-pointer rounded-lg border p-4 transition-colors hover:bg-muted/50',
+                  'group cursor-pointer rounded-lg border bg-card p-4 transition-colors hover:bg-muted/30',
                   note.is_archived && 'opacity-60'
                 )}
               >
@@ -434,25 +470,14 @@ export function Component() {
 
       {/* Pagination */}
       {data && data.total_pages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setParams({ ...params, page: (params.page ?? 1) - 1 })}
-            disabled={!data.has_prev}
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          >
-            上一页
-          </button>
-          <span className="text-sm text-muted-foreground">
-            第 {data.page} / {data.total_pages} 页
-          </span>
-          <button
-            onClick={() => setParams({ ...params, page: (params.page ?? 1) + 1 })}
-            disabled={!data.has_next}
-            className="rounded-md border px-3 py-1 text-sm disabled:opacity-50"
-          >
-            下一页
-          </button>
-        </div>
+        <Pagination
+          page={data.page}
+          pageSize={data.page_size}
+          total={data.total}
+          totalPages={data.total_pages}
+          onPageChange={handlePageChange}
+          position="center"
+        />
       )}
 
       {/* Create Note Dialog */}

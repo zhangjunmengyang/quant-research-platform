@@ -157,14 +157,14 @@ export function Component() {
 
       {/* Report Info */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-lg border p-4">
+        <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <FileText className="h-4 w-4" />
             文件大小
           </div>
           <div className="font-medium">{formatFileSize(report.file_size)}</div>
         </div>
-        <div className="rounded-lg border p-4">
+        <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <Layers className="h-4 w-4" />
             页数
@@ -172,7 +172,7 @@ export function Component() {
           <div className="font-medium">{report.page_count || '-'} 页</div>
         </div>
         {report.author && (
-          <div className="rounded-lg border p-4">
+          <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <User className="h-4 w-4" />
               作者
@@ -180,7 +180,7 @@ export function Component() {
             <div className="font-medium">{report.author}</div>
           </div>
         )}
-        <div className="rounded-lg border p-4">
+        <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <Calendar className="h-4 w-4" />
             上传时间
@@ -191,7 +191,7 @@ export function Component() {
 
       {/* Source URL */}
       {report.source_url && (
-        <div className="rounded-lg border p-4">
+        <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <ExternalLink className="h-4 w-4" />
             来源链接
@@ -209,7 +209,7 @@ export function Component() {
 
       {/* Processing Progress */}
       {report.progress > 0 && report.progress < 100 && (
-        <div className="rounded-lg border p-4">
+        <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-muted-foreground">处理进度</span>
             <span className="text-sm font-medium">{report.progress}%</span>

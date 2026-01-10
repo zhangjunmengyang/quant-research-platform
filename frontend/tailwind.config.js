@@ -92,14 +92,17 @@ export default {
         mono: ['JetBrains Mono', 'Fira Code', 'SF Mono', 'Consolas', 'monospace'],
       },
       fontSize: {
-        '2xs': ['0.6875rem', { lineHeight: '1rem' }],    // 11px
-        'xs': ['0.75rem', { lineHeight: '1rem' }],       // 12px
-        'sm': ['0.8125rem', { lineHeight: '1.25rem' }],  // 13px
-        'base': ['0.875rem', { lineHeight: '1.375rem' }],// 14px
-        'lg': ['1rem', { lineHeight: '1.5rem' }],        // 16px
-        'xl': ['1.125rem', { lineHeight: '1.625rem' }],  // 18px
-        '2xl': ['1.25rem', { lineHeight: '1.75rem' }],   // 20px
-        '3xl': ['1.5rem', { lineHeight: '2rem' }],       // 24px
+        // 使用 CSS 变量实现字号档位系统
+        // 通过 data-size-mode 属性切换: compact(14px) / standard(16px) / large(18px)
+        '2xs': 'var(--text-2xs)',
+        'xs': 'var(--text-xs)',
+        'sm': 'var(--text-sm)',
+        'base': 'var(--text-base)',
+        'lg': 'var(--text-lg)',
+        'xl': 'var(--text-xl)',
+        '2xl': 'var(--text-2xl)',
+        '3xl': 'var(--text-3xl)',
+        '4xl': 'var(--text-4xl)',
       },
       spacing: {
         '0.5': '0.125rem',  // 2px

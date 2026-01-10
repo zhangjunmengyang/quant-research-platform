@@ -185,7 +185,7 @@ export function Component() {
             {results.map((result, index) => (
               <div
                 key={result.chunk_id}
-                className="rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                className="rounded-lg border bg-card p-4 hover:bg-muted/30 transition-colors"
               >
                 <div className="flex items-start justify-between gap-4 mb-2">
                   <div className="flex items-center gap-2">

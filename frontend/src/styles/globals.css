@@ -13,6 +13,30 @@
    - Semantic colors for status indication
    ============================================ */
 
+@layer components {
+  /* Header 中的按钮移除 focus ring */
+  .header-action-btn {
+    @apply focus-visible:outline-none !important;
+    @apply focus-visible:ring-0 !important;
+  }
+
+  /* 强制移除所有可能的 ring 效果 */
+  button.header-action-btn:focus-visible,
+  button.header-action-btn:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    --tw-ring-opacity: 0 !important;
+  }
+
+  /* Header 按钮覆盖 - 移除 focus ring */
+  header button:focus-visible,
+  header [role="button"]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    --tw-ring-shadow: 0 0 0 0px transparent !important;
+  }
+}
+
 @layer base {
   :root {
     /* ========== Spacing Scale ========== */
@@ -27,16 +51,21 @@
     --space-12: 3rem;     /* 48px */
     --space-16: 4rem;     /* 64px */
 
-    /* ========== Typography Scale ========== */
-    --text-2xs: 0.6875rem; /* 11px */
-    --text-xs: 0.75rem;    /* 12px */
-    --text-sm: 0.875rem;   /* 14px */
-    --text-base: 1rem;     /* 16px - base */
-    --text-lg: 1.125rem;   /* 18px */
-    --text-xl: 1.25rem;    /* 20px */
-    --text-2xl: 1.5rem;    /* 24px */
-    --text-3xl: 1.875rem;  /* 30px */
-    --text-4xl: 2.25rem;   /* 36px */
+    /* ========== Typography Scale - Font Size Mode System ========== */
+    /* 字号档位基准 - 默认标准模式 16px */
+    --font-size-base: 16px;
+    --font-size-ratio: 1.125;
+
+    /* 字号层级 - 基于 --font-size-base 计算 */
+    --text-2xs: calc(var(--font-size-base) * 0.625);   /* 比例: 0.625 */
+    --text-xs: calc(var(--font-size-base) * 0.75);     /* 比例: 0.75 */
+    --text-sm: calc(var(--font-size-base) * 0.875);    /* 比例: 0.875 */
+    --text-base: var(--font-size-base);                /* 比例: 1 */
+    --text-lg: calc(var(--font-size-base) * 1.125);    /* 比例: 1.125 */
+    --text-xl: calc(var(--font-size-base) * 1.25);     /* 比例: 1.25 */
+    --text-2xl: calc(var(--font-size-base) * 1.5);      /* 比例: 1.5 */
+    --text-3xl: calc(var(--font-size-base) * 1.75);     /* 比例: 1.75 */
+    --text-4xl: calc(var(--font-size-base) * 2);        /* 比例: 2 */
 
     /* ========== Background Layers ========== */
     --background: 0 0% 98.5%;
@@ -180,6 +209,22 @@
     --shadow-3: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
     --shadow-4: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.35);
   }
+
+  /* ========== Font Size Mode ========== */
+  /* 小号模式 - 基准 14px */
+  [data-size-mode="compact"] {
+    --font-size-base: 14px;
+  }
+
+  /* 标准模式 - 基准 16px (默认) */
+  [data-size-mode="standard"] {
+    --font-size-base: 16px;
+  }
+
+  /* 大号模式 - 基准 18px */
+  [data-size-mode="large"] {
+    --font-size-base: 18px;
+  }
 }
 
 @layer base {
@@ -195,7 +240,8 @@
   }
 
   body {
-    @apply bg-background text-foreground text-sm;
+    @apply bg-background text-foreground;
+    font-size: var(--text-base);  /* 根据字号档位动态调整 */
     font-feature-settings: 'rlig' 1, 'calt' 1, 'ss01' 1;
     line-height: 1.5;
     letter-spacing: -0.01em;
@@ -241,9 +287,17 @@
     @apply bg-primary/20 text-foreground;
   }
 
-  /* Focus visible styles */
-  :focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  /* Focus visible styles - 完全重写，默认无 ring */
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 只对明确添加 .focus-ring 类的元素启用 ring */
+  .focus-ring:focus-visible {
+    --tw-ring-shadow: 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color) !important;
+    --tw-ring-offset-shadow: 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color) !important;
+    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color) !important;
   }
 }
 
