@@ -183,59 +183,64 @@ export function createResourceHooks<
       staleTime,
     })
 
-  const hooks: ResourceHooksWithMutations<T, ListParams, UpdateData, DeleteResponse> = {
-    useList,
-    useItem,
-    useMutations: (() => {
-      const queryClient = useQueryClient()
+  /**
+   * Mutations hook (correctly defined as a custom Hook)
+   */
+  const useMutations = () => {
+    const queryClient = useQueryClient()
 
-      const invalidateListAndStats = () => {
-        queryClient.invalidateQueries({ queryKey: keys.lists() })
-        queryClient.invalidateQueries({ queryKey: keys.stats() })
-      }
+    const invalidateListAndStats = () => {
+      queryClient.invalidateQueries({ queryKey: keys.lists() })
+      queryClient.invalidateQueries({ queryKey: keys.stats() })
+    }
 
-      const invalidateAll = () => {
-        queryClient.invalidateQueries({ queryKey: keys.all })
-      }
+    const invalidateAll = () => {
+      queryClient.invalidateQueries({ queryKey: keys.all })
+    }
 
-      const mutations: Record<string, ReturnType<typeof useMutation> | undefined> = {}
+    const mutations: Record<string, ReturnType<typeof useMutation> | undefined> = {}
 
-      // 更新 mutation
-      if (updateItem) {
-        mutations.update = useMutation({
-          mutationFn: updateItem,
-          onSuccess: (data) => {
-            const itemId = extractId(data as T)
-            queryClient.setQueryData(keys.detail(itemId), data)
+    // 更新 mutation
+    if (updateItem) {
+      mutations.update = useMutation({
+        mutationFn: updateItem,
+        onSuccess: (data) => {
+          const itemId = extractId(data as T)
+          queryClient.setQueryData(keys.detail(itemId), data)
+          invalidateListAndStats()
+        },
+      })
+    }
+
+    // 删除 mutation
+    if (deleteItem) {
+      mutations.delete = useMutation({
+        mutationFn: deleteItem,
+        onSuccess: () => {
+          invalidateAll()
+        },
+      })
+    }
+
+    // 自定义 actions
+    if (customActions) {
+      Object.entries(customActions).forEach(([name, actionFn]) => {
+        mutations[name] = useMutation({
+          mutationFn: actionFn,
+          onSuccess: () => {
             invalidateListAndStats()
           },
         })
-      }
+      })
+    }
 
-      // 删除 mutation
-      if (deleteItem) {
-        mutations.delete = useMutation({
-          mutationFn: deleteItem,
-          onSuccess: () => {
-            invalidateAll()
-          },
-        })
-      }
+    return mutations as ResourceHooksWithMutations<T, ListParams, UpdateData, DeleteResponse>['useMutations'] extends () => infer R ? R : never
+  }
 
-      // 自定义 actions
-      if (customActions) {
-        Object.entries(customActions).forEach(([name, actionFn]) => {
-          mutations[name] = useMutation({
-            mutationFn: actionFn,
-            onSuccess: () => {
-              invalidateListAndStats()
-            },
-          })
-        })
-      }
-
-      return mutations as ResourceHooksWithMutations<T, ListParams, UpdateData, DeleteResponse>['useMutations'] extends () => infer R ? R : never
-    }) as () => ResourceHooksWithMutations<T, ListParams, UpdateData, DeleteResponse>['useMutations'] extends () => infer R ? R : never,
+  const hooks: ResourceHooksWithMutations<T, ListParams, UpdateData, DeleteResponse> = {
+    useList,
+    useItem,
+    useMutations,
   }
 
   /**
