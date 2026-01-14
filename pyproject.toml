@@ -54,6 +54,13 @@ dependencies = [
     "pymupdf>=1.24.0",
     # Research Hub - 嵌入 (使用 OpenAI API，无需本地模型)
     "openai>=1.0.0",
+    # LlamaIndex RAG 框架
+    "llama-index-core>=0.12.0",
+    "llama-index-vector-stores-postgres>=0.4.0",
+    "llama-index-embeddings-openai>=0.3.0",
+    "llama-index-postprocessor-cohere-rerank>=0.3.0",
+    "llama-index-readers-file>=0.4.0",
+    "llama-index-llms-openai>=0.3.0",
 ]
 
 [project.optional-dependencies]
