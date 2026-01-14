@@ -44,9 +44,13 @@ export function TaskDetailView({ taskId, onBack }: TaskDetailViewProps) {
   useEffect(() => {
     if (taskExecution.isCompleted || taskExecution.isFailed) {
       refetch()
-      taskExecution.reset()
+      // 使用 setTimeout 避免同步调用导致的状态混乱
+      const timer = setTimeout(() => {
+        taskExecution.reset()
+      }, 0)
+      return () => clearTimeout(timer)
     }
-  }, [taskExecution.isCompleted, taskExecution.isFailed, refetch, taskExecution])
+  }, [taskExecution.isCompleted, taskExecution.isFailed, refetch, taskExecution.reset])
 
   const config = task ? parseJSON<TaskConfig | null>(task.config, null) : null
 

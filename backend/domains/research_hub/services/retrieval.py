@@ -1,18 +1,14 @@
 """
-研报检索服务
+研报检索服务 (LlamaIndex 版本)
 
-提供语义检索和 RAG 问答功能。
+基于 LlamaIndex 的语义检索和 RAG 问答服务。
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from ..core.store import get_research_store, get_chunk_store, ResearchStore, ChunkStore
-from ..core.config import get_pipeline_config
-from ..rag.base.registry import component_registries
-from ..rag.base.retriever import RetrievalResult
-from ..rag.base.embedder import BaseEmbedder
-from ..rag.base.vector_store import BaseVectorStore
+from ..core.store import get_research_store, ResearchStore
+from .llamaindex_rag import get_llamaindex_rag_service, LlamaIndexRAGService
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +20,7 @@ class RetrievalService:
     功能:
     - 语义检索：根据查询文本检索相关研报片段
     - RAG 问答：检索 + 生成回答
+    - 相似切块查询
 
     使用示例:
         service = RetrievalService()
@@ -38,16 +35,11 @@ class RetrievalService:
     def __init__(
         self,
         database_url: Optional[str] = None,
-        pipeline_name: Optional[str] = None,
+        pipeline_name: Optional[str] = None,  # 保留兼容性，LlamaIndex 版本不使用
     ):
         self.database_url = database_url
-        self.pipeline_name = pipeline_name
-
         self._research_store: Optional[ResearchStore] = None
-        self._chunk_store: Optional[ChunkStore] = None
-        self._embedder: Optional[BaseEmbedder] = None
-        self._vector_store: Optional[BaseVectorStore] = None
-        self._pipeline = None
+        self._rag_service: Optional[LlamaIndexRAGService] = None
 
     @property
     def research_store(self) -> ResearchStore:
@@ -56,39 +48,10 @@ class RetrievalService:
         return self._research_store
 
     @property
-    def chunk_store(self) -> ChunkStore:
-        if self._chunk_store is None:
-            self._chunk_store = get_chunk_store(self.database_url)
-        return self._chunk_store
-
-    async def _ensure_embedder(self) -> BaseEmbedder:
-        """确保嵌入器已初始化"""
-        if self._embedder is None:
-            config = get_pipeline_config(self.pipeline_name)
-            embedder_cls = component_registries.embedder.get(config.embedder.type)
-            self._embedder = embedder_cls(
-                model_name=config.embedder.model,
-                dimensions=config.embedder.dimensions,
-                batch_size=config.embedder.batch_size,
-                **config.embedder.options,
-            )
-            await self._embedder.setup()
-        return self._embedder
-
-    async def _ensure_vector_store(self) -> BaseVectorStore:
-        """确保向量存储已初始化"""
-        if self._vector_store is None:
-            config = get_pipeline_config(self.pipeline_name)
-            vs_cls = component_registries.vector_store.get(config.vector_store.type)
-            self._vector_store = vs_cls(
-                collection_name=config.vector_store.collection_name,
-                dimensions=config.embedder.dimensions,
-                index_type=config.vector_store.index_type,
-                distance_metric=config.vector_store.distance_metric,
-                **config.vector_store.options,
-            )
-            await self._vector_store.setup()
-        return self._vector_store
+    def rag_service(self) -> LlamaIndexRAGService:
+        if self._rag_service is None:
+            self._rag_service = get_llamaindex_rag_service()
+        return self._rag_service
 
     async def search(
         self,
@@ -119,54 +82,21 @@ class RetrievalService:
             - page_start: 起始页
             - section_title: 章节标题
         """
-        embedder = await self._ensure_embedder()
-        vector_store = await self._ensure_vector_store()
-
-        # 生成查询向量
-        query_embedding = await embedder.embed_query(query)
-
-        # 构建过滤条件
-        filter_conditions = {}
-        if report_id:
-            filter_conditions["report_id"] = report_id
-        if report_uuid:
-            filter_conditions["report_uuid"] = report_uuid
-
-        # 向量搜索
-        search_results = await vector_store.search(
-            query_vector=query_embedding.dense,
+        results = await self.rag_service.search(
+            query=query,
             top_k=top_k,
-            filter_conditions=filter_conditions if filter_conditions else None,
+            report_id=report_id,
+            report_uuid=report_uuid,
+            min_score=min_score,
         )
 
-        # 获取研报信息用于丰富结果
-        report_cache = {}
-
-        results = []
-        for sr in search_results:
-            if sr.score < min_score:
-                continue
-
-            # 获取研报标题
-            doc_id = sr.document_id
-            if doc_id not in report_cache:
-                report = self.research_store.get_by_uuid(doc_id)
-                report_cache[doc_id] = report
-
-            report = report_cache.get(doc_id)
-            report_title = report.title if report else ""
-            report_id_val = report.id if report else None
-
-            results.append({
-                "chunk_id": sr.chunk_id,
-                "content": sr.content,
-                "score": sr.score,
-                "report_id": report_id_val,
-                "report_uuid": doc_id,
-                "report_title": report_title,
-                "page_start": sr.chunk.metadata.page_start if sr.chunk.metadata else None,
-                "section_title": sr.chunk.metadata.section_title if sr.chunk.metadata else "",
-            })
+        # 丰富研报信息（如果 LlamaIndex 返回的信息不完整）
+        for result in results:
+            if not result.get("report_title") and result.get("report_uuid"):
+                report = self.research_store.get_by_uuid(result["report_uuid"])
+                if report:
+                    result["report_title"] = report.title
+                    result["report_id"] = report.id
 
         logger.info(f"语义检索完成: query='{query[:50]}...', 返回 {len(results)} 条结果")
         return results
@@ -187,7 +117,7 @@ class RetrievalService:
             top_k: 检索的切块数量
             report_id: 限定的研报 ID
             report_uuid: 限定的研报 UUID
-            conversation_history: 对话历史
+            conversation_history: 对话历史（当前版本暂不支持）
 
         Returns:
             问答结果:
@@ -195,48 +125,26 @@ class RetrievalService:
             - sources: 来源引用列表
             - retrieved_chunks: 检索到的切块数量
         """
-        from .pipeline_factory import get_pipeline_factory
-
-        factory = get_pipeline_factory()
-        pipeline = await factory.get_or_create_pipeline(self.pipeline_name)
-
-        # 构建过滤条件
-        filter_conditions = {}
-        if report_id:
-            filter_conditions["report_id"] = report_id
-        if report_uuid:
-            filter_conditions["report_uuid"] = report_uuid
-
-        # 执行 RAG 流水线
-        result = await pipeline.run(
-            query=question,
-            conversation_history=conversation_history,
-            filter_conditions=filter_conditions if filter_conditions else None,
+        result = await self.rag_service.ask(
+            question=question,
+            top_k=top_k,
+            report_id=report_id,
+            report_uuid=report_uuid,
+            rerank=True,
         )
 
-        # 构建来源引用
-        sources = []
-        if result.generation and result.generation.sources:
-            for src in result.generation.sources:
-                # 获取研报标题
-                report = None
-                if src.document_id:
-                    report = self.research_store.get_by_uuid(src.document_id)
-
-                sources.append({
-                    "chunk_id": src.chunk_id,
-                    "content": src.content,
-                    "page_number": src.page_number,
-                    "relevance": src.relevance,
-                    "report_uuid": src.document_id,
-                    "report_title": report.title if report else "",
-                })
+        # 丰富来源信息
+        for source in result.get("sources", []):
+            if not source.get("report_title") and source.get("report_uuid"):
+                report = self.research_store.get_by_uuid(source["report_uuid"])
+                if report:
+                    source["report_title"] = report.title
 
         return {
-            "answer": result.answer or "",
-            "sources": sources,
-            "retrieved_chunks": result.retrieved_chunks,
-            "total_time": result.total_time,
+            "answer": result.get("answer", ""),
+            "sources": result.get("sources", []),
+            "retrieved_chunks": result.get("retrieved_chunks", 0),
+            "total_time": 0,  # LlamaIndex 版本暂不提供耗时统计
         }
 
     async def get_similar_chunks(
@@ -256,56 +164,18 @@ class RetrievalService:
         Returns:
             相似切块列表
         """
-        vector_store = await self._ensure_vector_store()
-
-        # 获取参考切块
-        ref_chunk = await vector_store.get_by_id(chunk_id)
-        if ref_chunk is None:
-            return []
-
-        # 获取切块的向量
-        # 由于切块可能没有存储向量，需要重新生成
-        embedder = await self._ensure_embedder()
-        query_embedding = await embedder.embed_query(ref_chunk.content)
-
-        # 搜索相似切块
-        filter_conditions = {}
-        if exclude_same_report and ref_chunk.metadata:
-            # 注意: 这里需要排除同一研报，但 pgvector 不支持 NOT IN
-            # 简化处理：返回时过滤
-            pass
-
-        search_results = await vector_store.search(
-            query_vector=query_embedding.dense,
-            top_k=top_k + 10,  # 多取一些，用于过滤
-            filter_conditions=filter_conditions if filter_conditions else None,
+        results = await self.rag_service.get_similar_chunks(
+            chunk_id=chunk_id,
+            top_k=top_k,
+            exclude_same_report=exclude_same_report,
         )
 
-        results = []
-        ref_doc_id = ref_chunk.metadata.document_id if ref_chunk.metadata else None
-
-        for sr in search_results:
-            # 排除自身
-            if sr.chunk_id == chunk_id:
-                continue
-
-            # 排除同一研报
-            if exclude_same_report and sr.document_id == ref_doc_id:
-                continue
-
-            # 获取研报标题
-            report = self.research_store.get_by_uuid(sr.document_id) if sr.document_id else None
-
-            results.append({
-                "chunk_id": sr.chunk_id,
-                "content": sr.content,
-                "score": sr.score,
-                "report_uuid": sr.document_id,
-                "report_title": report.title if report else "",
-            })
-
-            if len(results) >= top_k:
-                break
+        # 丰富研报信息
+        for result in results:
+            if not result.get("report_title") and result.get("report_uuid"):
+                report = self.research_store.get_by_uuid(result["report_uuid"])
+                if report:
+                    result["report_title"] = report.title
 
         return results
 
