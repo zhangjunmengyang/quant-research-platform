@@ -15,10 +15,12 @@ export const apiClient: AxiosInstance = axios.create({
 // Request interceptor
 apiClient.interceptors.request.use(
   (config) => {
-    // Add auth token if available
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    // Add auth token if available (SSR-safe)
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token')
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
     }
     return config
   },
@@ -31,7 +33,9 @@ apiClient.interceptors.response.use(
   (error: AxiosError<ApiErrorResponse>) => {
     // Handle common errors
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+      }
       // Optionally redirect to login
     }
 

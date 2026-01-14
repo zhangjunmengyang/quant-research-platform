@@ -197,7 +197,8 @@ class RunBacktestTool(BaseTool):
 
     category = "mutation"
     execution_mode = ExecutionMode.COMPUTE  # CPU 密集型任务，由 BacktestRunner 管理
-    execution_timeout = 3600.0  # 最长 1 小时
+    # execution_timeout 不设置，使用 COMPUTE_TOOL_TIMEOUT 默认值 (300s)
+    # 注意：实际回测在 BacktestRunner 中异步执行，此超时仅控制任务提交阶段
 
     @property
     def name(self) -> str:

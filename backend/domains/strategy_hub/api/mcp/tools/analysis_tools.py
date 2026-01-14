@@ -7,7 +7,7 @@
 from typing import Any, Dict, List, Optional
 import logging
 
-from domains.mcp_core import BaseTool, ToolResult
+from domains.mcp_core import BaseTool, ToolResult, ExecutionMode
 
 from domains.strategy_hub.services import (
     get_param_search_service,
@@ -24,6 +24,7 @@ class RunParamSearchTool(BaseTool):
     """运行参数搜索工具"""
 
     category = "mutation"
+    execution_mode = ExecutionMode.COMPUTE  # 参数搜索是计算密集型任务
 
     @property
     def name(self) -> str:

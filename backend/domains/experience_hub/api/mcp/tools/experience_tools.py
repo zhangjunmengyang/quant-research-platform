@@ -285,6 +285,12 @@ class GetExperienceTool(BaseTool):
         try:
             experience_id = params.get("experience_id")
 
+            if experience_id is None:
+                return ToolResult(
+                    success=False,
+                    error="experience_id 参数不能为空"
+                )
+
             experience = self.experience_service.get_experience(experience_id)
             if experience is None:
                 return ToolResult(
@@ -470,6 +476,10 @@ class ValidateExperienceTool(BaseTool):
     async def execute(self, **params) -> ToolResult:
         try:
             experience_id = params.get("experience_id")
+
+            if experience_id is None:
+                return ToolResult(success=False, error="experience_id 参数不能为空")
+
             validation_note = params.get("validation_note")
             confidence_delta = params.get("confidence_delta")
 
