@@ -13,11 +13,16 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 from dataclasses import dataclass, field
 from enum import Enum
+import asyncio
 import logging
 import inspect
 import functools
 
 logger = logging.getLogger(__name__)
+
+# 工具执行超时配置（秒）
+DEFAULT_TOOL_TIMEOUT = 60.0  # 非回测工具默认超时
+COMPUTE_TOOL_TIMEOUT = 300.0  # 回测等计算密集型工具超时
 
 
 class ExecutionMode(str, Enum):
@@ -333,11 +338,11 @@ class ToolRegistry:
 
     async def execute(self, name: str, params: Dict[str, Any]) -> ToolResult:
         """
-        执行工具（带日志记录和执行模式调度）
+        执行工具（带超时控制、日志记录和执行模式调度）
 
         根据工具的 execution_mode 属性自动选择执行路径:
-        - FAST: 直接 async 执行
-        - COMPUTE: 由专用执行器管理（如 BacktestRunner）
+        - FAST: 直接 async 执行，默认 60s 超时
+        - COMPUTE: 由专用执行器管理（如 BacktestRunner），默认 300s 超时
 
         Args:
             name: 工具名称
@@ -355,22 +360,25 @@ class ToolRegistry:
         if error:
             return ToolResult.fail(error)
 
+        # 确定超时时间
+        execution_mode = getattr(tool, "execution_mode", ExecutionMode.FAST)
+        if tool.execution_timeout is not None:
+            timeout = tool.execution_timeout
+        elif execution_mode == ExecutionMode.COMPUTE:
+            timeout = COMPUTE_TOOL_TIMEOUT
+        else:
+            timeout = DEFAULT_TOOL_TIMEOUT
+
         try:
-            # 根据执行模式调度
-            execution_mode = getattr(tool, "execution_mode", ExecutionMode.FAST)
-
-            if execution_mode == ExecutionMode.FAST:
-                # Fast Path: 直接执行
-                result = await tool.execute(**params)
-            elif execution_mode == ExecutionMode.COMPUTE:
-                # Compute Path: 直接执行，实际的任务管理由工具内部处理
-                # 例如回测任务由 BacktestRunner 管理
-                result = await tool.execute(**params)
-            else:
-                # 未知模式，降级到直接执行
-                result = await tool.execute(**params)
-
+            # 带超时的执行
+            result = await asyncio.wait_for(
+                tool.execute(**params),
+                timeout=timeout
+            )
             return result
+        except asyncio.TimeoutError:
+            logger.error(f"工具 {name} 执行超时（{timeout}秒）")
+            return ToolResult.fail(f"执行超时: 工具 {name} 超过 {timeout} 秒未响应")
         except Exception as e:
             logger.exception(f"工具 {name} 执行失败")
             return ToolResult.fail(f"执行失败: {str(e)}")
