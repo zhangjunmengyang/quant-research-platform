@@ -362,31 +362,6 @@ class SearchResponse(BaseModel):
     results: List[SearchResultItem]
 
 
-class AskRequest(BaseModel):
-    """RAG 问答请求"""
-    question: str
-    top_k: int = 5
-    report_id: Optional[int] = None
-
-
-class SourceItem(BaseModel):
-    """来源项"""
-    chunk_id: str
-    content: str
-    page_number: Optional[int]
-    relevance: float
-    report_uuid: str
-    report_title: str
-
-
-class AskResponse(BaseModel):
-    """问答响应"""
-    question: str
-    answer: str
-    sources: List[SourceItem]
-    retrieved_chunks: int
-
-
 @router.post("/search", response_model=SearchResponse)
 async def search_reports(request: SearchRequest):
     """
@@ -412,34 +387,6 @@ async def search_reports(request: SearchRequest):
     except Exception as e:
         logger.error(f"Search failed: {e}")
         raise HTTPException(500, f"Search failed: {str(e)}")
-
-
-@router.post("/ask", response_model=AskResponse)
-async def ask_reports(request: AskRequest):
-    """
-    基于研报知识库进行问答
-
-    使用 RAG (检索增强生成) 技术，先检索相关研报内容，
-    然后基于检索到的内容生成回答。
-    """
-    service = get_retrieval_service()
-
-    try:
-        result = await service.ask(
-            question=request.question,
-            top_k=request.top_k,
-            report_id=request.report_id,
-        )
-
-        return AskResponse(
-            question=request.question,
-            answer=result["answer"],
-            sources=[SourceItem(**s) for s in result["sources"]],
-            retrieved_chunks=result["retrieved_chunks"],
-        )
-    except Exception as e:
-        logger.error(f"Ask failed: {e}")
-        raise HTTPException(500, f"Ask failed: {str(e)}")
 
 
 # ==================== 切块 API ====================

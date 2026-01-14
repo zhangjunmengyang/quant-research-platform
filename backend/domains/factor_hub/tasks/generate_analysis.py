@@ -10,9 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
 
-import aiohttp
-
-from ..core.config import get_config_loader
+from domains.mcp_core.llm import get_llm_client
 from ..services.prompt_engine import get_prompt_engine
 from ..core.progress import get_progress_reporter
 from ..core.store import get_factor_store, Factor
@@ -129,11 +127,9 @@ def build_analysis_prompt(
 
 
 async def call_analysis_api(
-    session: aiohttp.ClientSession,
     batch_factors: List[Dict[str, Any]],
     batch_id: int,
     semaphore: asyncio.Semaphore,
-    api_config: Dict[str, Any],
     prompt_engine,
 ) -> BatchAnalysisResult:
     """调用 API 生成分析"""
@@ -141,69 +137,36 @@ async def call_analysis_api(
         system_prompt, user_prompt = build_analysis_prompt(batch_factors, prompt_engine)
         filenames = [f['filename'] for f in batch_factors]
 
-        headers = {
-            "Authorization": f"Bearer {api_config['key']}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "model": api_config['model'],
-            "messages": [
+        try:
+            llm_client = get_llm_client()
+            messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.5,
-            "stream": False,
-            "max_tokens": 16000
-        }
+            ]
+            content = await llm_client.ainvoke(
+                messages=messages,
+                temperature=0.5,
+                max_tokens=16000,
+                caller="factor_hub.tasks.generate_analysis",
+                purpose="生成因子分析",
+            )
 
-        try:
-            timeout = aiohttp.ClientTimeout(total=api_config['timeout'])
-            async with session.post(
-                api_config['url'],
-                headers=headers,
-                json=payload,
-                timeout=timeout
-            ) as response:
-                if response.status == 200:
-                    response_text = await response.text()
-                    try:
-                        data = json.loads(response_text)
-                        choices = data.get('choices', [])
-                        if choices and choices[0]:
-                            message = choices[0].get('message', {})
-                            content = message.get('content', '')
-                            if content:
-                                results = parse_analysis_response(content, filenames)
-                                return BatchAnalysisResult(
-                                    batch_id=batch_id,
-                                    filenames=filenames,
-                                    success=True,
-                                    results=results,
-                                    raw_response=content
-                                )
+            if content:
+                results = parse_analysis_response(content, filenames)
+                return BatchAnalysisResult(
+                    batch_id=batch_id,
+                    filenames=filenames,
+                    success=True,
+                    results=results,
+                    raw_response=content
+                )
 
-                        return BatchAnalysisResult(
-                            batch_id=batch_id,
-                            filenames=filenames,
-                            success=False,
-                            error="响应格式错误"
-                        )
-                    except json.JSONDecodeError as e:
-                        return BatchAnalysisResult(
-                            batch_id=batch_id,
-                            filenames=filenames,
-                            success=False,
-                            error=f"JSON 解析失败: {e}"
-                        )
-                else:
-                    error_text = await response.text()
-                    return BatchAnalysisResult(
-                        batch_id=batch_id,
-                        filenames=filenames,
-                        success=False,
-                        error=f"HTTP {response.status}: {error_text}"
-                    )
+            return BatchAnalysisResult(
+                batch_id=batch_id,
+                filenames=filenames,
+                success=False,
+                error="响应内容为空"
+            )
 
         except Exception as e:
             return BatchAnalysisResult(
@@ -243,8 +206,6 @@ async def run_generate_analysis_async(
     Returns:
         批次结果列表
     """
-    config = get_config_loader()
-    api_config = config.get_api_config()
     prompt_engine = get_prompt_engine()
     progress = get_progress_reporter()
     store = get_factor_store() if save_to_store else None
@@ -289,28 +250,27 @@ async def run_generate_analysis_async(
     all_results = []
     semaphore = asyncio.Semaphore(concurrency)
 
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for batch_id, batch in enumerate(batches, 1):
-            task = call_analysis_api(
-                session, batch, batch_id, semaphore, api_config, prompt_engine
-            )
-            tasks.append(task)
+    tasks = []
+    for batch_id, batch in enumerate(batches, 1):
+        task = call_analysis_api(
+            batch, batch_id, semaphore, prompt_engine
+        )
+        tasks.append(task)
 
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            all_results.append(result)
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
+        all_results.append(result)
 
-            if result.success:
-                progress.increment(f"批次 {result.batch_id}")
+        if result.success:
+            progress.increment(f"批次 {result.batch_id}")
 
-                # 保存到 store
-                if store:
-                    for analysis in result.results:
-                        if analysis.success and analysis.analysis:
-                            store.update(analysis.filename, analysis=analysis.analysis)
-            else:
-                progress.fail(f"批次 {result.batch_id}: {result.error[:50]}")
+            # 保存到 store
+            if store:
+                for analysis in result.results:
+                    if analysis.success and analysis.analysis:
+                        store.update(analysis.filename, analysis=analysis.analysis)
+        else:
+            progress.fail(f"批次 {result.batch_id}: {result.error[:50]}")
 
     success_count = sum(1 for r in all_results if r.success)
     fail_count = len(all_results) - success_count

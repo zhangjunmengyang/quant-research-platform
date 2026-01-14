@@ -236,6 +236,14 @@ class FactorNotFoundError(NotFoundError):
     """因子不存在"""
     def __init__(self, filename: str):
         super().__init__("因子", filename)
+        self.filename = filename
+
+
+class FactorExistsError(ConflictError):
+    """因子已存在"""
+    def __init__(self, filename: str):
+        super().__init__("因子", "filename", filename)
+        self.filename = filename
 
 
 class FactorCodeError(BusinessError):
@@ -298,6 +306,24 @@ class DataLoadError(BusinessError):
         )
 
 
+class CalculationError(BusinessError):
+    """计算错误"""
+    def __init__(self, message: str, cause: Optional[Exception] = None):
+        super().__init__(
+            code="CALCULATION_ERROR",
+            message=message,
+            cause=cause
+        )
+
+
+# ==================== 兼容别名 ====================
+
+# 为保持向后兼容，提供别名
+DataHubError = ApplicationError
+FactorKBError = ApplicationError
+ConfigError = ConfigurationError
+
+
 # ==================== 导出 ====================
 
 __all__ = [
@@ -312,8 +338,10 @@ __all__ = [
     "BusinessError",
     "ExternalServiceError",
     "ConfigurationError",
+    "CalculationError",
     # 因子异常
     "FactorNotFoundError",
+    "FactorExistsError",
     "FactorCodeError",
     "FactorCalculationError",
     # 策略异常
@@ -322,4 +350,8 @@ __all__ = [
     # 数据异常
     "DataNotFoundError",
     "DataLoadError",
+    # 兼容别名
+    "DataHubError",
+    "FactorKBError",
+    "ConfigError",
 ]

@@ -7,7 +7,7 @@ Core 模块 - 数据模型和存储层
 from .models import Factor
 from .store import FactorStore, get_factor_store
 from .config import ConfigLoader, get_config_loader
-from .exceptions import FactorNotFoundError, FactorExistsError, ValidationError
+from domains.core.exceptions import FactorNotFoundError, FactorExistsError, ValidationError
 
 __all__ = [
     'Factor',

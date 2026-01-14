@@ -15,7 +15,7 @@ import numpy as np
 
 from .data_loader import DataLoader
 from .factor_calculator import FactorCalculator
-from ..core.exceptions import DataNotFoundError, FactorNotFoundError, CalculationError
+from domains.core.exceptions import DataNotFoundError, FactorNotFoundError, CalculationError
 
 logger = logging.getLogger(__name__)
 

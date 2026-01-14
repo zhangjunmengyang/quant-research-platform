@@ -1,7 +1,7 @@
 """
 Streamable HTTP 传输层
 
-使用官方 MCP SDK 的 StreamableHTTPServerTransport 实现 Streamable HTTP 传输。
+使用官方 MCP SDK 的 StreamableHTTPSessionManager 实现 Streamable HTTP 传输。
 这是 MCP 2025-03-26 规范推荐的传输方式，替代已弃用的 SSE 传输。
 
 用法:
@@ -17,21 +17,18 @@ Streamable HTTP 传输层
 import json
 import time
 import logging
-import uuid
 from typing import Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.routing import Mount
+from starlette.routing import Route
+from starlette.applications import Starlette
+from starlette.types import Scope, Receive, Send
 
 from mcp.server import Server
-from mcp.server.streamable_http import StreamableHTTPServerTransport
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 import mcp.types as types
 
 from .server import BaseMCPServer
-from ..config import MCPConfig
 
 # 延迟导入日志模块（避免循环导入）
 _logger = None
@@ -327,32 +324,47 @@ class MCPServerAdapter:
 
 def create_streamable_http_app(
     server: BaseMCPServer,
-) -> FastAPI:
+) -> Starlette:
     """
-    创建支持 Streamable HTTP 的 FastAPI 应用
+    创建支持 Streamable HTTP 的 Starlette 应用
+
+    使用官方 MCP SDK 的 StreamableHTTPSessionManager 正确管理会话生命周期。
+    这是 MCP SDK 推荐的用法，确保每个请求都能正确初始化 transport。
 
     Args:
         server: MCP 服务器实例
 
     Returns:
-        FastAPI 应用实例
+        Starlette 应用实例
     """
     config = server.config
 
-    # 创建适配器
+    # 创建适配器，将 BaseMCPServer 转换为官方 MCP Server
     adapter = MCPServerAdapter(server)
 
-    # 创建 Streamable HTTP 传输
-    # 不使用 session ID，允许无状态请求
-    transport = StreamableHTTPServerTransport(
-        mcp_session_id=None,  # 不强制 session
-        is_json_response_enabled=True,  # 启用 JSON 响应模式，更简单
+    # 创建 StreamableHTTPSessionManager
+    # 这是官方 SDK 推荐的方式，正确管理会话和 transport 生命周期
+    session_manager = StreamableHTTPSessionManager(
+        app=adapter.mcp_server,
+        json_response=True,  # 使用 JSON 响应模式
+        stateless=True,  # 无状态模式，每个请求独立处理
     )
 
+    # 创建 ASGI app wrapper
+    # StreamableHTTPSessionManager.handle_request 是一个 ASGI handler
+    class MCPASGIApp:
+        """ASGI 应用包装器，将 StreamableHTTPSessionManager 包装为 ASGI 应用"""
+
+        async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+            await session_manager.handle_request(scope, receive, send)
+
+    mcp_asgi_app = MCPASGIApp()
+
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app):
         """应用生命周期管理"""
         # 初始化日志存储
+        log_store_initialized = False
         try:
             from ..logging.config import configure_logging, init_log_store, shutdown_log_store
             configure_logging(service_name=f"mcp-{config.server_name}")
@@ -360,29 +372,12 @@ def create_streamable_http_app(
             log_store_initialized = True
         except Exception as e:
             logger.warning(f"日志存储初始化失败: {e}")
-            log_store_initialized = False
 
         slog = get_server_logger()
         slog.info(f"MCP Server {config.server_name} 启动中...")
 
-        # 启动 MCP 连接
-        async with transport.connect() as (read_stream, write_stream):
-            # 在后台运行 MCP 服务器
-            import asyncio
-
-            async def run_mcp():
-                await adapter.mcp_server.run(
-                    read_stream,
-                    write_stream,
-                    adapter.mcp_server.create_initialization_options(),
-                )
-
-            task = asyncio.create_task(run_mcp())
-
-            # 存储到 app.state 供路由使用
-            app.state.mcp_transport = transport
-            app.state.mcp_task = task
-
+        # 使用 session_manager.run() 启动会话管理
+        async with session_manager.run():
             slog.info(
                 "mcp_server_started",
                 server_name=config.server_name,
@@ -392,45 +387,23 @@ def create_streamable_http_app(
 
             yield
 
-            # 关闭
-            task.cancel()
+        # 关闭日志存储
+        if log_store_initialized:
             try:
-                await task
-            except asyncio.CancelledError:
-                pass
+                await shutdown_log_store()
+            except Exception as e:
+                logger.warning(f"日志存储关闭失败: {e}")
 
-            # 关闭日志存储
-            if log_store_initialized:
-                try:
-                    await shutdown_log_store()
-                except Exception as e:
-                    logger.warning(f"日志存储关闭失败: {e}")
+        slog.info(
+            "mcp_server_stopped",
+            server_name=config.server_name,
+        )
 
-            slog.info(
-                "mcp_server_stopped",
-                server_name=config.server_name,
-            )
-
-    app = FastAPI(
-        title=f"{config.server_name} MCP Server",
-        description="Model Context Protocol 服务 (Streamable HTTP)",
-        version=config.server_version,
-        lifespan=lifespan,
-    )
-
-    # CORS 中间件
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    @app.get("/")
-    async def root():
+    # 定义路由处理器
+    async def root_handler(request):
         """服务器信息"""
-        return {
+        from starlette.responses import JSONResponse as StarletteJSONResponse
+        return StarletteJSONResponse({
             "name": config.server_name,
             "version": config.server_version,
             "protocol": "MCP",
@@ -440,24 +413,50 @@ def create_streamable_http_app(
                 "health": "/health",
                 "ready": "/ready",
             },
-        }
+        })
 
-    @app.get("/health")
-    async def health():
+    async def health_handler(request):
         """健康检查端点"""
-        return server.get_health_status()
+        from starlette.responses import JSONResponse as StarletteJSONResponse
+        return StarletteJSONResponse(server.get_health_status())
 
-    @app.get("/ready")
-    async def ready():
+    async def ready_handler(request):
         """就绪检查端点"""
+        from starlette.responses import JSONResponse as StarletteJSONResponse
         status = server.get_ready_status()
         if not status["ready"]:
-            return JSONResponse(content=status, status_code=503)
-        return status
+            return StarletteJSONResponse(content=status, status_code=503)
+        return StarletteJSONResponse(status)
 
-    # 挂载 MCP Streamable HTTP 端点
-    # StreamableHTTPServerTransport.handle_request 是一个 ASGI 应用
-    app.mount("/mcp", app=transport.handle_request)
+    # 创建 Starlette 应用
+    from starlette.middleware import Middleware
+    from starlette.middleware.cors import CORSMiddleware as StarletteCORSMiddleware
+    from starlette.routing import Mount
+
+    routes = [
+        Route("/", endpoint=root_handler, methods=["GET"]),
+        Route("/health", endpoint=health_handler, methods=["GET"]),
+        Route("/ready", endpoint=ready_handler, methods=["GET"]),
+        # 使用 Route 挂载 ASGI 应用（endpoint 可以是实现 ASGI 接口的类）
+        Route("/mcp", endpoint=mcp_asgi_app),
+    ]
+
+    middleware = [
+        Middleware(
+            StarletteCORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ]
+
+    app = Starlette(
+        debug=False,
+        routes=routes,
+        middleware=middleware,
+        lifespan=lifespan,
+    )
 
     return app
 

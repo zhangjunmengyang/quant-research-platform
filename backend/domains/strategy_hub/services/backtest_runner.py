@@ -25,6 +25,7 @@ from .models import Strategy, TaskStatus, TaskInfo
 from .strategy_store import StrategyStore, get_strategy_store
 from .cache_isolation import isolated_cache, cleanup_task_cache
 from .task_store import BacktestTaskStore, get_task_store
+from domains.mcp_core.paths import get_project_root, get_backend_dir, get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,6 @@ def _get_default_workers() -> int:
 DEFAULT_MAX_WORKERS = _get_default_workers()
 
 
-def _get_project_root() -> Path:
-    """获取项目根目录"""
-    # 从 backend/domains/strategy_hub/services/backtest_runner.py 向上 5 级
-    return Path(__file__).parent.parent.parent.parent.parent
-
-
 def _setup_backtest_engine_paths():
     """
     设置回测引擎需要的 Python 路径。
@@ -58,8 +53,8 @@ def _setup_backtest_engine_paths():
     1. 项目根目录 - 用于 `from config import ...`
     2. backend 目录 - 用于 `from domains.engine.core...`
     """
-    project_root = _get_project_root()
-    backend_path = project_root / "backend"
+    project_root = get_project_root()
+    backend_path = get_backend_dir()
 
     paths_to_add = [str(project_root), str(backend_path)]
     for path in paths_to_add:
@@ -168,7 +163,7 @@ class BacktestRunner:
         # 使用动态计算的默认值
         if max_workers is None:
             max_workers = DEFAULT_MAX_WORKERS
-        self.tasks_dir = _get_project_root() / "data" / "tasks"
+        self.tasks_dir = get_data_dir() / "tasks"
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
 
         self._executor = ThreadPoolExecutor(max_workers=max_workers)

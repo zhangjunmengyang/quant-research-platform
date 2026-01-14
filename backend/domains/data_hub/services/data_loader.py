@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple, Set
 import pandas as pd
 
 from ..core.models import DataConfig, SymbolInfo
-from ..core.exceptions import DataNotFoundError, ConfigError
+from domains.core.exceptions import DataNotFoundError, ConfigError
 
 # 使用 engine 服务
 from domains.engine.services import (

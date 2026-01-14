@@ -11,9 +11,7 @@ import ast
 import asyncio
 import logging
 import re
-import sys
 import yaml
-from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
@@ -21,6 +19,7 @@ from dataclasses import dataclass, field
 from ..core.config import get_config_loader
 from ..core.store import get_factor_store, Factor
 from ...mcp_core.llm import get_llm_client, get_llm_settings
+from ...mcp_core.logging import setup_task_logger
 
 
 # 不可由大模型生成的字段（系统管理）
@@ -42,36 +41,7 @@ FIELD_DEPENDENCIES = {
 FIELD_ORDER = ['style', 'formula', 'input_data', 'value_range', 'tags', 'description', 'analysis', 'llm_score']
 
 
-def setup_logger(name: str = "field_filler"):
-    """设置日志"""
-    log_dir = Path(__file__).parent.parent.parent.parent.parent / "output" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-
-    if logger.handlers:
-        logger.handlers.clear()
-
-    fh = logging.FileHandler(log_file, encoding='utf-8')
-    fh.setLevel(logging.INFO)
-
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
-
-    formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
-    fh.setFormatter(formatter)
-    ch.setFormatter(formatter)
-
-    logger.addHandler(fh)
-    logger.addHandler(ch)
-
-    print(f"\n日志文件: {log_file}\n", flush=True)
-    return logger
-
-
-logger = setup_logger()
+logger = setup_task_logger("field_filler")
 
 
 @dataclass

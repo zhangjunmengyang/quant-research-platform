@@ -18,30 +18,12 @@ import argparse
 import sys
 from pathlib import Path
 
-# 获取项目根目录
-def get_project_root() -> Path:
-    """获取项目根目录
-
-    从 backend/domains/factor_hub/cli/main.py 向上 5 级到项目根目录
-    cli -> factor_hub -> domains -> backend -> project_root
-    """
-    return Path(__file__).parent.parent.parent.parent.parent
+from domains.mcp_core.paths import get_project_root
+from dotenv import load_dotenv
 
 
-def load_env():
-    """加载项目根目录的 .env 文件"""
-    env_path = get_project_root() / '.env'
-    if env_path.exists():
-        import os
-        with open(env_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
-                    os.environ.setdefault(key.strip(), value.strip())
-
-
-load_env()
+# 加载项目根目录的 .env 文件
+load_dotenv(get_project_root() / '.env')
 
 
 def cmd_discover(args):
@@ -242,9 +224,10 @@ def cmd_status(args):
 def cmd_export_md(args):
     """导出 Markdown"""
     from ..core.store import get_factor_store
+    from domains.mcp_core.paths import get_project_root as get_root
 
     store = get_factor_store()
-    output_path = args.output or str(get_project_root() / "output" / "factor_catalog_export.md")
+    output_path = args.output or str(get_root() / "output" / "factor_catalog_export.md")
     store.export_to_markdown(output_path)
     print(f"v 已导出到 {output_path}")
 

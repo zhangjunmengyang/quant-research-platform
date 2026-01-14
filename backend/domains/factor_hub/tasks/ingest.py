@@ -9,47 +9,15 @@
 
 import asyncio
 import logging
-import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
+from domains.mcp_core.logging import setup_task_logger
 from ..core.store import get_factor_store, Factor
 from ..services.field_filler import get_field_filler, FIELD_ORDER
 from .diff_catalog import discover_factors
 
-
-def setup_logger():
-    """设置日志"""
-    # 从 backend/domains/factor_hub/tasks/ingest.py 向上 5 级到项目根目录
-    log_dir = Path(__file__).parent.parent.parent.parent.parent / "output" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / f"ingest_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
-
-    logger = logging.getLogger("ingest")
-    logger.setLevel(logging.INFO)
-
-    if logger.handlers:
-        logger.handlers.clear()
-
-    fh = logging.FileHandler(log_file, encoding='utf-8')
-    fh.setLevel(logging.INFO)
-
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
-
-    formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
-    fh.setFormatter(formatter)
-    ch.setFormatter(formatter)
-
-    logger.addHandler(fh)
-    logger.addHandler(ch)
-
-    print(f"\n日志文件: {log_file}\n", flush=True)
-    return logger
-
-
-logger = setup_logger()
+logger = setup_task_logger("ingest")
 
 
 def run_ingest(

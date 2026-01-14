@@ -1,7 +1,7 @@
 """
 研报检索服务 (LlamaIndex 版本)
 
-基于 LlamaIndex 的语义检索和 RAG 问答服务。
+基于 LlamaIndex 的语义检索服务。
 """
 
 import logging
@@ -19,7 +19,6 @@ class RetrievalService:
 
     功能:
     - 语义检索：根据查询文本检索相关研报片段
-    - RAG 问答：检索 + 生成回答
     - 相似切块查询
 
     使用示例:
@@ -27,9 +26,6 @@ class RetrievalService:
 
         # 语义检索
         results = await service.search("什么是动量因子")
-
-        # RAG 问答
-        answer = await service.ask("动量因子的计算公式是什么？")
     """
 
     def __init__(
@@ -100,52 +96,6 @@ class RetrievalService:
 
         logger.info(f"语义检索完成: query='{query[:50]}...', 返回 {len(results)} 条结果")
         return results
-
-    async def ask(
-        self,
-        question: str,
-        top_k: int = 5,
-        report_id: Optional[int] = None,
-        report_uuid: Optional[str] = None,
-        conversation_history: Optional[List[Dict[str, str]]] = None,
-    ) -> Dict[str, Any]:
-        """
-        RAG 问答
-
-        Args:
-            question: 用户问题
-            top_k: 检索的切块数量
-            report_id: 限定的研报 ID
-            report_uuid: 限定的研报 UUID
-            conversation_history: 对话历史（当前版本暂不支持）
-
-        Returns:
-            问答结果:
-            - answer: 回答内容
-            - sources: 来源引用列表
-            - retrieved_chunks: 检索到的切块数量
-        """
-        result = await self.rag_service.ask(
-            question=question,
-            top_k=top_k,
-            report_id=report_id,
-            report_uuid=report_uuid,
-            rerank=True,
-        )
-
-        # 丰富来源信息
-        for source in result.get("sources", []):
-            if not source.get("report_title") and source.get("report_uuid"):
-                report = self.research_store.get_by_uuid(source["report_uuid"])
-                if report:
-                    source["report_title"] = report.title
-
-        return {
-            "answer": result.get("answer", ""),
-            "sources": result.get("sources", []),
-            "retrieved_chunks": result.get("retrieved_chunks", 0),
-            "total_time": 0,  # LlamaIndex 版本暂不提供耗时统计
-        }
 
     async def get_similar_chunks(
         self,

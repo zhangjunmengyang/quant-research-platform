@@ -10,16 +10,11 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
-
-def _get_project_root() -> Path:
-    """获取项目根目录"""
-    # 从 backend/domains/factor_hub/core/config.py 向上 5 级
-    return Path(__file__).parent.parent.parent.parent.parent
+from domains.mcp_core.paths import get_project_root, get_config_dir, get_factors_dir, get_data_dir
 
 
 # 加载项目根目录的 .env 文件
-_project_root = _get_project_root()
-load_dotenv(_project_root / '.env')
+load_dotenv(get_project_root() / '.env')
 
 
 class ConfigLoader:
@@ -37,13 +32,13 @@ class ConfigLoader:
             config_dir: 配置文件目录，默认为项目根目录下的 config/
         """
         if config_dir is None:
-            config_dir = _get_project_root() / "config"
+            config_dir = get_config_dir()
         self.config_dir = Path(config_dir)
         self.prompts_dir = self.config_dir / "prompts"
         self.llm_models_path = self.config_dir / "llm_models.yaml"
 
         # 数据目录
-        self.data_dir = _get_project_root() / "data"
+        self.data_dir = get_data_dir()
 
         # 缓存
         self._llm_models: Optional[Dict[str, Any]] = None
@@ -204,12 +199,12 @@ class ConfigLoader:
     @property
     def project_root(self) -> Path:
         """获取项目根目录"""
-        return _get_project_root()
+        return get_project_root()
 
     @property
     def factors_dir(self) -> Path:
         """获取因子代码目录"""
-        return self.project_root / "factors"
+        return get_factors_dir()
 
 
 # 单例实例

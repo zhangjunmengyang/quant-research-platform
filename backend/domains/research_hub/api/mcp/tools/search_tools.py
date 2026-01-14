@@ -1,7 +1,7 @@
 """
 语义检索 MCP 工具
 
-提供研报的语义检索和 RAG 问答功能。
+提供研报的语义检索功能。
 """
 
 from typing import Any, Dict
@@ -79,77 +79,6 @@ class SearchReportsTool(BaseTool):
                     "query": query,
                     "count": len(results),
                     "results": results,
-                }
-            )
-
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
-
-
-class AskReportsTool(BaseTool):
-    """RAG 问答工具"""
-
-    @property
-    def name(self) -> str:
-        return "ask_reports"
-
-    @property
-    def description(self) -> str:
-        return """基于研报知识库进行问答。
-
-使用 RAG (检索增强生成) 技术，先检索相关研报内容，
-然后基于检索到的内容生成回答。
-
-回答会附带来源引用，便于验证和深入阅读。
-
-使用场景:
-- 询问量化研究相关问题
-- 获取研报中的观点和结论
-- 理解复杂的量化概念"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "question": {
-                    "type": "string",
-                    "description": "问题（自然语言）"
-                },
-                "top_k": {
-                    "type": "integer",
-                    "description": "检索的切块数量",
-                    "default": 5,
-                    "minimum": 1,
-                    "maximum": 20
-                },
-                "report_id": {
-                    "type": "integer",
-                    "description": "限定的研报 ID（可选，用于针对特定研报提问）"
-                }
-            },
-            "required": ["question"]
-        }
-
-    async def execute(self, **params) -> ToolResult:
-        try:
-            question = params.get("question", "")
-            top_k = params.get("top_k", 5)
-            report_id = params.get("report_id")
-
-            result = await self.retrieval_service.ask(
-                question=question,
-                top_k=top_k,
-                report_id=report_id,
-            )
-
-            return ToolResult(
-                success=True,
-                data={
-                    "question": question,
-                    "answer": result["answer"],
-                    "sources": result["sources"],
-                    "retrieved_chunks": result["retrieved_chunks"],
                 }
             )
 
