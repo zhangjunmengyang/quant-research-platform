@@ -3,10 +3,33 @@
  * 用于处理 search params 与 filters 之间的转换
  */
 
-import type { FactorListParams } from '@/features/factor'
+import type { FactorListParams, ExcludedFilter } from '@/features/factor'
 import type { StrategyListParams } from '@/features/strategy'
-import type { ExperienceListParams } from '@/features/experience'
-import type { NoteListParams } from '@/features/note'
+import type { ExperienceListParams, ExperienceLevel, ExperienceStatus, SourceType } from '@/features/experience'
+import { NoteType, type NoteListParams } from '@/features/note'
+
+// =============================================================================
+// 类型验证辅助函数
+// =============================================================================
+
+/**
+ * 验证值是否在允许的选项中
+ */
+function validateEnum<T extends string>(value: string | null, validValues: readonly T[], defaultValue: T): T {
+  if (!value || !validValues.includes(value as T)) {
+    return defaultValue
+  }
+  return value as T
+}
+
+// 各业务域的有效枚举值 (必须与 types.ts 中的定义保持一致)
+const FACTOR_ORDER_BY_VALUES = ['filename', 'verified', 'created_at'] as const
+const FACTOR_EXCLUDED_VALUES: readonly ExcludedFilter[] = ['all', 'active', 'excluded']
+const STRATEGY_ORDER_BY_VALUES = ['created_at', 'updated_at', 'name'] as const
+const EXPERIENCE_LEVEL_VALUES: readonly ExperienceLevel[] = ['strategic', 'tactical', 'operational']
+const EXPERIENCE_STATUS_VALUES: readonly ExperienceStatus[] = ['draft', 'validated', 'deprecated']
+const EXPERIENCE_SOURCE_TYPE_VALUES: readonly SourceType[] = ['research', 'backtest', 'live_trade', 'external', 'manual', 'curated']
+const NOTE_TYPE_VALUES: readonly NoteType[] = [NoteType.OBSERVATION, NoteType.HYPOTHESIS, NoteType.FINDING, NoteType.TRAIL, NoteType.GENERAL]
 
 // =============================================================================
 // Factor 相关
@@ -20,8 +43,10 @@ export function paramsToFactorFilters(searchParams: URLSearchParams): FactorList
     search: searchParams.get('search') || undefined,
     style: searchParams.get('style') || undefined,
     verified: searchParams.get('verified') === 'true' ? true : searchParams.get('verified') === 'false' ? false : undefined,
-    order_by: (searchParams.get('order_by') as FactorListParams['order_by']) || 'filename',
-    excluded: (searchParams.get('excluded') as FactorListParams['excluded']) || undefined,
+    order_by: validateEnum(searchParams.get('order_by'), FACTOR_ORDER_BY_VALUES, 'filename'),
+    excluded: searchParams.get('excluded')
+      ? validateEnum(searchParams.get('excluded'), FACTOR_EXCLUDED_VALUES, 'active')
+      : undefined,
   }
 }
 
@@ -43,7 +68,7 @@ export function paramsToStrategyFilters(searchParams: URLSearchParams): Strategy
   return {
     page: Number(searchParams.get('page')) || 1,
     page_size: Number(searchParams.get('page_size')) || 50,
-    order_by: (searchParams.get('order_by') as StrategyListParams['order_by']) || 'created_at',
+    order_by: validateEnum(searchParams.get('order_by'), STRATEGY_ORDER_BY_VALUES, 'created_at'),
     verified: searchParams.get('verified') === 'true' ? true : searchParams.get('verified') === 'false' ? false : undefined,
   }
 }
@@ -64,13 +89,23 @@ export function strategyFiltersToParams(filters: Partial<StrategyListParams>): R
 
 // 将 URLSearchParams 转换为 ExperienceListParams
 export function paramsToExperienceFilters(searchParams: URLSearchParams): ExperienceListParams {
+  const experienceLevel = searchParams.get('experience_level')
+  const status = searchParams.get('status')
+  const sourceType = searchParams.get('source_type')
+
   return {
     page: Number(searchParams.get('page')) || 1,
     page_size: Number(searchParams.get('page_size')) || 20,
-    experience_level: (searchParams.get('experience_level') as ExperienceListParams['experience_level']) || undefined,
+    experience_level: experienceLevel
+      ? validateEnum(experienceLevel, EXPERIENCE_LEVEL_VALUES, 'strategic')
+      : undefined,
     category: searchParams.get('category') || undefined,
-    status: (searchParams.get('status') as ExperienceListParams['status']) || undefined,
-    source_type: (searchParams.get('source_type') as ExperienceListParams['source_type']) || undefined,
+    status: status
+      ? validateEnum(status, EXPERIENCE_STATUS_VALUES, 'validated')
+      : undefined,
+    source_type: sourceType
+      ? validateEnum(sourceType, EXPERIENCE_SOURCE_TYPE_VALUES, 'manual')
+      : undefined,
     market_regime: searchParams.get('market_regime') || undefined,
     min_confidence: searchParams.get('min_confidence') ? Number(searchParams.get('min_confidence')) : undefined,
     include_deprecated: searchParams.get('include_deprecated') === 'true' ? true : undefined,
@@ -102,13 +137,17 @@ export function experienceFiltersToParams(filters: Partial<ExperienceListParams>
 
 // 将 URLSearchParams 转换为 NoteListParams
 export function paramsToNoteFilters(searchParams: URLSearchParams): NoteListParams {
+  const noteType = searchParams.get('note_type')
+
   return {
     page: Number(searchParams.get('page')) || 1,
     page_size: Number(searchParams.get('page_size')) || 20,
     search: searchParams.get('search') || undefined,
     tags: searchParams.get('tags') || undefined,
     source: searchParams.get('source') || undefined,
-    note_type: (searchParams.get('note_type') as NoteListParams['note_type']) || undefined,
+    note_type: noteType
+      ? validateEnum(noteType, NOTE_TYPE_VALUES, NoteType.GENERAL)
+      : undefined,
     is_archived: searchParams.get('is_archived') === 'true' ? true : searchParams.get('is_archived') === 'false' ? false : false,
     order_by: searchParams.get('order_by') || 'updated_at',
     order_desc: searchParams.get('order_desc') !== 'false',

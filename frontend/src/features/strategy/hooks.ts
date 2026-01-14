@@ -578,15 +578,15 @@ export function useTaskExecution(taskId: string) {
 
   // Start polling when executionId changes
   useEffect(() => {
-    if (executionId && !pollingRef.current) {
-      // Initial poll
-      pollExecution(executionId)
+    if (!executionId) return
 
-      // Start polling every 2 seconds
-      pollingRef.current = setInterval(() => {
-        pollExecution(executionId)
-      }, 2000)
-    }
+    // Initial poll
+    pollExecution(executionId)
+
+    // Start polling every 2 seconds
+    pollingRef.current = setInterval(() => {
+      pollExecution(executionId)
+    }, 2000)
 
     return () => {
       if (pollingRef.current) {
@@ -594,7 +594,9 @@ export function useTaskExecution(taskId: string) {
         pollingRef.current = null
       }
     }
-  }, [executionId, pollExecution])
+    // 只依赖 executionId，避免 pollExecution 变化导致轮询重启
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [executionId])
 
   const reset = useCallback(() => {
     if (pollingRef.current) {

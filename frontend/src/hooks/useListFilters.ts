@@ -175,7 +175,7 @@ export function useListFilters<T extends Record<string, any>>(config: ListFilter
     pageSize,
     setPage,
     setPageSize,
-    // 状态
-    hasActiveFilters: hasActiveFilters(),
+    // 状态 - 返回函数本身，由调用方决定何时执行
+    hasActiveFilters,
   }
 }

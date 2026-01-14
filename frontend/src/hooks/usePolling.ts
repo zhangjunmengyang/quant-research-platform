@@ -66,6 +66,15 @@ export function usePolling<T>(config: PollingConfig<T>) {
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isActiveRef = useRef(false)
+  const isMountedRef = useRef(true)
+
+  // 组件卸载时标记
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   // 执行单次轮询
   const poll = useCallback(async () => {
@@ -74,6 +83,9 @@ export function usePolling<T>(config: PollingConfig<T>) {
     try {
       isActiveRef.current = true
       const data = await queryFn()
+
+      // 检查组件是否已卸载
+      if (!isMountedRef.current) return
 
       setState((prev) => ({
         ...prev,
@@ -87,6 +99,7 @@ export function usePolling<T>(config: PollingConfig<T>) {
       // 检查是否达到终止状态
       if (isTerminal(data)) {
         stopPolling()
+        if (!isMountedRef.current) return
         setState((prev) => ({
           ...prev,
           status: 'success',
@@ -95,6 +108,9 @@ export function usePolling<T>(config: PollingConfig<T>) {
         onTerminal?.(data)
       }
     } catch (error) {
+      // 检查组件是否已卸载
+      if (!isMountedRef.current) return
+
       const err = error instanceof Error ? error : new Error('Polling failed')
       setState((prev) => ({
         ...prev,
@@ -158,7 +174,9 @@ export function usePolling<T>(config: PollingConfig<T>) {
     } else if (!enabled) {
       stopPolling()
     }
-  }, [enabled])
+    // 依赖 state.status 以便在状态变回 idle 时重新启动
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, state.status])
 
   // 清理
   useEffect(() => {
