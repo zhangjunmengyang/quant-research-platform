@@ -76,7 +76,7 @@ class ApplicationError(Exception):
 
     def to_mcp_error(self) -> "MCPError":
         """转换为 MCP 错误格式"""
-        from .middleware.error_handler import MCPError, ErrorCode
+        from domains.mcp_core.middleware.error_handler import MCPError, ErrorCode
 
         # 映射到 MCP 错误码
         code_mapping = {

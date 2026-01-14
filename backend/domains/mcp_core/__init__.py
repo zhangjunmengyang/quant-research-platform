@@ -19,6 +19,7 @@ from .base.tool import (
     ToolRegistry,
     get_tool_registry,
     register_tool,
+    ExecutionMode,
 )
 from .base.resource import (
     BaseResourceProvider,
@@ -102,6 +103,7 @@ __all__ = [
     "ToolRegistry",
     "get_tool_registry",
     "register_tool",
+    "ExecutionMode",
     # Resource
     "BaseResourceProvider",
     "ResourceDefinition",
