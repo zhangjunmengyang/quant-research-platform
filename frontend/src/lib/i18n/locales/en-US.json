@@ -42,6 +42,7 @@
     "information": "Information",
     "factorOverview": "Factor Overview",
     "factorAnalysis": "Factor Analysis",
+    "factorPipeline": "Factor Pipeline",
     "strategyOverview": "Strategy Overview",
     "backtestQueue": "Backtest Queue",
     "strategyAnalysis": "Strategy Analysis",

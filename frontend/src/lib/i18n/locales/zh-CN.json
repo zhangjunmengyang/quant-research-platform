@@ -42,6 +42,7 @@
     "information": "信息",
     "factorOverview": "因子概览",
     "factorAnalysis": "因子分析",
+    "factorPipeline": "因子填充",
     "strategyOverview": "策略概览",
     "backtestQueue": "回测队列",
     "strategyAnalysis": "策略分析",
