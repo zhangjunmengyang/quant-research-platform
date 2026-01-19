@@ -5,7 +5,7 @@
 
 import type { FactorListParams, ExcludedFilter } from '@/features/factor'
 import type { StrategyListParams } from '@/features/strategy'
-import type { ExperienceListParams, ExperienceLevel, ExperienceStatus, SourceType } from '@/features/experience'
+import type { ExperienceListParams } from '@/features/experience'
 import { NoteType, type NoteListParams } from '@/features/note'
 
 // =============================================================================
@@ -26,9 +26,6 @@ function validateEnum<T extends string>(value: string | null, validValues: reado
 const FACTOR_ORDER_BY_VALUES = ['filename', 'verified', 'created_at'] as const
 const FACTOR_EXCLUDED_VALUES: readonly ExcludedFilter[] = ['all', 'active', 'excluded']
 const STRATEGY_ORDER_BY_VALUES = ['created_at', 'updated_at', 'name'] as const
-const EXPERIENCE_LEVEL_VALUES: readonly ExperienceLevel[] = ['strategic', 'tactical', 'operational']
-const EXPERIENCE_STATUS_VALUES: readonly ExperienceStatus[] = ['draft', 'validated', 'deprecated']
-const EXPERIENCE_SOURCE_TYPE_VALUES: readonly SourceType[] = ['research', 'backtest', 'live_trade', 'external', 'manual', 'curated']
 const NOTE_TYPE_VALUES: readonly NoteType[] = [NoteType.OBSERVATION, NoteType.HYPOTHESIS, NoteType.FINDING, NoteType.TRAIL, NoteType.GENERAL]
 
 // =============================================================================
@@ -89,26 +86,10 @@ export function strategyFiltersToParams(filters: Partial<StrategyListParams>): R
 
 // 将 URLSearchParams 转换为 ExperienceListParams
 export function paramsToExperienceFilters(searchParams: URLSearchParams): ExperienceListParams {
-  const experienceLevel = searchParams.get('experience_level')
-  const status = searchParams.get('status')
-  const sourceType = searchParams.get('source_type')
-
   return {
     page: Number(searchParams.get('page')) || 1,
     page_size: Number(searchParams.get('page_size')) || 20,
-    experience_level: experienceLevel
-      ? validateEnum(experienceLevel, EXPERIENCE_LEVEL_VALUES, 'strategic')
-      : undefined,
-    category: searchParams.get('category') || undefined,
-    status: status
-      ? validateEnum(status, EXPERIENCE_STATUS_VALUES, 'validated')
-      : undefined,
-    source_type: sourceType
-      ? validateEnum(sourceType, EXPERIENCE_SOURCE_TYPE_VALUES, 'manual')
-      : undefined,
-    market_regime: searchParams.get('market_regime') || undefined,
-    min_confidence: searchParams.get('min_confidence') ? Number(searchParams.get('min_confidence')) : undefined,
-    include_deprecated: searchParams.get('include_deprecated') === 'true' ? true : undefined,
+    tags: searchParams.get('tags') || undefined,
     order_by: searchParams.get('order_by') || 'updated_at',
     order_desc: searchParams.get('order_desc') !== 'false',
   }
@@ -119,13 +100,7 @@ export function experienceFiltersToParams(filters: Partial<ExperienceListParams>
   const params: Record<string, string> = {}
   if (filters.page) params.page = String(filters.page)
   if (filters.page_size) params.page_size = String(filters.page_size)
-  if (filters.experience_level) params.experience_level = filters.experience_level
-  if (filters.category) params.category = filters.category
-  if (filters.status) params.status = filters.status
-  if (filters.source_type) params.source_type = filters.source_type
-  if (filters.market_regime) params.market_regime = filters.market_regime
-  if (filters.min_confidence) params.min_confidence = String(filters.min_confidence)
-  if (filters.include_deprecated) params.include_deprecated = String(filters.include_deprecated)
+  if (filters.tags) params.tags = filters.tags
   if (filters.order_by) params.order_by = filters.order_by
   if (filters.order_desc !== undefined) params.order_desc = String(filters.order_desc)
   return params

@@ -1,8 +1,9 @@
 """
 经验知识库领域模块
 
-提供研究经验的结构化存储、语义检索和生命周期管理功能。
+提供研究经验的结构化存储和检索功能。
 基于 PARL 框架（Problem-Approach-Result-Lesson）存储可迁移的研究智慧。
+以标签为核心进行分类管理。
 """
 
 from .core.models import (
@@ -10,9 +11,6 @@ from .core.models import (
     ExperienceContent,
     ExperienceContext,
     ExperienceLink,
-    ExperienceLevel,
-    ExperienceStatus,
-    ExperienceCategory,
     SourceType,
     EntityType,
 )
@@ -25,9 +23,6 @@ __all__ = [
     'ExperienceContent',
     'ExperienceContext',
     'ExperienceLink',
-    'ExperienceLevel',
-    'ExperienceStatus',
-    'ExperienceCategory',
     'SourceType',
     'EntityType',
     # 存储层

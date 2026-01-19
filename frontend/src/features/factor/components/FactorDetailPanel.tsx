@@ -11,7 +11,7 @@ import { factorApi } from '../api'
 import { pipelineApi, type FillableField } from '../pipeline-api'
 import type { Factor, FactorUpdate } from '../types'
 import { cn, stripPyExtension } from '@/lib/utils'
-import { Loader2, X, Copy, Check, Edit2, Save, Sparkles, Ban, Undo2 } from 'lucide-react'
+import { Loader2, X, Copy, Check, Edit2, Save, Sparkles, Ban, Undo2, Trash2 } from 'lucide-react'
 import { toast } from '@/components/ui/toast'
 
 // 可自动生成的字段
@@ -32,12 +32,13 @@ interface FactorDetailPanelProps {
 }
 
 export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
-  const { verifyFactor, unverifyFactor, updateFactor, excludeFactor, unexcludeFactor } = useFactorMutations()
+  const { verifyFactor, unverifyFactor, updateFactor, excludeFactor, unexcludeFactor, deleteFactor } = useFactorMutations()
   const [fullFactor, setFullFactor] = useState<Factor | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // 自动生成相关状态
   const [showAutoFill, setShowAutoFill] = useState(false)
@@ -134,6 +135,20 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
         },
       })
     }
+  }
+
+  const handleDelete = () => {
+    const factorName = stripPyExtension(displayFactor.filename)
+    deleteFactor.mutate(displayFactor.filename, {
+      onSuccess: () => {
+        toast.success('已删除', `${factorName} 已从因子库中删除`)
+        onClose()
+      },
+      onError: (error) => {
+        toast.error('删除失败', (error as Error).message)
+      },
+    })
+    setShowDeleteConfirm(false)
   }
 
   const handleCopyCode = async () => {
@@ -362,6 +377,23 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
                     </>
                   )}
                 </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={deleteFactor.isPending}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md border border-red-300 px-4 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50',
+                    deleteFactor.isPending && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  {deleteFactor.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" />
+                      删除
+                    </>
+                  )}
+                </button>
               </>
             )
           )}
@@ -374,6 +406,43 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
           </button>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+          <div className="w-[480px] rounded-lg bg-background p-6 shadow-xl">
+            <h3 className="text-lg font-semibold">确认删除</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              确定要删除因子 <span className="font-medium text-foreground">{stripPyExtension(displayFactor.filename)}</span> 吗?
+            </p>
+            <p className="mt-1 text-sm text-red-600">
+              此操作将同时删除因子的数据库记录和代码文件，不可恢复。
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteFactor.isPending}
+                className="flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteFactor.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    删除中...
+                  </>
+                ) : (
+                  '确认删除'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auto Fill Panel */}
       {showAutoFill && isEditing && (

@@ -2,6 +2,7 @@
  * Experience Create Dialog Component
  *
  * 创建经验的对话框
+ * 简化版本: 以标签为核心管理
  */
 
 import { useState, useCallback } from 'react'
@@ -18,19 +19,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
 import { useExperienceMutations } from '../hooks'
-import type { ExperienceCreate, ExperienceLevel, SourceType } from '../types'
+import type { ExperienceCreate } from '../types'
 import {
-  EXPERIENCE_LEVEL_LABELS,
-  SOURCE_TYPE_LABELS,
-  MARKET_REGIME_OPTIONS,
-  TIME_HORIZON_OPTIONS,
-  ASSET_CLASS_OPTIONS,
-  CATEGORIES_BY_LEVEL,
-  EXPERIENCE_CATEGORY_LABELS,
   DEFAULT_EXPERIENCE_CONTENT,
-  DEFAULT_EXPERIENCE_CONTEXT,
 } from '../types'
 
 interface ExperienceCreateDialogProps {
@@ -39,43 +31,12 @@ interface ExperienceCreateDialogProps {
   onSuccess?: (experience: unknown) => void
 }
 
-// 层级选项
-const LEVEL_OPTIONS: SelectOption[] = [
-  { value: 'operational', label: EXPERIENCE_LEVEL_LABELS.operational },
-  { value: 'tactical', label: EXPERIENCE_LEVEL_LABELS.tactical },
-  { value: 'strategic', label: EXPERIENCE_LEVEL_LABELS.strategic },
-]
-
-// 来源类型选项
-const SOURCE_TYPE_OPTIONS: SelectOption[] = [
-  { value: 'manual', label: SOURCE_TYPE_LABELS.manual },
-  { value: 'research', label: SOURCE_TYPE_LABELS.research },
-  { value: 'backtest', label: SOURCE_TYPE_LABELS.backtest },
-  { value: 'live_trade', label: SOURCE_TYPE_LABELS.live_trade },
-  { value: 'external', label: SOURCE_TYPE_LABELS.external },
-]
-
-// 获取分类选项
-function getCategoryOptions(level: ExperienceLevel): SelectOption[] {
-  const categories = CATEGORIES_BY_LEVEL[level] || []
-  return [
-    { value: '', label: '选择分类' },
-    ...categories.map((cat) => ({
-      value: cat,
-      label: EXPERIENCE_CATEGORY_LABELS[cat],
-    })),
-  ]
-}
-
 const initialFormData: ExperienceCreate = {
   title: '',
-  experience_level: 'operational',
-  category: '',
   content: { ...DEFAULT_EXPERIENCE_CONTENT },
-  context: { ...DEFAULT_EXPERIENCE_CONTEXT },
-  source_type: 'manual',
-  source_ref: '',
-  confidence: 0.5,
+  context: {
+    tags: [],
+  },
 }
 
 export function ExperienceCreateDialog({
@@ -86,9 +47,7 @@ export function ExperienceCreateDialog({
   const { createExperience } = useExperienceMutations()
   const [formData, setFormData] = useState<ExperienceCreate>(initialFormData)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'basic' | 'parl' | 'context'>('basic')
-
-  const categoryOptions = getCategoryOptions(formData.experience_level || 'operational')
+  const [activeTab, setActiveTab] = useState<'basic' | 'parl'>('basic')
 
   const handleSubmit = useCallback(async () => {
     if (!formData.title?.trim()) {
@@ -125,21 +84,14 @@ export function ExperienceCreateDialog({
     []
   )
 
-  const updateContext = useCallback(
-    (field: keyof typeof DEFAULT_EXPERIENCE_CONTEXT, value: string | string[]) => {
-      setFormData((prev) => ({
-        ...prev,
-        context: { ...prev.context!, [field]: value },
-      }))
-    },
-    []
-  )
-
-  const handleLevelChange = useCallback((level: string) => {
+  const updateTags = useCallback((value: string) => {
+    const tags = value
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
     setFormData((prev) => ({
       ...prev,
-      experience_level: level as ExperienceLevel,
-      category: '', // 重置分类
+      context: { ...prev.context, tags },
     }))
   }, [])
 
@@ -177,17 +129,6 @@ export function ExperienceCreateDialog({
           >
             PARL 内容
           </button>
-          <button
-            type="button"
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              activeTab === 'context'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setActiveTab('context')}
-          >
-            上下文
-          </button>
         </div>
 
         <div className="space-y-4 py-4">
@@ -212,62 +153,13 @@ export function ExperienceCreateDialog({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>经验层级</Label>
-                  <SearchableSelect
-                    options={LEVEL_OPTIONS}
-                    value={formData.experience_level || 'operational'}
-                    onChange={handleLevelChange}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>分类</Label>
-                  <SearchableSelect
-                    options={categoryOptions}
-                    value={formData.category || ''}
-                    onChange={(value) => updateFormData({ category: value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>来源类型</Label>
-                  <SearchableSelect
-                    options={SOURCE_TYPE_OPTIONS}
-                    value={formData.source_type || 'manual'}
-                    onChange={(value) =>
-                      updateFormData({ source_type: value as SourceType })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="source_ref">来源引用</Label>
-                  <Input
-                    id="source_ref"
-                    value={formData.source_ref || ''}
-                    onChange={(e) => updateFormData({ source_ref: e.target.value })}
-                    placeholder="如：研究会话 ID、回测任务 ID"
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
-                <Label htmlFor="confidence">
-                  初始置信度: {Math.round((formData.confidence || 0.5) * 100)}%
-                </Label>
-                <input
-                  type="range"
-                  id="confidence"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={formData.confidence || 0.5}
-                  onChange={(e) =>
-                    updateFormData({ confidence: parseFloat(e.target.value) })
-                  }
-                  className="w-full"
+                <Label htmlFor="tags">标签（逗号分隔）</Label>
+                <Input
+                  id="tags"
+                  value={formData.context?.tags?.join(', ') || ''}
+                  onChange={(e) => updateTags(e.target.value)}
+                  placeholder="自定义标签，用于快速检索，如: 动量, 反转, 震荡市"
                 />
               </div>
             </div>
@@ -282,7 +174,7 @@ export function ExperienceCreateDialog({
                   id="problem"
                   value={formData.content?.problem || ''}
                   onChange={(e) => updateContent('problem', e.target.value)}
-                  placeholder="面临的问题或挑战是什么？"
+                  placeholder="面临的问题或挑战是什么?"
                   rows={3}
                 />
               </div>
@@ -293,7 +185,7 @@ export function ExperienceCreateDialog({
                   id="approach"
                   value={formData.content?.approach || ''}
                   onChange={(e) => updateContent('approach', e.target.value)}
-                  placeholder="采用了什么方法或策略来解决？"
+                  placeholder="采用了什么方法或策略来解决?"
                   rows={3}
                 />
               </div>
@@ -304,7 +196,7 @@ export function ExperienceCreateDialog({
                   id="result"
                   value={formData.content?.result || ''}
                   onChange={(e) => updateContent('result', e.target.value)}
-                  placeholder="得到了什么结果？"
+                  placeholder="得到了什么结果?"
                   rows={3}
                 />
               </div>
@@ -317,78 +209,9 @@ export function ExperienceCreateDialog({
                   id="lesson"
                   value={formData.content?.lesson || ''}
                   onChange={(e) => updateContent('lesson', e.target.value)}
-                  placeholder="总结出的教训或规律是什么？这是最重要的部分。"
+                  placeholder="总结出的教训或规律是什么?这是最重要的部分。"
                   rows={4}
                   className="border-primary/50"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* 上下文 Tab */}
-          {activeTab === 'context' && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>市场环境</Label>
-                  <SearchableSelect
-                    options={MARKET_REGIME_OPTIONS}
-                    value={formData.context?.market_regime || ''}
-                    onChange={(value) => updateContext('market_regime', value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>时间范围</Label>
-                  <SearchableSelect
-                    options={TIME_HORIZON_OPTIONS}
-                    value={formData.context?.time_horizon || ''}
-                    onChange={(value) => updateContext('time_horizon', value)}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>资产类别</Label>
-                <SearchableSelect
-                  options={ASSET_CLASS_OPTIONS}
-                  value={formData.context?.asset_class || ''}
-                  onChange={(value) => updateContext('asset_class', value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="factor_styles">因子风格（逗号分隔）</Label>
-                <Input
-                  id="factor_styles"
-                  value={formData.context?.factor_styles?.join(', ') || ''}
-                  onChange={(e) =>
-                    updateContext(
-                      'factor_styles',
-                      e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                    )
-                  }
-                  placeholder="如：动量, 反转, 波动率"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tags">标签（逗号分隔）</Label>
-                <Input
-                  id="tags"
-                  value={formData.context?.tags?.join(', ') || ''}
-                  onChange={(e) =>
-                    updateContext(
-                      'tags',
-                      e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                    )
-                  }
-                  placeholder="自定义标签，用于快速检索"
                 />
               </div>
             </div>

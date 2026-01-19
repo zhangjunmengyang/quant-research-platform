@@ -3,7 +3,6 @@
 
 提供经验的持久化存储和查询功能。
 继承 mcp_core.BaseStore，复用连接管理和通用 CRUD。
-支持向量检索（通过 pgvector）。
 """
 
 import json
@@ -25,8 +24,6 @@ from .models import (
     ExperienceContent,
     ExperienceContext,
     ExperienceLink,
-    ExperienceLevel,
-    ExperienceStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,28 +33,22 @@ class ExperienceStore(BaseStore[Experience]):
     """
     经验存储层 - PostgreSQL 数据源
 
-    继承 BaseStore，提供经验的 CRUD 操作、查询和向量检索功能。
+    继承 BaseStore，提供经验的 CRUD 操作和查询功能。
     """
 
-    # BaseStore 配置
     table_name = "experiences"
 
     allowed_columns = {
-        'id', 'uuid', 'title', 'experience_level', 'category',
-        'content', 'context', 'source_type', 'source_ref',
-        'confidence', 'validation_count', 'last_validated',
-        'status', 'deprecated_reason',
+        'id', 'uuid', 'title',
+        'content', 'context',
+        'source_type', 'source_ref',
         'created_at', 'updated_at'
     }
 
-    numeric_fields = {'id', 'confidence', 'validation_count'}
-
-    # 向后兼容别名
-    ALLOWED_COLUMNS = allowed_columns
+    numeric_fields = {'id'}
 
     def _row_to_entity(self, row: Dict[str, Any]) -> Experience:
         """将数据库行转换为 Experience 对象"""
-        # 处理 JSONB 字段
         content = row.get('content')
         if isinstance(content, str):
             content = ExperienceContent.from_json(content)
@@ -78,17 +69,10 @@ class ExperienceStore(BaseStore[Experience]):
             id=row.get('id'),
             uuid=row.get('uuid', ''),
             title=row.get('title', ''),
-            experience_level=row.get('experience_level', ExperienceLevel.OPERATIONAL.value),
-            category=row.get('category', ''),
             content=content,
             context=context,
             source_type=row.get('source_type', ''),
             source_ref=row.get('source_ref', ''),
-            confidence=row.get('confidence', 0.5),
-            validation_count=row.get('validation_count', 0),
-            last_validated=row.get('last_validated'),
-            status=row.get('status', ExperienceStatus.DRAFT.value),
-            deprecated_reason=row.get('deprecated_reason', ''),
             created_at=row.get('created_at'),
             updated_at=row.get('updated_at'),
         )
@@ -141,7 +125,6 @@ class ExperienceStore(BaseStore[Experience]):
         experience.created_at = datetime.now()
         experience.updated_at = datetime.now()
 
-        # 序列化 JSONB 字段
         content_json = experience.content.to_json() if isinstance(experience.content, ExperienceContent) else json.dumps(experience.content)
         context_json = experience.context.to_json() if isinstance(experience.context, ExperienceContext) else json.dumps(experience.context)
 
@@ -149,19 +132,15 @@ class ExperienceStore(BaseStore[Experience]):
             with self._cursor() as cursor:
                 cursor.execute('''
                     INSERT INTO experiences (
-                        uuid, title, experience_level, category,
-                        content, context, source_type, source_ref,
-                        confidence, validation_count, last_validated,
-                        status, deprecated_reason,
+                        uuid, title, content, context,
+                        source_type, source_ref,
                         created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 ''', (
-                    experience.uuid, experience.title, experience.experience_level,
-                    experience.category, content_json, context_json,
+                    experience.uuid, experience.title,
+                    content_json, context_json,
                     experience.source_type, experience.source_ref,
-                    experience.confidence, experience.validation_count, experience.last_validated,
-                    experience.status, experience.deprecated_reason,
                     experience.created_at, experience.updated_at
                 ))
                 result = cursor.fetchone()
@@ -175,13 +154,11 @@ class ExperienceStore(BaseStore[Experience]):
         if not fields:
             return False
 
-        # 安全验证字段名，防止 SQL 注入
         safe_fields = {k: v for k, v in fields.items() if k in self.allowed_columns}
         if not safe_fields:
             logger.warning(f"No valid fields to update: {list(fields.keys())}")
             return False
 
-        # 处理 JSONB 字段
         if 'content' in safe_fields and isinstance(safe_fields['content'], ExperienceContent):
             safe_fields['content'] = safe_fields['content'].to_json()
         if 'context' in safe_fields and isinstance(safe_fields['context'], ExperienceContext):
@@ -202,12 +179,10 @@ class ExperienceStore(BaseStore[Experience]):
     def delete(self, experience_id: int) -> bool:
         """删除经验"""
         with self._cursor() as cursor:
-            # 先删除关联
             cursor.execute(
                 'DELETE FROM experience_links WHERE experience_id = %s',
                 (experience_id,)
             )
-            # 再删除经验
             cursor.execute(
                 'DELETE FROM experiences WHERE id = %s',
                 (experience_id,)
@@ -219,14 +194,14 @@ class ExperienceStore(BaseStore[Experience]):
     def query(
         self,
         search: Optional[str] = None,
-        experience_level: Optional[str] = None,
-        category: Optional[str] = None,
-        status: Optional[str] = None,
+        tags: Optional[List[str]] = None,
         source_type: Optional[str] = None,
         market_regime: Optional[str] = None,
         factor_styles: Optional[List[str]] = None,
-        min_confidence: float = 0.0,
-        include_deprecated: bool = False,
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
+        updated_after: Optional[datetime] = None,
+        updated_before: Optional[datetime] = None,
         order_by: str = "updated_at DESC",
         limit: int = 50,
         offset: int = 0
@@ -236,14 +211,14 @@ class ExperienceStore(BaseStore[Experience]):
 
         Args:
             search: 搜索关键词（标题和内容）
-            experience_level: 经验层级筛选
-            category: 分类筛选
-            status: 状态筛选
+            tags: 标签筛选
             source_type: 来源类型筛选
             market_regime: 市场环境筛选
             factor_styles: 因子风格筛选
-            min_confidence: 最低置信度
-            include_deprecated: 是否包含已废弃
+            created_after: 创建时间起始
+            created_before: 创建时间截止
+            updated_after: 更新时间起始
+            updated_before: 更新时间截止
             order_by: 排序
             limit: 限制数量
             offset: 偏移量
@@ -253,32 +228,20 @@ class ExperienceStore(BaseStore[Experience]):
         """
         builder = self._create_query_builder()
 
-        # 文本搜索
         if search:
             builder.where_raw(
                 "(title ILIKE %s OR content::text ILIKE %s)",
                 [f'%{search}%', f'%{search}%']
             )
 
-        # 筛选条件
-        if experience_level:
-            builder.where("experience_level", experience_level)
-
-        if category:
-            builder.where("category", category)
-
-        if status:
-            builder.where("status", status)
-        elif not include_deprecated:
-            builder.where_raw("status != %s", [ExperienceStatus.DEPRECATED.value])
-
         if source_type:
             builder.where("source_type", source_type)
 
-        if min_confidence > 0:
-            builder.where_raw("confidence >= %s", [min_confidence])
+        # 标签筛选（JSONB 查询）
+        if tags:
+            for tag in tags:
+                builder.where_raw("context->'tags' ? %s", [tag])
 
-        # 上下文筛选（JSONB 查询）
         if market_regime:
             builder.where_raw("context->>'market_regime' = %s", [market_regime])
 
@@ -286,13 +249,21 @@ class ExperienceStore(BaseStore[Experience]):
             for style in factor_styles:
                 builder.where_raw("context->'factor_styles' ? %s", [style])
 
-        # 先获取总数
+        # 时间筛选
+        if created_after:
+            builder.where_raw("created_at >= %s", [created_after])
+        if created_before:
+            builder.where_raw("created_at <= %s", [created_before])
+        if updated_after:
+            builder.where_raw("updated_at >= %s", [updated_after])
+        if updated_before:
+            builder.where_raw("updated_at <= %s", [updated_before])
+
         count_sql, count_params = builder.build_count()
         with self._cursor() as cursor:
             cursor.execute(count_sql, count_params)
             total = cursor.fetchone()['count']
 
-        # 添加排序和分页
         builder.order_by(order_by)
         builder.limit(limit)
         builder.offset(offset)
@@ -310,20 +281,6 @@ class ExperienceStore(BaseStore[Experience]):
         experiences, _ = self.query(search=keyword, limit=limit)
         return experiences
 
-    def get_by_level(
-        self,
-        level: str,
-        include_deprecated: bool = False,
-        limit: int = 50
-    ) -> List[Experience]:
-        """根据层级获取经验"""
-        experiences, _ = self.query(
-            experience_level=level,
-            include_deprecated=include_deprecated,
-            limit=limit
-        )
-        return experiences
-
     def get_by_source(self, source_type: str, source_ref: str) -> List[Experience]:
         """根据来源获取经验"""
         with self._cursor() as cursor:
@@ -333,92 +290,22 @@ class ExperienceStore(BaseStore[Experience]):
             )
             return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
 
-    def get_categories(self) -> List[str]:
-        """获取所有分类（去重）"""
+    def get_all_tags(self) -> List[str]:
+        """获取所有标签（去重）"""
         with self._cursor() as cursor:
-            cursor.execute("SELECT DISTINCT category FROM experiences WHERE category != ''")
-            return [row['category'] for row in cursor.fetchall()]
+            cursor.execute("""
+                SELECT DISTINCT jsonb_array_elements_text(context->'tags') as tag
+                FROM experiences
+                WHERE context->'tags' IS NOT NULL
+                ORDER BY tag
+            """)
+            return [row['tag'] for row in cursor.fetchall()]
 
     def count(self) -> int:
         """统计经验总数"""
         with self._cursor() as cursor:
             cursor.execute('SELECT COUNT(*) as count FROM experiences')
             return cursor.fetchone()['count']
-
-    def count_by_status(self) -> Dict[str, int]:
-        """按状态统计经验数量"""
-        with self._cursor() as cursor:
-            cursor.execute('''
-                SELECT status, COUNT(*) as count
-                FROM experiences
-                GROUP BY status
-            ''')
-            return {row['status']: row['count'] for row in cursor.fetchall()}
-
-    def count_by_level(self) -> Dict[str, int]:
-        """按层级统计经验数量"""
-        with self._cursor() as cursor:
-            cursor.execute('''
-                SELECT experience_level, COUNT(*) as count
-                FROM experiences
-                GROUP BY experience_level
-            ''')
-            return {row['experience_level']: row['count'] for row in cursor.fetchall()}
-
-    # ==================== 验证与废弃 ====================
-
-    def validate(
-        self,
-        experience_id: int,
-        confidence_delta: float = 0.1
-    ) -> Optional[Experience]:
-        """
-        验证经验
-
-        增加验证次数，提升置信度，更新状态为 validated。
-        """
-        experience = self.get(experience_id)
-        if experience is None:
-            return None
-
-        new_confidence = min(1.0, experience.confidence + confidence_delta)
-        now = datetime.now()
-
-        with self._cursor() as cursor:
-            cursor.execute('''
-                UPDATE experiences
-                SET validation_count = validation_count + 1,
-                    last_validated = %s,
-                    confidence = %s,
-                    status = %s,
-                    updated_at = %s
-                WHERE id = %s
-            ''', (now, new_confidence, ExperienceStatus.VALIDATED.value, now, experience_id))
-
-        return self.get(experience_id)
-
-    def deprecate(self, experience_id: int, reason: str) -> Optional[Experience]:
-        """
-        废弃经验
-
-        将状态更新为 deprecated，记录废弃原因。
-        """
-        experience = self.get(experience_id)
-        if experience is None:
-            return None
-
-        now = datetime.now()
-
-        with self._cursor() as cursor:
-            cursor.execute('''
-                UPDATE experiences
-                SET status = %s,
-                    deprecated_reason = %s,
-                    updated_at = %s
-                WHERE id = %s
-            ''', (ExperienceStatus.DEPRECATED.value, reason, now, experience_id))
-
-        return self.get(experience_id)
 
     # ==================== 关联管理 ====================
 
@@ -475,84 +362,6 @@ class ExperienceStore(BaseStore[Experience]):
                 (link_id,)
             )
             return cursor.rowcount > 0
-
-    # ==================== 向量检索 ====================
-
-    def vector_search(
-        self,
-        embedding: List[float],
-        top_k: int = 10,
-        min_confidence: float = 0.0,
-        include_deprecated: bool = False
-    ) -> List[Tuple[Experience, float]]:
-        """
-        向量相似度检索
-
-        Args:
-            embedding: 查询向量
-            top_k: 返回数量
-            min_confidence: 最低置信度
-            include_deprecated: 是否包含已废弃
-
-        Returns:
-            [(经验, 相似度分数), ...]
-        """
-        # 构建过滤条件
-        conditions = ["1=1"]
-        params: List[Any] = []
-
-        if min_confidence > 0:
-            conditions.append("e.confidence >= %s")
-            params.append(min_confidence)
-
-        if not include_deprecated:
-            conditions.append("e.status != %s")
-            params.append(ExperienceStatus.DEPRECATED.value)
-
-        where_clause = " AND ".join(conditions)
-
-        # 向量相似度查询（使用 pgvector）
-        # 假设 embedding 存储在 experience_embeddings 表中
-        sql = f'''
-            SELECT e.*, 1 - (ee.embedding <=> %s::vector) as similarity
-            FROM experiences e
-            JOIN experience_embeddings ee ON e.id = ee.experience_id
-            WHERE {where_clause}
-            ORDER BY ee.embedding <=> %s::vector
-            LIMIT %s
-        '''
-
-        params = [embedding] + params + [embedding, top_k]
-
-        try:
-            with self._cursor() as cursor:
-                cursor.execute(sql, params)
-                results = []
-                for row in cursor.fetchall():
-                    experience = self._row_to_entity(dict(row))
-                    similarity = row.get('similarity', 0)
-                    results.append((experience, similarity))
-                return results
-        except Exception as e:
-            logger.warning(f"向量检索失败（可能表不存在）: {e}")
-            return []
-
-    def store_embedding(self, experience_id: int, embedding: List[float], model: str = ""):
-        """存储经验的向量表示"""
-        try:
-            with self._cursor() as cursor:
-                cursor.execute('''
-                    INSERT INTO experience_embeddings (experience_id, embedding, model, created_at)
-                    VALUES (%s, %s::vector, %s, %s)
-                    ON CONFLICT (experience_id) DO UPDATE
-                    SET embedding = EXCLUDED.embedding,
-                        model = EXCLUDED.model,
-                        created_at = EXCLUDED.created_at
-                ''', (experience_id, embedding, model, datetime.now()))
-                return True
-        except Exception as e:
-            logger.error(f"存储向量失败: {e}")
-            return False
 
 
 # ==================== 单例管理 ====================

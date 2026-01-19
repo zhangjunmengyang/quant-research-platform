@@ -8,13 +8,8 @@ from .base import BaseTool, ToolResult
 from .report_tools import (
     ListReportsTool,
     GetReportTool,
-    GetReportStatusTool,
-    GetReportChunksTool,
 )
-from .search_tools import (
-    SearchReportsTool,
-    GetSimilarChunksTool,
-)
+from .search_tools import RetrieveTool
 
 __all__ = [
     "BaseTool",
@@ -22,9 +17,6 @@ __all__ = [
     # 研报管理
     "ListReportsTool",
     "GetReportTool",
-    "GetReportStatusTool",
-    "GetReportChunksTool",
     # 检索
-    "SearchReportsTool",
-    "GetSimilarChunksTool",
+    "RetrieveTool",
 ]

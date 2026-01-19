@@ -3,6 +3,11 @@ MCP Server - 研报知识库 MCP 服务器
 
 基于 mcp_core 实现的 MCP 服务器。
 使用 Streamable HTTP 传输协议（MCP 2025-03-26 规范推荐）。
+
+提供工具:
+- retrieve: 统一检索接口，支持查询重写、前置过滤、结果重排
+- list_reports: 列出研报
+- get_report: 获取研报详情
 """
 
 import logging
@@ -11,22 +16,15 @@ from typing import Optional
 from domains.mcp_core import (
     BaseMCPServer,
     MCPConfig,
-    create_mcp_app,
     create_streamable_http_app,
     run_streamable_http_server,
 )
-from domains.mcp_core.server.server import run_server as mcp_run_server
 
 from .tools.report_tools import (
     ListReportsTool,
     GetReportTool,
-    GetReportStatusTool,
-    GetReportChunksTool,
 )
-from .tools.search_tools import (
-    SearchReportsTool,
-    GetSimilarChunksTool,
-)
+from .tools.search_tools import RetrieveTool
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +36,8 @@ class ResearchHubMCPServer(BaseMCPServer):
     继承 mcp_core.BaseMCPServer，注册研报相关的工具。
 
     提供功能:
-    - 研报管理（列表、详情、状态）
-    - 语义检索
+    - 检索: 统一的 RAG 检索接口
+    - 研报管理: 列表、详情查询
     """
 
     def _setup(self) -> None:
@@ -48,15 +46,12 @@ class ResearchHubMCPServer(BaseMCPServer):
 
     def _register_tools(self) -> None:
         """注册研报知识库工具"""
-        # 研报管理工具（查询类）
+        # 核心检索工具
+        self.register_tool(RetrieveTool(), "query")
+
+        # 研报管理工具（仅保留必要的）
         self.register_tool(ListReportsTool(), "query")
         self.register_tool(GetReportTool(), "query")
-        self.register_tool(GetReportStatusTool(), "query")
-        self.register_tool(GetReportChunksTool(), "query")
-
-        # 检索工具（查询类）
-        self.register_tool(SearchReportsTool(), "query")
-        self.register_tool(GetSimilarChunksTool(), "query")
 
         logger.info(f"注册了 {len(self.tool_registry)} 个研报知识库工具")
 

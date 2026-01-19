@@ -1,7 +1,7 @@
 """
-语义检索 MCP 工具
+检索 MCP 工具
 
-提供研报的语义检索功能。
+提供统一的 RAG 检索接口。
 """
 
 from typing import Any, Dict
@@ -9,24 +9,35 @@ from typing import Any, Dict
 from .base import BaseTool, ToolResult
 
 
-class SearchReportsTool(BaseTool):
-    """语义搜索研报工具"""
+class RetrieveTool(BaseTool):
+    """
+    统一检索工具
+
+    对外提供简洁的 RAG 检索接口，支持:
+    - 查询重写: 使用 LLM 优化查询
+    - 前置过滤: 按研报 ID、分类过滤
+    - 结果重排: 使用 LLM 对结果重新排序
+    """
 
     @property
     def name(self) -> str:
-        return "search_reports"
+        return "retrieve"
 
     @property
     def description(self) -> str:
-        return """在研报知识库中进行语义搜索。
+        return """在研报知识库中检索相关内容。
 
-使用向量相似度检索与查询语义相关的研报内容片段。
-返回最相关的切块及其来源研报信息。
+这是一个 RAG 检索接口，根据查询语义检索最相关的研报片段。
+
+支持功能:
+- 查询重写: 自动优化查询以提升检索效果
+- 前置过滤: 限定检索范围（按研报 ID 或分类）
+- 结果重排: 对检索结果按相关性重新排序
 
 使用场景:
 - 查找特定主题的研报内容
-- 搜索包含某个概念的研报片段
-- 查找相关的量化研究观点"""
+- 获取某个概念的相关解释
+- 查找量化研究观点"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -35,7 +46,7 @@ class SearchReportsTool(BaseTool):
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "搜索查询（自然语言描述）"
+                    "description": "检索查询（自然语言）"
                 },
                 "top_k": {
                     "type": "integer",
@@ -44,16 +55,32 @@ class SearchReportsTool(BaseTool):
                     "minimum": 1,
                     "maximum": 50
                 },
-                "report_id": {
-                    "type": "integer",
-                    "description": "限定搜索的研报 ID（可选）"
+                "report_ids": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "限定检索的研报 ID 列表（前置过滤）"
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "限定检索的分类列表（前置过滤）"
                 },
                 "min_score": {
                     "type": "number",
-                    "description": "最小相似度分数（0-1）",
+                    "description": "最小相似度分数 (0-1)",
                     "default": 0.0,
                     "minimum": 0,
                     "maximum": 1
+                },
+                "enable_rewrite": {
+                    "type": "boolean",
+                    "description": "是否启用查询重写",
+                    "default": False
+                },
+                "enable_rerank": {
+                    "type": "boolean",
+                    "description": "是否启用结果重排",
+                    "default": False
                 }
             },
             "required": ["query"]
@@ -63,96 +90,29 @@ class SearchReportsTool(BaseTool):
         try:
             query = params.get("query", "")
             top_k = params.get("top_k", 10)
-            report_id = params.get("report_id")
+            report_ids = params.get("report_ids")
+            categories = params.get("categories")
             min_score = params.get("min_score", 0.0)
+            enable_rewrite = params.get("enable_rewrite", False)
+            enable_rerank = params.get("enable_rerank", False)
 
-            results = await self.retrieval_service.search(
+            result = await self.retrieval_service.retrieve(
                 query=query,
                 top_k=top_k,
-                report_id=report_id,
+                report_ids=report_ids,
+                categories=categories,
                 min_score=min_score,
+                enable_rewrite=enable_rewrite,
+                enable_rerank=enable_rerank,
             )
 
             return ToolResult(
                 success=True,
                 data={
-                    "query": query,
-                    "count": len(results),
-                    "results": results,
-                }
-            )
-
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
-
-
-class GetSimilarChunksTool(BaseTool):
-    """获取相似切块工具"""
-
-    @property
-    def name(self) -> str:
-        return "get_similar_chunks"
-
-    @property
-    def description(self) -> str:
-        return """获取与指定切块相似的其他切块。
-
-用于发现相关内容，扩展阅读范围。
-
-使用场景:
-- 查找讨论相似主题的其他研报片段
-- 发现不同研报中的相关观点
-- 扩展阅读相关内容"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "chunk_id": {
-                    "type": "string",
-                    "description": "参考切块 ID"
-                },
-                "top_k": {
-                    "type": "integer",
-                    "description": "返回数量",
-                    "default": 5,
-                    "minimum": 1,
-                    "maximum": 20
-                },
-                "exclude_same_report": {
-                    "type": "boolean",
-                    "description": "是否排除同一研报的切块",
-                    "default": False
-                }
-            },
-            "required": ["chunk_id"]
-        }
-
-    async def execute(self, **params) -> ToolResult:
-        try:
-            chunk_id = params.get("chunk_id", "")
-            top_k = params.get("top_k", 5)
-            exclude_same_report = params.get("exclude_same_report", False)
-
-            results = await self.retrieval_service.get_similar_chunks(
-                chunk_id=chunk_id,
-                top_k=top_k,
-                exclude_same_report=exclude_same_report,
-            )
-
-            if not results:
-                return ToolResult(
-                    success=False,
-                    error=f"切块不存在或无相似切块: {chunk_id}"
-                )
-
-            return ToolResult(
-                success=True,
-                data={
-                    "chunk_id": chunk_id,
-                    "count": len(results),
-                    "similar_chunks": results,
+                    "query": result["query"],
+                    "rewritten_query": result.get("rewritten_query"),
+                    "total": result["total"],
+                    "results": result["results"],
                 }
             )
 

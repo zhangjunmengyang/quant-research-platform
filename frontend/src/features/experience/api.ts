@@ -1,5 +1,6 @@
 /**
  * Experience API client
+ * 简化版本: 移除 validate/deprecate/curate，以标签为核心管理
  */
 
 import { apiClient, type ApiResponse, type PaginatedResponse } from '@/lib/api/client'
@@ -10,15 +11,9 @@ import type {
   ExperienceListParams,
   ExperienceStats,
   ExperienceQueryParams,
-  ExperienceValidateRequest,
-  ExperienceValidateResponse,
-  ExperienceDeprecateRequest,
-  ExperienceDeprecateResponse,
   ExperienceLinkRequest,
   ExperienceLinkResponse,
   ExperienceLink,
-  ExperienceCurateRequest,
-  ExperienceCurateResponse,
 } from './types'
 
 const BASE_URL = '/experiences'
@@ -104,40 +99,6 @@ export const experienceApi = {
   },
 
   /**
-   * Validate experience (increase confidence)
-   */
-  validate: async (
-    id: number,
-    request?: ExperienceValidateRequest
-  ): Promise<ExperienceValidateResponse> => {
-    const { data } = await apiClient.post<ApiResponse<ExperienceValidateResponse>>(
-      `${BASE_URL}/${id}/validate`,
-      request || {}
-    )
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to validate experience')
-    }
-    return data.data
-  },
-
-  /**
-   * Deprecate experience
-   */
-  deprecate: async (
-    id: number,
-    request: ExperienceDeprecateRequest
-  ): Promise<ExperienceDeprecateResponse> => {
-    const { data } = await apiClient.post<ApiResponse<ExperienceDeprecateResponse>>(
-      `${BASE_URL}/${id}/deprecate`,
-      request
-    )
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to deprecate experience')
-    }
-    return data.data
-  },
-
-  /**
    * Link experience to entity
    */
   link: async (id: number, request: ExperienceLinkRequest): Promise<ExperienceLinkResponse> => {
@@ -158,20 +119,6 @@ export const experienceApi = {
     const { data } = await apiClient.get<ApiResponse<ExperienceLink[]>>(`${BASE_URL}/${id}/links`)
     if (!data.success || !data.data) {
       throw new Error(data.error || 'Failed to get links')
-    }
-    return data.data
-  },
-
-  /**
-   * Curate experience (synthesize from multiple experiences)
-   */
-  curate: async (request: ExperienceCurateRequest): Promise<ExperienceCurateResponse> => {
-    const { data } = await apiClient.post<ApiResponse<ExperienceCurateResponse>>(
-      `${BASE_URL}/curate`,
-      request
-    )
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to curate experience')
     }
     return data.data
   },

@@ -13,38 +13,6 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
-class ExperienceLevel(str, Enum):
-    """经验层级"""
-    STRATEGIC = "strategic"      # 战略级: 长期有效的研究原则
-    TACTICAL = "tactical"        # 战术级: 特定场景下的研究结论
-    OPERATIONAL = "operational"  # 操作级: 具体的研究记录
-
-
-class ExperienceStatus(str, Enum):
-    """经验状态"""
-    DRAFT = "draft"              # 草稿: 新记录的经验，待验证
-    VALIDATED = "validated"      # 已验证: 经过后续研究验证
-    DEPRECATED = "deprecated"    # 已废弃: 被证伪或已过时
-
-
-class ExperienceCategory(str, Enum):
-    """经验分类"""
-    # 战略级分类
-    MARKET_REGIME_PRINCIPLE = "market_regime_principle"      # 市场环境原则
-    FACTOR_DESIGN_PRINCIPLE = "factor_design_principle"      # 因子设计原则
-    RISK_MANAGEMENT_PRINCIPLE = "risk_management_principle"  # 风险管理原则
-
-    # 战术级分类
-    FACTOR_PERFORMANCE = "factor_performance"          # 因子表现结论
-    STRATEGY_OPTIMIZATION = "strategy_optimization"    # 策略优化结论
-    PARAM_SENSITIVITY = "param_sensitivity"            # 参数敏感性结论
-
-    # 操作级分类
-    SUCCESSFUL_EXPERIMENT = "successful_experiment"    # 成功实验
-    FAILED_EXPERIMENT = "failed_experiment"            # 失败实验
-    RESEARCH_OBSERVATION = "research_observation"      # 研究观察
-
-
 class SourceType(str, Enum):
     """来源类型"""
     RESEARCH = "research"        # 研究会话
@@ -52,7 +20,6 @@ class SourceType(str, Enum):
     LIVE_TRADE = "live_trade"    # 实盘交易
     EXTERNAL = "external"        # 外部输入
     MANUAL = "manual"            # 手动录入
-    CURATED = "curated"          # 提炼生成
 
 
 class EntityType(str, Enum):
@@ -61,7 +28,7 @@ class EntityType(str, Enum):
     STRATEGY = "strategy"        # 策略
     NOTE = "note"                # 笔记
     RESEARCH = "research"        # 研报
-    EXPERIENCE = "experience"    # 经验（父级经验）
+    EXPERIENCE = "experience"    # 经验
 
 
 @dataclass
@@ -112,11 +79,7 @@ class ExperienceContent:
         return cls.from_dict(data)
 
     def to_embedding_text(self) -> str:
-        """
-        生成用于向量化的文本
-
-        组合 problem 和 lesson，这两个字段最能代表经验的核心语义。
-        """
+        """生成用于向量化的文本"""
         parts = []
         if self.problem:
             parts.append(f"问题: {self.problem}")
@@ -131,37 +94,37 @@ class ExperienceContext:
     经验的上下文信息
 
     Attributes:
-        market_regime: 市场状态（牛市/熊市/震荡）
+        tags: 自定义标签（核心分类方式）
         factor_styles: 相关的因子风格
+        market_regime: 市场状态（牛市/熊市/震荡）
         time_horizon: 适用的时间范围（短期/中期/长期）
         asset_class: 资产类别（BTC/ETH/山寨币/全市场）
-        tags: 自定义标签
     """
-    market_regime: str = ""
+    tags: List[str] = field(default_factory=list)
     factor_styles: List[str] = field(default_factory=list)
+    market_regime: str = ""
     time_horizon: str = ""
     asset_class: str = ""
-    tags: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
         return {
-            'market_regime': self.market_regime,
+            'tags': self.tags,
             'factor_styles': self.factor_styles,
+            'market_regime': self.market_regime,
             'time_horizon': self.time_horizon,
             'asset_class': self.asset_class,
-            'tags': self.tags,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ExperienceContext':
         """从字典创建"""
         return cls(
-            market_regime=data.get('market_regime', ''),
+            tags=data.get('tags', []),
             factor_styles=data.get('factor_styles', []),
+            market_regime=data.get('market_regime', ''),
             time_horizon=data.get('time_horizon', ''),
             asset_class=data.get('asset_class', ''),
-            tags=data.get('tags', []),
         )
 
     def to_json(self) -> str:
@@ -192,40 +155,26 @@ class Experience:
     """
     经验实体
 
-    存储结构化的研究经验，支持语义检索和生命周期管理。
+    存储结构化的研究经验，通过标签进行分类管理。
     """
     # === 基础信息 ===
     id: Optional[int] = None
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     title: str = ""
-    experience_level: str = ExperienceLevel.OPERATIONAL.value
-    category: str = ""
 
     # === 核心内容（PARL） ===
     content: ExperienceContent = field(default_factory=ExperienceContent)
 
-    # === 上下文 ===
+    # === 上下文（包含标签） ===
     context: ExperienceContext = field(default_factory=ExperienceContext)
 
     # === 来源追溯 ===
     source_type: str = SourceType.MANUAL.value
     source_ref: str = ""
 
-    # === 置信度与验证 ===
-    confidence: float = 0.5
-    validation_count: int = 0
-    last_validated: Optional[datetime] = None
-
-    # === 生命周期 ===
-    status: str = ExperienceStatus.DRAFT.value
-    deprecated_reason: str = ""
-
     # === 时间戳 ===
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-
-    # === 语义检索 ===
-    # embedding 存储在单独的向量存储中
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -233,17 +182,10 @@ class Experience:
             'id': self.id,
             'uuid': self.uuid,
             'title': self.title,
-            'experience_level': self.experience_level,
-            'category': self.category,
             'content': self.content.to_dict() if isinstance(self.content, ExperienceContent) else self.content,
             'context': self.context.to_dict() if isinstance(self.context, ExperienceContext) else self.context,
             'source_type': self.source_type,
             'source_ref': self.source_ref,
-            'confidence': self.confidence,
-            'validation_count': self.validation_count,
-            'last_validated': self.last_validated,
-            'status': self.status,
-            'deprecated_reason': self.deprecated_reason,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
         }
@@ -251,7 +193,6 @@ class Experience:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Experience':
         """从字典创建经验实例"""
-        # 处理嵌套对象
         content = data.get('content')
         if isinstance(content, str):
             content = ExperienceContent.from_json(content)
@@ -272,45 +213,18 @@ class Experience:
             id=data.get('id'),
             uuid=data.get('uuid', str(uuid.uuid4())),
             title=data.get('title', ''),
-            experience_level=data.get('experience_level', ExperienceLevel.OPERATIONAL.value),
-            category=data.get('category', ''),
             content=content,
             context=context,
             source_type=data.get('source_type', SourceType.MANUAL.value),
             source_ref=data.get('source_ref', ''),
-            confidence=data.get('confidence', 0.5),
-            validation_count=data.get('validation_count', 0),
-            last_validated=data.get('last_validated'),
-            status=data.get('status', ExperienceStatus.DRAFT.value),
-            deprecated_reason=data.get('deprecated_reason', ''),
             created_at=data.get('created_at'),
             updated_at=data.get('updated_at'),
         )
 
     @property
-    def is_validated(self) -> bool:
-        """是否已验证"""
-        return self.status == ExperienceStatus.VALIDATED.value
-
-    @property
-    def is_deprecated(self) -> bool:
-        """是否已废弃"""
-        return self.status == ExperienceStatus.DEPRECATED.value
-
-    @property
-    def is_strategic(self) -> bool:
-        """是否为战略级经验"""
-        return self.experience_level == ExperienceLevel.STRATEGIC.value
-
-    @property
-    def is_tactical(self) -> bool:
-        """是否为战术级经验"""
-        return self.experience_level == ExperienceLevel.TACTICAL.value
-
-    @property
-    def is_operational(self) -> bool:
-        """是否为操作级经验"""
-        return self.experience_level == ExperienceLevel.OPERATIONAL.value
+    def tags(self) -> List[str]:
+        """获取标签列表"""
+        return self.context.tags
 
     @property
     def summary(self) -> str:
@@ -323,11 +237,7 @@ class Experience:
         return ""
 
     def to_embedding_text(self) -> str:
-        """
-        生成用于向量化的文本
-
-        组合标题和核心内容。
-        """
+        """生成用于向量化的文本"""
         parts = [self.title]
         content_text = self.content.to_embedding_text()
         if content_text:
@@ -345,9 +255,9 @@ class ExperienceLink:
     id: Optional[int] = None
     experience_id: Optional[int] = None
     experience_uuid: str = ""
-    entity_type: str = ""           # factor, strategy, note, research, experience
-    entity_id: str = ""             # 实体 ID（因子名、策略ID等）
-    relation: str = "related"       # 关系类型: related, derived_from, applied_to, curated_from
+    entity_type: str = ""
+    entity_id: str = ""
+    relation: str = "related"
     created_at: Optional[datetime] = None
 
     def to_dict(self) -> Dict[str, Any]:

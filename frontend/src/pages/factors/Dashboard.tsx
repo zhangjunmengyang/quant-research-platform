@@ -75,6 +75,7 @@ export function Component() {
   })
 
   // Filter by search query (client-side)
+  // 搜索范围: filename, style, tags, formula, input_data, description, analysis
   const filteredItems = useMemo(() => {
     if (!data?.items || !searchQuery) return data?.items || []
     const query = searchQuery.toLowerCase()
@@ -82,7 +83,11 @@ export function Component() {
       (factor) =>
         factor.filename.toLowerCase().includes(query) ||
         factor.style?.toLowerCase().includes(query) ||
-        factor.description?.toLowerCase().includes(query)
+        factor.tags?.toLowerCase().includes(query) ||
+        factor.formula?.toLowerCase().includes(query) ||
+        factor.input_data?.toLowerCase().includes(query) ||
+        factor.description?.toLowerCase().includes(query) ||
+        factor.analysis?.toLowerCase().includes(query)
     )
   }, [data?.items, searchQuery])
 
