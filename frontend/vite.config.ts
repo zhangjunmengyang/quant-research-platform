@@ -12,6 +12,21 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // 开发服务器配置
+  server: {
+    port: 5173,
+    host: '127.0.0.1',
+    proxy: {
+      '/api': {
+        target: `http://${API_HOST}:8000`,
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: `ws://${API_HOST}:8000`,
+        ws: true,
+      },
+    },
+  },
   // 预览服务器配置（生产模式）
   preview: {
     port: 5173,

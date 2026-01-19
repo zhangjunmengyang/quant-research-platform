@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any
 import pandas as pd
 
 from ..core.models import FactorResult, FactorInfo
-from ..core.exceptions import FactorNotFoundError, CalculationError
+from domains.core.exceptions import FactorNotFoundError, CalculationError
 
 # 使用 engine 服务
 from domains.engine.services import (

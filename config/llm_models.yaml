@@ -4,6 +4,11 @@
 # API 密钥和端点通过环境变量配置:
 #   LLM_API_KEY: API 密钥
 #   LLM_API_URL: API 端点 (默认: https://api.openai.com/v1/chat/completions)
+#
+# openai_compatible 参数说明:
+#   设为 true 时使用 ChatOpenAICompatible 类，用于不支持新版 OpenAI API 的代理:
+#   1. 将 max_completion_tokens 转换回 max_tokens
+#   2. 支持 Gemini 的 thought_signature 传递
 # =============================================================================
 
 # 默认配置
@@ -32,3 +37,12 @@ llm_configs:
     model: gemini-3-flash-preview
     temperature: 1
     max_tokens: 16384
+    openai_compatible: true
+
+  # 示例: 使用 openai_compatible 模式的第三方代理
+  # mt-gpt:
+  #   provider: openai
+  #   model: gpt-4.1
+  #   temperature: 0.6
+  #   max_tokens: 16384
+  #   openai_compatible: true   # 启用兼容模式

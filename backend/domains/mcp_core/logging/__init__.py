@@ -16,6 +16,7 @@ from .config import (
     LogFormat,
     bind_request_context,
     clear_request_context,
+    setup_task_logger,
 )
 from .store import LogStore, LogEntry, LogTopic, LogQueryResult
 
@@ -25,6 +26,8 @@ __all__ = [
     "get_logger",
     "LogConfig",
     "LogFormat",
+    # 任务日志
+    "setup_task_logger",
     # 上下文
     "bind_request_context",
     "clear_request_context",

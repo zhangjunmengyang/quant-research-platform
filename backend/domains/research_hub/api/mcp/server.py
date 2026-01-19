@@ -25,7 +25,6 @@ from .tools.report_tools import (
 )
 from .tools.search_tools import (
     SearchReportsTool,
-    AskReportsTool,
     GetSimilarChunksTool,
 )
 
@@ -41,7 +40,6 @@ class ResearchHubMCPServer(BaseMCPServer):
     提供功能:
     - 研报管理（列表、详情、状态）
     - 语义检索
-    - RAG 问答
     """
 
     def _setup(self) -> None:
@@ -56,9 +54,8 @@ class ResearchHubMCPServer(BaseMCPServer):
         self.register_tool(GetReportStatusTool(), "query")
         self.register_tool(GetReportChunksTool(), "query")
 
-        # 检索和问答工具（查询类）
+        # 检索工具（查询类）
         self.register_tool(SearchReportsTool(), "query")
-        self.register_tool(AskReportsTool(), "query")
         self.register_tool(GetSimilarChunksTool(), "query")
 
         logger.info(f"注册了 {len(self.tool_registry)} 个研报知识库工具")

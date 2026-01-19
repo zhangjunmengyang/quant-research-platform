@@ -13,7 +13,7 @@
 
 from .core.config import DataHubConfig, get_data_hub_config
 from .core.models import DataConfig, KlineData, FactorResult
-from .core.exceptions import DataHubError, DataNotFoundError, FactorNotFoundError
+from domains.core.exceptions import DataHubError, DataNotFoundError, FactorNotFoundError
 
 from .services.data_loader import DataLoader
 from .services.factor_calculator import FactorCalculator

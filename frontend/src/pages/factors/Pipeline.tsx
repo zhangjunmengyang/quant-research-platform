@@ -4,7 +4,7 @@
  * 按任务拆分为多个 Tab: 概览、因子入库、字段填充、质量审核
  */
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Settings,
   Sparkles,
+  X,
+  XCircle,
   Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -36,7 +38,10 @@ import {
   type PromptConfigUpdate,
   type PromptVariable,
   type LLMModelInfo,
+  type FillLog,
+  type FillProgress,
 } from '@/features/factor/pipeline-api'
+import { useFillProgress } from '@/features/factor/hooks'
 import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
 import { toast } from '@/components/ui/toast'
 
@@ -338,7 +343,7 @@ function VariableTextarea({
   const context = getVariableContext(value, cursorPosition)
   const filteredVars = context
     ? variables.filter(v =>
-        v.name.toLowerCase().startsWith(context.prefix.toLowerCase())
+        v.name.toLowerCase().startsWith((context.prefix ?? '').toLowerCase())
       )
     : []
 
@@ -352,9 +357,10 @@ function VariableTextarea({
       e.preventDefault()
       setSuggestionIndex(i => (i - 1 + filteredVars.length) % filteredVars.length)
     } else if (e.key === 'Enter' || e.key === 'Tab') {
-      if (showSuggestions && filteredVars.length > 0) {
+      const selectedVar = filteredVars[suggestionIndex]
+      if (showSuggestions && selectedVar) {
         e.preventDefault()
-        insertVariable(filteredVars[suggestionIndex].name)
+        insertVariable(selectedVar.name)
       }
     } else if (e.key === 'Escape') {
       setShowSuggestions(false)
@@ -633,19 +639,174 @@ function PromptEditor({
 
 // ==================== Fill Tab ====================
 
+function FillProgressPanel({
+  progress,
+  logs,
+  onClose,
+}: {
+  progress: FillProgress
+  logs: FillLog[]
+  onClose: () => void
+}) {
+  const logsEndRef = useRef<HTMLDivElement>(null)
+
+  // 自动滚动到底部
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs.length])
+
+  const isRunning = progress.status === 'running' || progress.status === 'pending'
+  const isCompleted = progress.status === 'completed'
+  const isFailed = progress.status === 'failed'
+
+  const progressPercent = Math.round(progress.progress || 0)
+  const currentNum = progress.current_step_num || 0
+  const totalSteps = progress.total_steps || 0
+
+  // 统计成功和失败数量
+  // 优先使用后端返回的完成状态中的计数（切换页面回来时 logs 可能为空）
+  const completedData = progress.data?.type === 'completed' ? progress.data : null
+  const successCount = completedData?.success_count ?? logs.filter((l) => l.success).length
+  const failCount = completedData?.fail_count ?? logs.filter((l) => !l.success).length
+
+  return (
+    <div className="rounded-lg border bg-card p-4 mt-4 space-y-4">
+      {/* 标题栏 */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {isRunning && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+          {isCompleted && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+          {isFailed && <XCircle className="h-4 w-4 text-red-500" />}
+          <span className="text-sm font-medium">
+            {isRunning && '填充进行中...'}
+            {isCompleted && '填充完成'}
+            {isFailed && '填充失败'}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
+            {currentNum} / {totalSteps}
+          </span>
+          {!isRunning && (
+            <button
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 进度条 */}
+      <div className="h-2 rounded-full bg-muted overflow-hidden">
+        <div
+          className={cn(
+            'h-full transition-all duration-300',
+            isFailed ? 'bg-red-500' : 'bg-primary'
+          )}
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
+      {/* 统计 */}
+      <div className="flex items-center gap-4 text-sm">
+        <span className="text-green-600">成功: {successCount}</span>
+        <span className="text-red-600">失败: {failCount}</span>
+        {progress.current_step && (
+          <span className="text-muted-foreground">
+            当前字段: {FIELD_LABELS[progress.current_step] || progress.current_step}
+          </span>
+        )}
+      </div>
+
+      {/* 日志列表 */}
+      <div className="max-h-64 overflow-y-auto space-y-1 text-sm font-mono bg-muted/30 rounded-md p-3">
+        {logs.length === 0 ? (
+          <p className="text-muted-foreground">
+            {isRunning ? '等待任务开始...' : isCompleted ? '任务已完成 (日志在页面切换后不保留)' : '暂无日志'}
+          </p>
+        ) : (
+          logs.map((log, i) => (
+            <div
+              key={i}
+              className={cn(
+                'flex items-start gap-2 py-0.5',
+                log.success ? 'text-green-600' : 'text-red-600'
+              )}
+            >
+              {log.success ? (
+                <Check className="h-3 w-3 mt-0.5 flex-shrink-0" />
+              ) : (
+                <X className="h-3 w-3 mt-0.5 flex-shrink-0" />
+              )}
+              <span className="flex-shrink-0">{log.factor}</span>
+              <span className="text-muted-foreground flex-shrink-0">
+                ({FIELD_LABELS[log.field] || log.field})
+              </span>
+              {log.error && (
+                <span className="text-red-500 truncate" title={log.error}>
+                  : {log.error}
+                </span>
+              )}
+            </div>
+          ))
+        )}
+        <div ref={logsEndRef} />
+      </div>
+
+      {/* 失败时显示错误信息 */}
+      {isFailed && progress.error && (
+        <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950/20 rounded-md p-3">
+          {progress.error}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FillTab({ status }: { status?: PipelineStatus }) {
   const queryClient = useQueryClient()
   const [selectedFields, setSelectedFields] = useState<FillableField[]>([])
   const [fillMode, setFillMode] = useState<FillMode>('incremental')
   const [delay, setDelay] = useState(15)
   const [concurrency, setConcurrency] = useState(1)
+  const [taskId, setTaskId] = useState<string | null>(null)
+
+  // 挂载时查询活跃任务
+  const { data: activeTask } = useQuery({
+    queryKey: ['pipeline-fill-active'],
+    queryFn: pipelineApi.getActiveFillTask,
+    refetchOnWindowFocus: false,
+    staleTime: 0, // 始终查询最新状态
+  })
+
+  // 发现活跃任务时自动恢复
+  useEffect(() => {
+    if (activeTask?.task_id && !taskId) {
+      setTaskId(activeTask.task_id)
+    }
+  }, [activeTask, taskId])
+
+  const { progress, logs, isRunning, isCompleted, reset } = useFillProgress(taskId)
 
   const fillMutation = useMutation({
     mutationFn: (request: FillRequest) => pipelineApi.fill(request),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // 如果返回了 task_id，说明是异步任务
+      if (data.task_id) {
+        setTaskId(data.task_id)
+      }
       queryClient.invalidateQueries({ queryKey: ['pipeline-status'] })
     },
   })
+
+  // 任务完成后刷新状态
+  useEffect(() => {
+    if (isCompleted) {
+      queryClient.invalidateQueries({ queryKey: ['pipeline-status'] })
+    }
+  }, [isCompleted, queryClient])
 
   const fieldOptions: { value: FillableField; label: string }[] = [
     { value: 'style', label: '风格分类' },
@@ -675,6 +836,12 @@ function FillTab({ status }: { status?: PipelineStatus }) {
   const handleFill = async (dryRun: boolean = false) => {
     if (selectedFields.length === 0) return
 
+    // 清除之前的任务状态
+    if (!dryRun) {
+      setTaskId(null)
+      reset()
+    }
+
     await fillMutation.mutateAsync({
       fields: selectedFields,
       mode: fillMode,
@@ -684,9 +851,19 @@ function FillTab({ status }: { status?: PipelineStatus }) {
     })
   }
 
+  const handleCloseProgress = () => {
+    setTaskId(null)
+    reset()
+    // 清除缓存，避免下次挂载时自动恢复已关闭的任务
+    queryClient.setQueryData(['pipeline-fill-active'], null)
+  }
+
   const getFieldEmptyCount = (field: FillableField): number => {
     return status?.field_coverage?.[field]?.empty ?? 0
   }
+
+  // 判断是否正在执行任务（mutation pending 或 SSE running）
+  const isBusy = fillMutation.isPending || isRunning
 
   return (
     <div className="space-y-6">
@@ -703,7 +880,11 @@ function FillTab({ status }: { status?: PipelineStatus }) {
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium">选择要填充的字段</h4>
-          <button onClick={handleSelectAll} className="text-sm text-primary hover:underline">
+          <button
+            onClick={handleSelectAll}
+            disabled={isBusy}
+            className="text-sm text-primary hover:underline disabled:opacity-50"
+          >
             {selectedFields.length === fieldOptions.length ? '取消全选' : '全选'}
           </button>
         </div>
@@ -715,8 +896,9 @@ function FillTab({ status }: { status?: PipelineStatus }) {
               <button
                 key={value}
                 onClick={() => handleToggleField(value)}
+                disabled={isBusy}
                 className={cn(
-                  'flex items-center justify-between rounded-lg border p-4 text-left transition-colors',
+                  'flex items-center justify-between rounded-lg border p-4 text-left transition-colors disabled:opacity-50',
                   isSelected
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
@@ -744,6 +926,7 @@ function FillTab({ status }: { status?: PipelineStatus }) {
               value={fillMode}
               onChange={(value) => setFillMode(value as FillMode)}
               className="mt-1"
+              disabled={isBusy}
             />
           </div>
           <div>
@@ -754,7 +937,8 @@ function FillTab({ status }: { status?: PipelineStatus }) {
               onChange={(e) => setDelay(Number(e.target.value))}
               min={0}
               max={120}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              disabled={isBusy}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             />
           </div>
           <div>
@@ -765,7 +949,8 @@ function FillTab({ status }: { status?: PipelineStatus }) {
               onChange={(e) => setConcurrency(Number(e.target.value))}
               min={1}
               max={10}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              disabled={isBusy}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
             />
           </div>
         </div>
@@ -774,17 +959,17 @@ function FillTab({ status }: { status?: PipelineStatus }) {
         <div className="flex items-center gap-3 mt-6">
           <button
             onClick={() => handleFill(true)}
-            disabled={selectedFields.length === 0 || fillMutation.isPending}
+            disabled={selectedFields.length === 0 || isBusy}
             className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent disabled:opacity-50"
           >
             预览
           </button>
           <button
             onClick={() => handleFill(false)}
-            disabled={selectedFields.length === 0 || fillMutation.isPending}
+            disabled={selectedFields.length === 0 || isBusy}
             className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {fillMutation.isPending ? (
+            {isBusy ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Play className="h-4 w-4" />
@@ -793,12 +978,19 @@ function FillTab({ status }: { status?: PipelineStatus }) {
           </button>
         </div>
 
-        {/* Result */}
-        {fillMutation.data && (
+        {/* Progress Panel (when task is running or completed) */}
+        {taskId && progress && (
+          <FillProgressPanel
+            progress={progress}
+            logs={logs}
+            onClose={handleCloseProgress}
+          />
+        )}
+
+        {/* Dry run result */}
+        {fillMutation.data?.dry_run && (
           <div className="rounded-lg bg-muted/50 p-4 mt-4">
-            <h4 className="text-sm font-medium mb-2">
-              {fillMutation.data.dry_run ? '预览结果' : '填充结果'}
-            </h4>
+            <h4 className="text-sm font-medium mb-2">预览结果</h4>
             <div className="text-sm text-muted-foreground space-y-1">
               <p>总因子数: {fillMutation.data.total_factors}</p>
               <p>字段: {fillMutation.data.fields.join(', ')}</p>

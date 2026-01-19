@@ -6,7 +6,7 @@
 
 from .models import DataConfig, KlineData, FactorResult
 from .config import DataHubConfig, get_data_hub_config
-from .exceptions import DataHubError, DataNotFoundError, FactorNotFoundError
+from domains.core.exceptions import DataHubError, DataNotFoundError, FactorNotFoundError
 
 __all__ = [
     "DataConfig",

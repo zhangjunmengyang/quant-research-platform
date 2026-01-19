@@ -11,13 +11,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from domains.mcp_core.paths import get_data_dir
+
 logger = logging.getLogger(__name__)
-
-
-def _get_project_root() -> Path:
-    """获取项目根目录"""
-    # 从 backend/domains/strategy_hub/services/backtest_template.py 向上 5 级
-    return Path(__file__).parent.parent.parent.parent.parent
 
 
 @dataclass
@@ -72,7 +68,7 @@ class BacktestTemplateService:
         Args:
             templates_dir: 模板存储目录
         """
-        self.templates_dir = templates_dir or (_get_project_root() / "data" / "templates")
+        self.templates_dir = templates_dir or (get_data_dir() / "templates")
         self.templates_dir.mkdir(parents=True, exist_ok=True)
 
         # 预设模板

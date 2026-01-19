@@ -8,52 +8,15 @@ import asyncio
 import json
 import logging
 import re
-import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
 
-import aiohttp
+from domains.mcp_core.llm import get_llm_client
+from domains.mcp_core.logging import setup_task_logger
 
-# 设置日志
-def setup_logger():
-    """设置日志，同时输出到控制台和文件"""
-    # 从 backend/domains/factor_hub/tasks/review.py 向上 5 级到项目根目录
-    log_dir = Path(__file__).parent.parent.parent.parent.parent / "output" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / f"review_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+logger = setup_task_logger("review")
 
-    logger = logging.getLogger("review")
-    logger.setLevel(logging.INFO)
-
-    # 清除已有处理器（避免重复添加）
-    if logger.handlers:
-        logger.handlers.clear()
-
-    # 文件处理器
-    fh = logging.FileHandler(log_file, encoding='utf-8')
-    fh.setLevel(logging.INFO)
-
-    # 控制台处理器
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
-
-    # 格式
-    formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
-    fh.setFormatter(formatter)
-    ch.setFormatter(formatter)
-
-    logger.addHandler(fh)
-    logger.addHandler(ch)
-
-    print(f"\n日志文件: {log_file}\n", flush=True)
-    return logger
-
-
-logger = setup_logger()
-
-from ..core.config import get_config_loader
 from ..services.prompt_engine import get_prompt_engine
 from ..core.progress import get_progress_reporter
 from ..core.store import get_factor_store, Factor
@@ -232,12 +195,10 @@ def build_review_prompt(
 
 
 async def _review_single_factor(
-    session: aiohttp.ClientSession,
     factor: Dict[str, Any],
     factor_index: int,
     total_factors: int,
     semaphore: asyncio.Semaphore,
-    api_config: Dict[str, Any],
     prompt_engine,
     delay: float = 0.0,
     review_fields: Optional[List[str]] = None,
@@ -247,12 +208,10 @@ async def _review_single_factor(
     审核单个因子
 
     Args:
-        session: HTTP 会话
         factor: 因子信息字典
         factor_index: 因子索引（从1开始）
         total_factors: 因子总数
         semaphore: 并发信号量
-        api_config: API 配置
         prompt_engine: Prompt 引擎
         delay: 请求间隔（秒）
         review_fields: 要审核的字段列表
@@ -272,74 +231,29 @@ async def _review_single_factor(
         logger.info(f"[{factor_index}/{total_factors}] {filename} 开始审核...")
         system_prompt, user_prompt = build_review_prompt(factor, prompt_engine, review_fields)
 
-        headers = {
-            "Authorization": f"Bearer {api_config['key']}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "model": api_config['model'],
-            "messages": [
+        try:
+            llm_client = get_llm_client()
+            messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
-            ],
-            "temperature": 0.7,
-            "stream": False,
-            "max_tokens": 16384
-        }
+            ]
+            content = await llm_client.ainvoke(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=16384,
+                caller="factor_hub.tasks.review",
+                purpose="审核因子",
+            )
 
-        try:
-            timeout = aiohttp.ClientTimeout(total=api_config['timeout'])
-            async with session.post(
-                api_config['url'],
-                headers=headers,
-                json=payload,
-                timeout=timeout
-            ) as response:
-                if response.status == 200:
-                    response_text = await response.text()
-                    try:
-                        data = json.loads(response_text)
-                        choices = data.get('choices', [])
-                        if choices and choices[0]:
-                            finish_reason = choices[0].get('finish_reason')
-                            if finish_reason == 'length':
-                                result = ReviewResult(
-                                    filename=filename,
-                                    passed=False,
-                                    error="输出太长，超出 max_tokens 限制"
-                                )
-                            else:
-                                message = choices[0].get('message', {})
-                                content = message.get('content', '')
-                                if content:
-                                    result = parse_review_response(content, filename)
-                                    logger.info(f"[{factor_index}/{total_factors}] {filename} 审核完成")
-                                else:
-                                    result = ReviewResult(
-                                        filename=filename,
-                                        passed=False,
-                                        error="响应内容为空"
-                                    )
-                        else:
-                            result = ReviewResult(
-                                filename=filename,
-                                passed=False,
-                                error=f"响应格式错误: {response_text[:500]}"
-                            )
-                    except json.JSONDecodeError as e:
-                        result = ReviewResult(
-                            filename=filename,
-                            passed=False,
-                            error=f"JSON 解析失败: {e}"
-                        )
-                else:
-                    error_text = await response.text()
-                    result = ReviewResult(
-                        filename=filename,
-                        passed=False,
-                        error=f"HTTP {response.status}: {error_text}"
-                    )
+            if content:
+                result = parse_review_response(content, filename)
+                logger.info(f"[{factor_index}/{total_factors}] {filename} 审核完成")
+            else:
+                result = ReviewResult(
+                    filename=filename,
+                    passed=False,
+                    error="响应内容为空"
+                )
 
         except Exception as e:
             import traceback
@@ -408,8 +322,6 @@ async def run_review_async(
     Returns:
         ReviewSummary
     """
-    config = get_config_loader()
-    api_config = config.get_api_config()
     prompt_engine = get_prompt_engine()
     progress = get_progress_reporter()
     store = get_factor_store() if apply_revisions else None
@@ -451,44 +363,41 @@ async def run_review_async(
     delete_candidates = []
     semaphore = asyncio.Semaphore(concurrency)
 
-    async with aiohttp.ClientSession() as session:
-        tasks = []
-        for i, factor in enumerate(valid_factors, 1):
-            task = _review_single_factor(
-                session=session,
-                factor=factor,
-                factor_index=i,
-                total_factors=total_factors,
-                semaphore=semaphore,
-                api_config=api_config,
-                prompt_engine=prompt_engine,
-                delay=delay,
-                review_fields=review_fields,
-                output_dir=output_dir,
-            )
-            tasks.append(task)
+    tasks = []
+    for i, factor in enumerate(valid_factors, 1):
+        task = _review_single_factor(
+            factor=factor,
+            factor_index=i,
+            total_factors=total_factors,
+            semaphore=semaphore,
+            prompt_engine=prompt_engine,
+            delay=delay,
+            review_fields=review_fields,
+            output_dir=output_dir,
+        )
+        tasks.append(task)
 
-        for coro in asyncio.as_completed(tasks):
-            result = await coro
-            summary.results.append(result)
+    for coro in asyncio.as_completed(tasks):
+        result = await coro
+        summary.results.append(result)
 
-            if result.error:
-                summary.fail_count += 1
-                progress.fail(f"{result.filename}: {result.error[:50]}")
-            else:
-                summary.success_count += 1
-                progress.increment(result.filename)
+        if result.error:
+            summary.fail_count += 1
+            progress.fail(f"{result.filename}: {result.error[:50]}")
+        else:
+            summary.success_count += 1
+            progress.increment(result.filename)
 
-                # 收集修订和删除建议
-                if result.should_delete:
-                    delete_candidates.append({
-                        'filename': result.filename,
-                        'reason': result.delete_reason,
-                        'lessons': result.lessons_learned,
-                    })
-                    summary.delete_count += 1
+            # 收集修订和删除建议
+            if result.should_delete:
+                delete_candidates.append({
+                    'filename': result.filename,
+                    'reason': result.delete_reason,
+                    'lessons': result.lessons_learned,
+                })
+                summary.delete_count += 1
 
-                all_revisions.extend(result.revisions)
+            all_revisions.extend(result.revisions)
 
     summary.revision_count = len(all_revisions)
 

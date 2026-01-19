@@ -10,12 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from .models import DataConfig
-
-
-def _get_project_root() -> Path:
-    """获取项目根目录"""
-    # 从 backend/domains/data_hub/core/config.py 向上 5 级
-    return Path(__file__).parent.parent.parent.parent.parent
+from domains.mcp_core.paths import get_project_root, get_config_dir, get_factors_dir, get_sections_dir
 
 
 class DataHubConfig:
@@ -33,9 +28,9 @@ class DataHubConfig:
             config_dir: 配置文件目录，默认为项目根目录下的 config/
         """
         if config_dir is None:
-            config_dir = _get_project_root() / "config"
+            config_dir = get_config_dir()
         self.config_dir = Path(config_dir)
-        self.project_root = _get_project_root()
+        self.project_root = get_project_root()
 
         # 缓存
         self._data_config: Optional[DataConfig] = None
@@ -203,12 +198,12 @@ class DataHubConfig:
     @property
     def factors_dir(self) -> Path:
         """获取因子代码目录"""
-        return self.project_root / "factors"
+        return get_factors_dir()
 
     @property
     def sections_dir(self) -> Path:
         """获取截面因子目录"""
-        return self.project_root / "sections"
+        return get_sections_dir()
 
 
 # 单例实例

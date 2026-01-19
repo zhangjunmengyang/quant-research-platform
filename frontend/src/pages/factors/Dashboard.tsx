@@ -5,7 +5,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Loader2, RotateCcw } from 'lucide-react'
+import { Loader2, RotateCcw, Check, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import {
   useFactorStats,
@@ -337,20 +337,15 @@ function FactorTable({
 
           case 'verified':
             column.align = 'center'
-            column.render = (value) => {
-              // 使用 Check 和 X 图标
-              const Check = require('lucide-react').Check
-              const X = require('lucide-react').X
-              return (
-                <div className="flex items-center justify-center">
-                  {value ? (
-                    <Check className="h-4 w-4 text-success" />
-                  ) : (
-                    <X className="h-4 w-4 text-muted-foreground/50" />
-                  )}
-                </div>
-              )
-            }
+            column.render = (value) => (
+              <div className="flex items-center justify-center">
+                {value ? (
+                  <Check className="h-4 w-4 text-success" />
+                ) : (
+                  <X className="h-4 w-4 text-muted-foreground/50" />
+                )}
+              </div>
+            )
             break
 
           case 'ic':

@@ -11,7 +11,7 @@ import pandas as pd
 from .data_loader import DataLoader
 from .factor_calculator import FactorCalculator
 from ..core.models import DataConfig
-from ..core.exceptions import DataNotFoundError
+from domains.core.exceptions import DataNotFoundError
 
 
 class DataSlicer:

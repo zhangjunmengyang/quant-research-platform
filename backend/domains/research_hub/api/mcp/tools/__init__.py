@@ -13,7 +13,6 @@ from .report_tools import (
 )
 from .search_tools import (
     SearchReportsTool,
-    AskReportsTool,
     GetSimilarChunksTool,
 )
 
@@ -27,6 +26,5 @@ __all__ = [
     "GetReportChunksTool",
     # 检索
     "SearchReportsTool",
-    "AskReportsTool",
     "GetSimilarChunksTool",
 ]

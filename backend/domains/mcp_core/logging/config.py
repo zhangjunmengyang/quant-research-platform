@@ -376,3 +376,65 @@ def bind_request_context(request_id: str, user_id: Optional[str] = None):
 def clear_request_context():
     """清除请求上下文"""
     structlog.contextvars.clear_contextvars()
+
+
+def setup_task_logger(
+    name: str,
+    log_dir: Optional[str] = None,
+    level: int = logging.INFO,
+) -> logging.Logger:
+    """
+    创建任务日志器
+
+    专门为长时间运行的批量任务设计，同时输出到控制台和文件。
+
+    Args:
+        name: 日志器名称，同时用作日志文件前缀
+        log_dir: 日志目录，默认为项目根目录下的 output/logs/
+        level: 日志级别
+
+    Returns:
+        标准 logging.Logger 实例
+
+    示例:
+        logger = setup_task_logger("review")
+        logger.info("开始审核因子...")
+    """
+    from pathlib import Path
+    from ..paths import get_project_root
+
+    # 确定日志目录
+    if log_dir is None:
+        log_path = get_project_root() / "output" / "logs"
+    else:
+        log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+
+    # 生成带时间戳的日志文件名
+    log_file = log_path / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    # 清除已有处理器（避免重复添加）
+    if logger.handlers:
+        logger.handlers.clear()
+
+    # 文件处理器
+    fh = logging.FileHandler(log_file, encoding='utf-8')
+    fh.setLevel(level)
+
+    # 控制台处理器
+    ch = logging.StreamHandler(sys.stdout)
+    ch.setLevel(level)
+
+    # 格式
+    formatter = logging.Formatter('[%(asctime)s] %(message)s', datefmt='%H:%M:%S')
+    fh.setFormatter(formatter)
+    ch.setFormatter(formatter)
+
+    logger.addHandler(fh)
+    logger.addHandler(ch)
+
+    print(f"\n日志文件: {log_file}\n", flush=True)
+    return logger

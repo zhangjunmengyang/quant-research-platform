@@ -3,7 +3,7 @@ description: 因子风格分类
 model:
   name: gemini
   temperature: 1.0
-  max_tokens: 2048
+  max_tokens: 8192
 system: |
   <Role>
   你是一位资深的加密货币量化研究员，擅长通过阅读因子代码深刻理解其背后的金融逻辑，最终输出因子风格标签。

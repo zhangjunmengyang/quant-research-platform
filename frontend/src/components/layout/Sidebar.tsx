@@ -21,6 +21,7 @@ import {
   FlaskConical,
   Lightbulb,
   Server,
+  Sparkles,
   Target,
 } from 'lucide-react'
 
@@ -51,6 +52,7 @@ const navigation: NavGroup[] = [
     items: [
       { labelKey: 'nav.factorOverview', href: '/factors', icon: FlaskConical },
       { labelKey: 'nav.factorAnalysis', href: '/factors/analysis', icon: BarChart3 },
+      { labelKey: 'nav.factorPipeline', href: '/factors/pipeline', icon: Sparkles },
       { labelKey: 'nav.strategyOverview', href: '/strategies', icon: Target },
       { labelKey: 'nav.strategyAnalysis', href: '/strategies/analysis', icon: BarChart3 },
     ],

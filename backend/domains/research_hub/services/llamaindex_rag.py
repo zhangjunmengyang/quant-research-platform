@@ -1,15 +1,15 @@
 """
-LlamaIndex RAG 服务
+LlamaIndex 向量存储服务
 
-基于 LlamaIndex 框架的 RAG 实现，替代原有的自研 rag/ 模块。
-代码量从 4,834 行精简到约 200 行。
+基于 LlamaIndex 框架的向量存储实现，提供文档摄取和语义检索功能。
+问答由外部 LLM 调用完成，本服务只负责存储和检索。
 """
 
 import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from llama_index.core import Settings, VectorStoreIndex, PromptTemplate
+from llama_index.core import Settings, VectorStoreIndex
 from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.postprocessor import SimilarityPostprocessor
@@ -17,14 +17,13 @@ from llama_index.core.postprocessor.types import BaseNodePostprocessor
 from llama_index.core.schema import NodeWithScore, TextNode, QueryBundle
 from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
 from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.llms.openai import OpenAI
 from llama_index.vector_stores.postgres import PGVectorStore
 
 logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# 自定义 PostProcessor（唯一需要继承的组件）
+# 自定义 PostProcessor
 # =============================================================================
 
 
@@ -58,49 +57,17 @@ class ExcludeSameReportPostProcessor(BaseNodePostprocessor):
 
 
 # =============================================================================
-# 自定义 Prompt
-# =============================================================================
-
-
-QA_PROMPT = PromptTemplate(
-    """你是一个专业的量化研究助手，帮助用户理解和分析量化研究报告。
-
-你的职责:
-1. 基于提供的研报内容准确回答用户问题
-2. 如果上下文不足以回答问题，请明确说明
-3. 回答时引用具体来源，使用 [1]、[2] 等标注
-4. 保持专业、准确、简洁的风格
-
-注意:
-- 只使用提供的上下文信息回答，不要编造内容
-- 如果涉及具体数据或公式，确保准确引用
-- 对于复杂问题，可以分步骤解释
-
-## 研报内容
-
-{context_str}
-
-## 问题
-
-{query_str}
-
-请基于上述内容回答问题。如果内容不足以回答，请说明。引用来源时使用 [1]、[2] 等标注。"""
-)
-
-
-# =============================================================================
-# LlamaIndex RAG 服务
+# LlamaIndex 向量存储服务
 # =============================================================================
 
 
 class LlamaIndexRAGService:
     """
-    基于 LlamaIndex 的 RAG 服务
+    基于 LlamaIndex 的向量存储服务
 
     功能:
     - 文档摄取（解析 + 切块 + 嵌入 + 存储）
     - 语义检索
-    - RAG 问答
     - 相似切块查询
 
     使用示例:
@@ -112,23 +79,19 @@ class LlamaIndexRAGService:
 
         # 语义检索
         results = await service.search("什么是动量因子")
-
-        # RAG 问答
-        answer = await service.ask("动量因子的计算公式是什么？")
     """
 
     def __init__(
         self,
-        embedding_model: str = "text-embedding-3-small",
-        embedding_dim: int = 1536,
-        llm_model: str = "gpt-4o-mini",
+        embedding_model: str = None,
+        embedding_dim: int = None,
         chunk_size: int = 512,
         chunk_overlap: int = 50,
         table_name: str = "research_chunks_llama",
     ):
-        self.embedding_model = embedding_model
-        self.embedding_dim = embedding_dim
-        self.llm_model = llm_model
+        # 从环境变量读取，支持自定义模型
+        self.embedding_model = embedding_model or os.getenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small")
+        self.embedding_dim = embedding_dim or int(os.getenv("RAG_EMBEDDING_DIM", "1536"))
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.table_name = table_name
@@ -143,15 +106,12 @@ class LlamaIndexRAGService:
         if self._is_setup:
             return
 
-        # 配置全局设置
+        # 配置嵌入模型
+        # 优先使用 OPENAI_API_KEY，否则回退到 LLM_API_KEY
+        embed_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
         Settings.embed_model = OpenAIEmbedding(
             model=self.embedding_model,
-            api_key=os.getenv("OPENAI_API_KEY"),
-            api_base=os.getenv("LLM_API_URL"),
-        )
-        Settings.llm = OpenAI(
-            model=self.llm_model,
-            api_key=os.getenv("LLM_API_KEY"),
+            api_key=embed_api_key,
             api_base=os.getenv("LLM_API_URL"),
         )
 
@@ -184,7 +144,7 @@ class LlamaIndexRAGService:
         )
 
         self._is_setup = True
-        logger.info("LlamaIndex RAG Service initialized")
+        logger.info("LlamaIndex Vector Store Service initialized")
 
     async def ingest_document(
         self,
@@ -333,81 +293,6 @@ class LlamaIndexRAGService:
         logger.info(f"Search completed: query='{query[:50]}...', found {len(results)} results")
         return results
 
-    async def ask(
-        self,
-        question: str,
-        top_k: int = 5,
-        report_id: Optional[int] = None,
-        report_uuid: Optional[str] = None,
-        rerank: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        RAG 问答
-
-        Args:
-            question: 用户问题
-            top_k: 检索的切块数量
-            report_id: 限定研报 ID
-            report_uuid: 限定研报 UUID
-            rerank: 是否使用重排
-
-        Returns:
-            问答结果
-        """
-        await self.setup()
-
-        # 构建过滤器
-        filters = self._build_filters(report_id, report_uuid)
-
-        # 构建后处理器
-        postprocessors = [
-            SimilarityPostprocessor(similarity_cutoff=0.3),
-        ]
-
-        # 添加重排器（如果可用）
-        if rerank:
-            cohere_key = os.getenv("COHERE_API_KEY")
-            if cohere_key:
-                try:
-                    from llama_index.postprocessor.cohere_rerank import CohereRerank
-                    postprocessors.append(CohereRerank(
-                        api_key=cohere_key,
-                        top_n=top_k,
-                    ))
-                except ImportError:
-                    logger.warning("CohereRerank not available, skipping rerank")
-
-        # 创建查询引擎
-        query_engine = self._index.as_query_engine(
-            similarity_top_k=top_k * 4 if rerank else top_k,
-            filters=filters,
-            node_postprocessors=postprocessors,
-            text_qa_template=QA_PROMPT,
-        )
-
-        # 执行查询
-        response = await query_engine.aquery(question)
-
-        # 构建来源引用
-        sources = []
-        if response.source_nodes:
-            for i, node in enumerate(response.source_nodes[:top_k], 1):
-                sources.append({
-                    "index": i,
-                    "chunk_id": node.node.node_id,
-                    "content": node.node.text[:200] + "..." if len(node.node.text) > 200 else node.node.text,
-                    "score": node.score or 0.0,
-                    "report_uuid": node.node.metadata.get("report_uuid"),
-                    "report_title": node.node.metadata.get("report_title", ""),
-                    "page_number": node.node.metadata.get("page_start"),
-                })
-
-        return {
-            "answer": str(response),
-            "sources": sources,
-            "retrieved_chunks": len(response.source_nodes) if response.source_nodes else 0,
-        }
-
     async def get_similar_chunks(
         self,
         chunk_id: str,
@@ -428,10 +313,7 @@ class LlamaIndexRAGService:
         await self.setup()
 
         # 获取参考节点
-        # 注意：LlamaIndex 的 PGVectorStore 不直接支持按 ID 获取
-        # 这里通过查询实现
         try:
-            # 使用节点 ID 作为查询
             retriever = self._index.as_retriever(
                 similarity_top_k=1,
                 filters=MetadataFilters(filters=[
@@ -447,7 +329,6 @@ class LlamaIndexRAGService:
             ref_report_id = ref_node.node.metadata.get("report_uuid")
 
         except Exception:
-            # 如果无法获取参考节点，返回空
             logger.warning(f"Could not find reference chunk: {chunk_id}")
             return []
 
@@ -460,7 +341,7 @@ class LlamaIndexRAGService:
 
         # 搜索相似切块
         retriever = self._index.as_retriever(
-            similarity_top_k=top_k + 5,  # 多取一些用于过滤
+            similarity_top_k=top_k + 5,
             node_postprocessors=postprocessors,
         )
 
@@ -497,17 +378,14 @@ class LlamaIndexRAGService:
         """
         await self.setup()
 
-        # LlamaIndex PGVectorStore 支持按条件删除
-        # 需要直接操作底层数据库
         try:
-            # 使用 vector_store 的 delete 方法
             self._vector_store.delete(
                 filters=MetadataFilters(filters=[
                     MetadataFilter(key="report_uuid", value=report_uuid),
                 ]),
             )
             logger.info(f"Deleted chunks for report {report_uuid}")
-            return 1  # 无法获取精确数量
+            return 1
         except Exception as e:
             logger.error(f"Failed to delete chunks: {e}")
             return 0
@@ -548,7 +426,7 @@ _llamaindex_rag_service: Optional[LlamaIndexRAGService] = None
 
 
 def get_llamaindex_rag_service(**kwargs) -> LlamaIndexRAGService:
-    """获取 LlamaIndex RAG 服务单例"""
+    """获取 LlamaIndex 向量存储服务单例"""
     global _llamaindex_rag_service
     if _llamaindex_rag_service is None:
         _llamaindex_rag_service = LlamaIndexRAGService(**kwargs)
@@ -556,7 +434,7 @@ def get_llamaindex_rag_service(**kwargs) -> LlamaIndexRAGService:
 
 
 async def get_initialized_rag_service(**kwargs) -> LlamaIndexRAGService:
-    """获取已初始化的 RAG 服务"""
+    """获取已初始化的向量存储服务"""
     service = get_llamaindex_rag_service(**kwargs)
     await service.setup()
     return service

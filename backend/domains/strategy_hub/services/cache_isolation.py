@@ -14,16 +14,12 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
+from domains.mcp_core.paths import get_data_dir
+
 logger = logging.getLogger(__name__)
 
 # 线程本地存储，用于存储每个线程的缓存目录
 _thread_local = threading.local()
-
-
-def _get_project_root() -> Path:
-    """获取项目根目录"""
-    # 从 backend/domains/strategy_hub/services/cache_isolation.py 向上 5 级
-    return Path(__file__).parent.parent.parent.parent.parent
 
 
 def get_thread_cache_dir() -> Optional[str]:
@@ -71,7 +67,7 @@ def isolated_cache(
         缓存目录路径
     """
     if base_dir is None:
-        base_dir = _get_project_root() / "data" / "tasks"
+        base_dir = get_data_dir() / "tasks"
 
     task_dir = base_dir / task_id / "cache"
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -109,7 +105,7 @@ def get_cache_dir() -> Path:
     if thread_cache:
         return Path(thread_cache)
 
-    return _get_project_root() / "data" / "cache"
+    return get_data_dir() / "cache"
 
 
 def cleanup_task_cache(task_id: str, base_dir: Optional[Path] = None) -> bool:
@@ -124,7 +120,7 @@ def cleanup_task_cache(task_id: str, base_dir: Optional[Path] = None) -> bool:
         是否清理成功
     """
     if base_dir is None:
-        base_dir = _get_project_root() / "data" / "tasks"
+        base_dir = get_data_dir() / "tasks"
 
     task_dir = base_dir / task_id
     if task_dir.exists():
@@ -149,7 +145,7 @@ def list_task_caches(base_dir: Optional[Path] = None) -> list:
         任务ID列表
     """
     if base_dir is None:
-        base_dir = _get_project_root() / "data" / "tasks"
+        base_dir = get_data_dir() / "tasks"
 
     if not base_dir.exists():
         return []

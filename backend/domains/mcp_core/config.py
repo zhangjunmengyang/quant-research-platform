@@ -10,42 +10,10 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 import logging
 
+# 从统一路径模块导入
+from .paths import get_project_root, get_data_dir
+
 logger = logging.getLogger(__name__)
-
-
-# ============================================
-# 项目路径管理
-# ============================================
-
-def get_project_root() -> Path:
-    """
-    获取项目根目录
-
-    通过查找 .git 目录来确定项目根目录（比 pyproject.toml 更可靠，因为子目录也可能有 pyproject.toml）。
-    """
-    # 从当前文件向上查找
-    current = Path(__file__).resolve()
-
-    # 向上最多查找 10 层，优先找 .git
-    for _ in range(10):
-        current = current.parent
-        if (current / ".git").exists():
-            return current
-
-    # 回退：从当前文件向上 5 层
-    # backend/domains/mcp_core/config.py -> backend -> QuantResearchMCP
-    return Path(__file__).resolve().parent.parent.parent.parent.parent
-
-
-def get_data_dir() -> Path:
-    """
-    获取数据目录（项目根目录/data）
-
-    自动创建目录（如果不存在）。
-    """
-    data_dir = get_project_root() / "data"
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir
 
 
 @dataclass

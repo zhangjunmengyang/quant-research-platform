@@ -18,6 +18,7 @@ from langchain_core.messages import (
     AIMessage,
 )
 
+from .compatible import ChatOpenAICompatible
 from .config import get_llm_settings, LLMSettings
 from ..observability.llm_logger import get_llm_logger
 
@@ -53,11 +54,13 @@ class LLMClient:
         model_key: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-    ) -> ChatOpenAI:
+    ) -> BaseChatModel:
         """
         创建 LangChain 模型实例
 
-        使用 OpenAI 兼容接口 (通过代理)
+        根据配置选择:
+        - openai_compatible=True: 使用 ChatOpenAICompatible (兼容不支持新 API 参数的代理)
+        - openai_compatible=False: 使用标准 ChatOpenAI
         """
         config = self.settings.resolve_config(
             model_key=model_key,
@@ -65,7 +68,11 @@ class LLMClient:
             max_tokens=max_tokens,
         )
 
-        return ChatOpenAI(
+        model_class = (
+            ChatOpenAICompatible if config.get("openai_compatible") else ChatOpenAI
+        )
+
+        return model_class(
             model=config["model"],
             temperature=config["temperature"],
             openai_api_base=self.settings.api_url,
@@ -123,32 +130,17 @@ class LLMClient:
         model = self.get_model(model_key, temperature, max_tokens)
         lc_messages = self._convert_messages(messages)
 
-        # 获取实际使用的配置
         config = self.settings.resolve_config(model_key, temperature, max_tokens)
-        actual_model = config["model"]
-        actual_temperature = config["temperature"]
-        actual_max_tokens = config["max_tokens"]
+        system_prompt, user_prompt = self._extract_prompts(messages)
 
-        # 从 messages 提取 system_prompt 和 user_prompt
-        system_prompt = ""
-        user_prompt = ""
-        for msg in messages:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if role == "system" and not system_prompt:
-                system_prompt = content
-            elif role == "user":
-                user_prompt = content  # 取最后一个 user message
-
-        # 记录请求
         llm_logger = get_llm_logger()
         call_id = llm_logger.log_request(
-            model=actual_model,
+            model=config["model"],
             messages=messages,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            temperature=actual_temperature,
-            max_tokens=actual_max_tokens,
+            temperature=config["temperature"],
+            max_tokens=config["max_tokens"],
             caller=caller,
             purpose=purpose,
             provider=config.get("provider", "openai"),
@@ -159,19 +151,8 @@ class LLMClient:
         try:
             response = await model.ainvoke(lc_messages)
             duration_ms = (time.time() - start_time) * 1000
+            prompt_tokens, completion_tokens, total_tokens = self._extract_token_usage(response)
 
-            # 提取 token 使用信息
-            usage_metadata = getattr(response, "usage_metadata", None)
-            prompt_tokens = 0
-            completion_tokens = 0
-            total_tokens = 0
-
-            if usage_metadata:
-                prompt_tokens = usage_metadata.get("input_tokens", 0)
-                completion_tokens = usage_metadata.get("output_tokens", 0)
-                total_tokens = usage_metadata.get("total_tokens", 0)
-
-            # 记录响应
             llm_logger.log_response(
                 call_id=call_id,
                 content=response.content,
@@ -225,22 +206,11 @@ class LLMClient:
         lc_messages = self._convert_messages(messages)
 
         config = self.settings.resolve_config(model_key, temperature, max_tokens)
-        actual_model = config["model"]
-
-        # 从 messages 提取 system_prompt 和 user_prompt
-        system_prompt = ""
-        user_prompt = ""
-        for msg in messages:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if role == "system" and not system_prompt:
-                system_prompt = content
-            elif role == "user":
-                user_prompt = content
+        system_prompt, user_prompt = self._extract_prompts(messages)
 
         llm_logger = get_llm_logger()
         call_id = llm_logger.log_request(
-            model=actual_model,
+            model=config["model"],
             messages=messages,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -259,21 +229,17 @@ class LLMClient:
             async for chunk in model.astream(lc_messages):
                 if hasattr(chunk, "content") and chunk.content:
                     full_content += chunk.content
-                # 尝试从最后一个 chunk 获取 usage_metadata
                 if hasattr(chunk, "usage_metadata") and chunk.usage_metadata:
                     usage_metadata = chunk.usage_metadata
                 yield chunk
 
             duration_ms = (time.time() - start_time) * 1000
-
-            # 提取 token 使用信息
-            prompt_tokens = 0
-            completion_tokens = 0
-            total_tokens = 0
-            if usage_metadata:
-                prompt_tokens = usage_metadata.get("input_tokens", 0)
-                completion_tokens = usage_metadata.get("output_tokens", 0)
-                total_tokens = usage_metadata.get("total_tokens", 0)
+            prompt_tokens, completion_tokens, total_tokens = (
+                (usage_metadata.get("input_tokens", 0),
+                 usage_metadata.get("output_tokens", 0),
+                 usage_metadata.get("total_tokens", 0))
+                if usage_metadata else (0, 0, 0)
+            )
 
             llm_logger.log_response(
                 call_id=call_id,
@@ -315,22 +281,11 @@ class LLMClient:
         lc_messages = self._convert_messages(messages)
 
         config = self.settings.resolve_config(model_key, temperature, max_tokens)
-        actual_model = config["model"]
-
-        # 从 messages 提取 system_prompt 和 user_prompt
-        system_prompt = ""
-        user_prompt = ""
-        for msg in messages:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if role == "system" and not system_prompt:
-                system_prompt = content
-            elif role == "user":
-                user_prompt = content  # 取最后一个 user message
+        system_prompt, user_prompt = self._extract_prompts(messages)
 
         llm_logger = get_llm_logger()
         call_id = llm_logger.log_request(
-            model=actual_model,
+            model=config["model"],
             messages=messages,
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -346,16 +301,7 @@ class LLMClient:
         try:
             response = model.invoke(lc_messages)
             duration_ms = (time.time() - start_time) * 1000
-
-            usage_metadata = getattr(response, "usage_metadata", None)
-            prompt_tokens = 0
-            completion_tokens = 0
-            total_tokens = 0
-
-            if usage_metadata:
-                prompt_tokens = usage_metadata.get("input_tokens", 0)
-                completion_tokens = usage_metadata.get("output_tokens", 0)
-                total_tokens = usage_metadata.get("total_tokens", 0)
+            prompt_tokens, completion_tokens, total_tokens = self._extract_token_usage(response)
 
             llm_logger.log_response(
                 call_id=call_id,
@@ -401,6 +347,44 @@ class LLMClient:
                 result.append(HumanMessage(content=content))
 
         return result
+
+    @staticmethod
+    def _extract_prompts(
+        messages: List[Dict[str, str]],
+    ) -> tuple[str, str]:
+        """
+        从消息列表提取 system 和 user prompt
+
+        Returns:
+            (system_prompt, user_prompt)
+        """
+        system_prompt = ""
+        user_prompt = ""
+        for msg in messages:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "system" and not system_prompt:
+                system_prompt = content
+            elif role == "user":
+                user_prompt = content  # 取最后一个 user message
+        return system_prompt, user_prompt
+
+    @staticmethod
+    def _extract_token_usage(response) -> tuple[int, int, int]:
+        """
+        从响应对象提取 token 使用信息
+
+        Returns:
+            (prompt_tokens, completion_tokens, total_tokens)
+        """
+        usage_metadata = getattr(response, "usage_metadata", None)
+        if not usage_metadata:
+            return 0, 0, 0
+        return (
+            usage_metadata.get("input_tokens", 0),
+            usage_metadata.get("output_tokens", 0),
+            usage_metadata.get("total_tokens", 0),
+        )
 
 
 # 全局客户端实例
