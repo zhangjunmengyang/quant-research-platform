@@ -3,24 +3,18 @@
 
 提供经验的业务逻辑封装，包括:
 - 存储和查询
-- 语义检索
-- 验证和废弃
-- 提炼和关联
+- 关联管理
 """
 
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from ..core.config import get_experience_hub_settings
 from ..core.models import (
     Experience,
     ExperienceContent,
     ExperienceContext,
     ExperienceLink,
-    ExperienceLevel,
-    ExperienceStatus,
-    SourceType,
     EntityType,
 )
 from ..core.store import ExperienceStore, get_experience_store
@@ -29,21 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 class ExperienceService:
-    """
-    经验服务层
-
-    封装经验相关的业务逻辑，代理存储层操作。
-    """
+    """经验服务层"""
 
     def __init__(self, store: Optional[ExperienceStore] = None):
-        """
-        初始化服务
-
-        Args:
-            store: 经验存储层实例
-        """
         self._store = store
-        self._settings = get_experience_hub_settings()
 
     @property
     def store(self) -> ExperienceStore:
@@ -57,26 +40,20 @@ class ExperienceService:
     def store_experience(
         self,
         title: str,
-        experience_level: str,
-        category: str,
         content: Dict[str, str],
         context: Optional[Dict[str, Any]] = None,
         source_type: str = "manual",
         source_ref: str = "",
-        confidence: Optional[float] = None,
     ) -> Tuple[bool, str, Optional[int]]:
         """
         存储新经验
 
         Args:
             title: 经验标题
-            experience_level: 经验层级（strategic/tactical/operational）
-            category: 分类
             content: PARL 内容 {problem, approach, result, lesson}
-            context: 上下文信息 {market_regime, factor_styles, time_horizon, asset_class, tags}
+            context: 上下文信息 {tags, factor_styles, market_regime, time_horizon, asset_class}
             source_type: 来源类型
             source_ref: 来源引用
-            confidence: 初始置信度
 
         Returns:
             (成功, 消息, 经验ID)
@@ -84,11 +61,6 @@ class ExperienceService:
         if not title.strip():
             return False, "标题不能为空", None
 
-        # 验证层级
-        if experience_level not in [e.value for e in ExperienceLevel]:
-            return False, f"无效的经验层级: {experience_level}", None
-
-        # 构建经验对象
         exp_content = ExperienceContent(
             problem=content.get('problem', ''),
             approach=content.get('approach', ''),
@@ -99,22 +71,19 @@ class ExperienceService:
         exp_context = ExperienceContext()
         if context:
             exp_context = ExperienceContext(
-                market_regime=context.get('market_regime', ''),
+                tags=context.get('tags', []),
                 factor_styles=context.get('factor_styles', []),
+                market_regime=context.get('market_regime', ''),
                 time_horizon=context.get('time_horizon', ''),
                 asset_class=context.get('asset_class', ''),
-                tags=context.get('tags', []),
             )
 
         experience = Experience(
             title=title.strip(),
-            experience_level=experience_level,
-            category=category,
             content=exp_content,
             context=exp_context,
             source_type=source_type,
             source_ref=source_ref,
-            confidence=confidence if confidence is not None else self._settings.default_confidence,
         )
 
         experience_id = self.store.add(experience)
@@ -136,39 +105,33 @@ class ExperienceService:
 
     def list_experiences(
         self,
-        experience_level: str = "",
-        category: str = "",
-        status: str = "",
+        tags: Optional[List[str]] = None,
         source_type: str = "",
         market_regime: str = "",
         factor_styles: Optional[List[str]] = None,
-        min_confidence: float = 0.0,
-        include_deprecated: bool = False,
+        created_after: Optional[datetime] = None,
+        created_before: Optional[datetime] = None,
+        updated_after: Optional[datetime] = None,
+        updated_before: Optional[datetime] = None,
         order_by: str = "updated_at",
         order_desc: bool = True,
         page: int = 1,
         page_size: int = 20
     ) -> Tuple[List[Experience], int]:
-        """
-        查询经验列表
-
-        Returns:
-            (经验列表, 总数)
-        """
+        """查询经验列表"""
         sort_direction = "DESC" if order_desc else "ASC"
         order_by_str = f"{order_by} {sort_direction}"
-
         offset = (page - 1) * page_size
 
         return self.store.query(
-            experience_level=experience_level if experience_level else None,
-            category=category if category else None,
-            status=status if status else None,
+            tags=tags,
             source_type=source_type if source_type else None,
             market_regime=market_regime if market_regime else None,
             factor_styles=factor_styles,
-            min_confidence=min_confidence,
-            include_deprecated=include_deprecated,
+            created_after=created_after,
+            created_before=created_before,
+            updated_after=updated_after,
+            updated_before=updated_before,
             order_by=order_by_str,
             limit=page_size,
             offset=offset
@@ -181,233 +144,24 @@ class ExperienceService:
     def query_experiences(
         self,
         query: str,
-        experience_level: Optional[str] = None,
-        category: Optional[str] = None,
+        tags: Optional[List[str]] = None,
         market_regime: Optional[str] = None,
         factor_styles: Optional[List[str]] = None,
-        min_confidence: float = 0.0,
-        include_deprecated: bool = False,
         top_k: int = 5,
     ) -> List[Experience]:
-        """
-        语义检索经验
-
-        优先使用向量检索，如果向量检索不可用则降级为关键词搜索。
-
-        Args:
-            query: 自然语言查询
-            experience_level: 过滤层级
-            category: 过滤分类
-            market_regime: 过滤市场环境
-            factor_styles: 过滤因子风格
-            min_confidence: 最低置信度
-            include_deprecated: 是否包含已废弃经验
-            top_k: 返回数量
-
-        Returns:
-            匹配的经验列表，按相关性排序
-        """
-        # TODO: 实现向量检索
-        # 当前降级为关键词搜索
+        """语义检索经验（当前降级为关键词搜索）"""
         experiences, _ = self.store.query(
             search=query,
-            experience_level=experience_level,
-            category=category,
+            tags=tags,
             market_regime=market_regime,
             factor_styles=factor_styles,
-            min_confidence=min_confidence,
-            include_deprecated=include_deprecated,
             limit=top_k
         )
         return experiences
 
-    # ==================== 验证和废弃 ====================
-
-    def validate_experience(
-        self,
-        experience_id: int,
-        validation_note: Optional[str] = None,
-        confidence_delta: Optional[float] = None,
-    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-        """
-        验证/增强经验
-
-        当后续研究证实了某条经验时调用，会：
-        1. 增加 validation_count
-        2. 更新 last_validated
-        3. 提升 confidence（不超过 1.0）
-        4. 如果是 draft 状态，更新为 validated
-
-        Args:
-            experience_id: 经验 ID
-            validation_note: 验证说明（可选，用于记录）
-            confidence_delta: 置信度增量
-
-        Returns:
-            (成功, 消息, {experience_id, new_confidence, validation_count})
-        """
-        experience = self.store.get(experience_id)
-        if experience is None:
-            return False, f"经验不存在: {experience_id}", None
-
-        if experience.is_deprecated:
-            return False, "已废弃的经验无法验证", None
-
-        delta = confidence_delta if confidence_delta is not None else self._settings.confidence_delta_on_validate
-        updated = self.store.validate(experience_id, delta)
-
-        if updated:
-            logger.info(f"验证经验成功: {experience_id}, 置信度: {updated.confidence}")
-            return True, "验证成功", {
-                "experience_id": experience_id,
-                "new_confidence": updated.confidence,
-                "validation_count": updated.validation_count,
-            }
-        else:
-            return False, "验证失败", None
-
-    def deprecate_experience(
-        self,
-        experience_id: int,
-        reason: str,
-    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-        """
-        废弃经验
-
-        当经验被证伪或已过时时调用，会：
-        1. 将 status 更新为 deprecated
-        2. 记录废弃原因
-        3. 保留历史记录但降低检索权重
-
-        Args:
-            experience_id: 经验 ID
-            reason: 废弃原因
-
-        Returns:
-            (成功, 消息, {experience_id, status})
-        """
-        if not reason.strip():
-            return False, "废弃原因不能为空", None
-
-        experience = self.store.get(experience_id)
-        if experience is None:
-            return False, f"经验不存在: {experience_id}", None
-
-        if experience.is_deprecated:
-            return False, "经验已经是废弃状态", None
-
-        updated = self.store.deprecate(experience_id, reason)
-
-        if updated:
-            logger.info(f"废弃经验成功: {experience_id}, 原因: {reason}")
-            return True, "废弃成功", {
-                "experience_id": experience_id,
-                "status": ExperienceStatus.DEPRECATED.value,
-            }
-        else:
-            return False, "废弃失败", None
-
-    # ==================== 提炼经验 ====================
-
-    def curate_experience(
-        self,
-        source_experience_ids: List[int],
-        target_level: str,
-        title: str,
-        content: Dict[str, str],
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[bool, str, Optional[int]]:
-        """
-        从低层经验提炼高层经验
-
-        例如：
-        - 从多个 operational 经验总结为一个 tactical 结论
-        - 从多个 tactical 结论抽象为一个 strategic 原则
-
-        Args:
-            source_experience_ids: 源经验 ID 列表
-            target_level: 目标层级（必须高于源经验）
-            title: 新经验标题
-            content: PARL 内容
-            context: 上下文
-
-        Returns:
-            (成功, 消息, 新经验ID)
-        """
-        if len(source_experience_ids) < 2:
-            return False, "至少需要两个源经验", None
-
-        # 验证源经验存在
-        source_experiences = []
-        for exp_id in source_experience_ids:
-            exp = self.store.get(exp_id)
-            if exp is None:
-                return False, f"源经验不存在: {exp_id}", None
-            source_experiences.append(exp)
-
-        # 验证层级关系
-        for exp in source_experiences:
-            if not self._settings.can_curate_to_level(exp.experience_level, target_level):
-                return False, f"无法从 {exp.experience_level} 提炼到 {target_level}", None
-
-        # 确定分类（根据目标层级选择合适的分类）
-        category = self._determine_category_for_level(target_level)
-
-        # 创建新经验
-        success, message, new_id = self.store_experience(
-            title=title,
-            experience_level=target_level,
-            category=category,
-            content=content,
-            context=context,
-            source_type=SourceType.CURATED.value,
-            source_ref=",".join(str(id) for id in source_experience_ids),
-            confidence=0.6,  # 提炼的经验初始置信度稍高
-        )
-
-        if not success or new_id is None:
-            return False, message, None
-
-        # 记录提炼来源
-        for source_id in source_experience_ids:
-            self._record_curation_source(new_id, source_id)
-
-        # 关联源经验
-        new_exp = self.store.get(new_id)
-        if new_exp:
-            for source_id in source_experience_ids:
-                link = ExperienceLink(
-                    experience_id=new_id,
-                    experience_uuid=new_exp.uuid,
-                    entity_type=EntityType.EXPERIENCE.value,
-                    entity_id=str(source_id),
-                    relation="curated_from",
-                )
-                self.store.add_link(link)
-
-        logger.info(f"提炼经验成功: {title} (ID: {new_id}), 来源: {source_experience_ids}")
-        return True, "提炼成功", new_id
-
-    def _determine_category_for_level(self, level: str) -> str:
-        """根据层级确定默认分类"""
-        if level == ExperienceLevel.STRATEGIC.value:
-            return "market_regime_principle"
-        elif level == ExperienceLevel.TACTICAL.value:
-            return "factor_performance"
-        else:
-            return "research_observation"
-
-    def _record_curation_source(self, curated_id: int, source_id: int):
-        """记录提炼来源关系"""
-        try:
-            with self.store._cursor() as cursor:
-                cursor.execute('''
-                    INSERT INTO experience_curation_sources (curated_experience_id, source_experience_id)
-                    VALUES (%s, %s)
-                    ON CONFLICT DO NOTHING
-                ''', (curated_id, source_id))
-        except Exception as e:
-            logger.warning(f"记录提炼来源失败: {e}")
+    def get_all_tags(self) -> List[str]:
+        """获取所有标签"""
+        return self.store.get_all_tags()
 
     # ==================== 关联管理 ====================
 
@@ -418,20 +172,7 @@ class ExperienceService:
         entity_id: str,
         relation: str = "related",
     ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
-        """
-        关联经验与其他实体
-
-        建立经验与因子、策略、笔记、研报的关联关系。
-
-        Args:
-            experience_id: 经验 ID
-            entity_type: 实体类型（factor/strategy/note/research）
-            entity_id: 实体 ID
-            relation: 关系类型（related/derived_from/applied_to）
-
-        Returns:
-            (成功, 消息, {link_id, experience_id, entity_type, entity_id})
-        """
+        """关联经验与其他实体"""
         experience = self.store.get(experience_id)
         if experience is None:
             return False, f"经验不存在: {experience_id}", None
@@ -479,7 +220,6 @@ class ExperienceService:
         if experience is None:
             return False
 
-        # 处理嵌套对象
         if 'content' in fields and isinstance(fields['content'], dict):
             fields['content'] = ExperienceContent.from_dict(fields['content'])
         if 'context' in fields and isinstance(fields['context'], dict):
@@ -496,20 +236,15 @@ class ExperienceService:
     def get_stats(self) -> Dict[str, Any]:
         """获取统计信息"""
         total = self.store.count()
-        by_status = self.store.count_by_status()
-        by_level = self.store.count_by_level()
-        categories = self.store.get_categories()
+        tags = self.store.get_all_tags()
 
         return {
             "total": total,
-            "by_status": by_status,
-            "by_level": by_level,
-            "categories": categories,
-            "categories_count": len(categories),
+            "tags": tags,
+            "tags_count": len(tags),
         }
 
 
-# 单例实例
 _experience_service: Optional[ExperienceService] = None
 
 

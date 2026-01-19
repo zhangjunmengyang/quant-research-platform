@@ -91,7 +91,7 @@ class LlamaIndexRAGService:
     ):
         # 从环境变量读取，支持自定义模型
         self.embedding_model = embedding_model or os.getenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small")
-        self.embedding_dim = embedding_dim or int(os.getenv("RAG_EMBEDDING_DIM", "1536"))
+        self.embedding_dim = embedding_dim or int(os.getenv("RAG_EMBEDDING_DIM", "512"))
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.table_name = table_name
@@ -108,11 +108,12 @@ class LlamaIndexRAGService:
 
         # 配置嵌入模型
         # 优先使用 OPENAI_API_KEY，否则回退到 LLM_API_KEY
-        embed_api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
+        embed_api_key = os.getenv("OPENAI_API_KEY", "").strip() or os.getenv("LLM_API_KEY")
         Settings.embed_model = OpenAIEmbedding(
             model=self.embedding_model,
             api_key=embed_api_key,
             api_base=os.getenv("LLM_API_URL"),
+            dimensions=self.embedding_dim,
         )
 
         # 初始化向量存储

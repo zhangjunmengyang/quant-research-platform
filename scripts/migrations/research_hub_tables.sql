@@ -80,13 +80,13 @@ CREATE TABLE IF NOT EXISTS research_chunks (
     content TEXT NOT NULL,                 -- 切块内容
     token_count INTEGER DEFAULT 0,         -- Token 数量
 
-    -- 层次信息（用于 TreeRAG 扩展）
+    -- 层次信息
     heading_path TEXT DEFAULT '',          -- 标题路径，JSON 数组格式
     section_title VARCHAR(500) DEFAULT '', -- 所属章节标题
 
     -- 嵌入信息
     embedding_model VARCHAR(100) DEFAULT '',  -- 使用的嵌入模型
-    embedding vector(512),                    -- 稠密向量（512 维，bge-small-zh）
+    embedding vector(1536),                   -- 稠密向量（1536 维，text-embedding-3-small）
 
     -- 扩展元数据
     metadata JSONB DEFAULT '{}',
@@ -113,110 +113,3 @@ USING GIN(to_tsvector('simple', content));
 
 -- 切块元数据索引
 CREATE INDEX IF NOT EXISTS idx_research_chunks_metadata ON research_chunks USING GIN(metadata);
-
-
--- ============================================
--- RAG 流水线配置表（用于 A/B 测试）
--- ============================================
-
-CREATE TABLE IF NOT EXISTS rag_pipeline_configs (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) UNIQUE NOT NULL,     -- 配置名称
-    description TEXT DEFAULT '',
-
-    -- 组件配置（JSON）
-    -- {
-    --   "parser": {"type": "mineru", "model": "MinerU2.5"},
-    --   "chunker": {"type": "recursive", "chunk_size": 512, "overlap": 50},
-    --   "embedder": {"type": "bge_m3", "model": "BAAI/bge-m3"},
-    --   "retriever": {"type": "hybrid", "top_k": 20},
-    --   "reranker": {"type": "bge_reranker", "top_k": 5},
-    --   "generator": {"type": "openai", "model": "gpt-4"}
-    -- }
-    config JSONB NOT NULL DEFAULT '{}',
-
-    -- 状态
-    is_active BOOLEAN DEFAULT FALSE,       -- 是否为当前激活配置
-    is_default BOOLEAN DEFAULT FALSE,      -- 是否为默认配置
-
-    -- 时间戳
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 配置索引
-CREATE INDEX IF NOT EXISTS idx_rag_pipeline_configs_name ON rag_pipeline_configs(name);
-CREATE INDEX IF NOT EXISTS idx_rag_pipeline_configs_active ON rag_pipeline_configs(is_active);
-
--- 更新时间触发器
-CREATE TRIGGER update_rag_pipeline_configs_updated_at
-    BEFORE UPDATE ON rag_pipeline_configs
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- 插入默认配置
-INSERT INTO rag_pipeline_configs (name, description, config, is_active, is_default) VALUES
-('default', '默认 RAG 配置', '{
-    "parser": {"type": "mineru", "version": "2.5"},
-    "chunker": {"type": "recursive", "chunk_size": 512, "chunk_overlap": 50},
-    "embedder": {"type": "bge_m3", "model": "BAAI/bge-m3", "dimensions": 1024},
-    "retriever": {"type": "dense", "top_k": 20},
-    "reranker": {"type": "bge_reranker", "model": "BAAI/bge-reranker-v2-m3", "top_k": 5},
-    "generator": {"type": "openai", "model": "gpt-4o-mini"}
-}', TRUE, TRUE)
-ON CONFLICT (name) DO NOTHING;
-
-
--- ============================================
--- RAG 评估记录表（用于对比实验）
--- ============================================
-
-CREATE TABLE IF NOT EXISTS rag_evaluations (
-    id SERIAL PRIMARY KEY,
-
-    -- 关联信息
-    pipeline_config_id INTEGER REFERENCES rag_pipeline_configs(id) ON DELETE SET NULL,
-    pipeline_name VARCHAR(100) NOT NULL,
-
-    -- 评估查询
-    query TEXT NOT NULL,
-    expected_answer TEXT DEFAULT '',       -- 可选的预期答案
-
-    -- 检索结果
-    retrieved_chunks JSONB DEFAULT '[]',   -- 检索到的切块
-    retrieval_top_k INTEGER,
-    rerank_top_k INTEGER,
-
-    -- 生成结果
-    generated_answer TEXT DEFAULT '',
-
-    -- 评估指标
-    -- RAGAS 指标
-    faithfulness FLOAT,                    -- 忠实度
-    answer_relevance FLOAT,                -- 答案相关性
-    context_precision FLOAT,               -- 上下文精确度
-    context_recall FLOAT,                  -- 上下文召回率
-
-    -- 检索指标
-    recall_at_k FLOAT,
-    precision_at_k FLOAT,
-    ndcg FLOAT,
-    mrr FLOAT,                             -- Mean Reciprocal Rank
-
-    -- 延迟指标（毫秒）
-    retrieval_latency_ms INTEGER,
-    rerank_latency_ms INTEGER,
-    generation_latency_ms INTEGER,
-    total_latency_ms INTEGER,
-
-    -- 元数据
-    metadata JSONB DEFAULT '{}',
-
-    -- 时间戳
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 评估索引
-CREATE INDEX IF NOT EXISTS idx_rag_evaluations_pipeline ON rag_evaluations(pipeline_config_id);
-CREATE INDEX IF NOT EXISTS idx_rag_evaluations_name ON rag_evaluations(pipeline_name);
-CREATE INDEX IF NOT EXISTS idx_rag_evaluations_created_at ON rag_evaluations(created_at DESC);

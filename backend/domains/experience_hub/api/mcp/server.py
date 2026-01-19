@@ -22,10 +22,8 @@ from .tools.experience_tools import (
     QueryExperiencesTool,
     GetExperienceTool,
     ListExperiencesTool,
-    ValidateExperienceTool,
-    DeprecateExperienceTool,
     LinkExperienceTool,
-    CurateExperienceTool,
+    GetAllTagsTool,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,13 +46,11 @@ class ExperienceHubMCPServer(BaseMCPServer):
         self.register_tool(ListExperiencesTool(), "query")
         self.register_tool(GetExperienceTool(), "query")
         self.register_tool(QueryExperiencesTool(), "query")
+        self.register_tool(GetAllTagsTool(), "query")
 
         # 修改类工具
         self.register_tool(StoreExperienceTool(), "mutation")
-        self.register_tool(ValidateExperienceTool(), "mutation")
-        self.register_tool(DeprecateExperienceTool(), "mutation")
         self.register_tool(LinkExperienceTool(), "mutation")
-        self.register_tool(CurateExperienceTool(), "mutation")
 
         logger.info(f"注册了 {len(self.tool_registry)} 个经验知识库工具")
 

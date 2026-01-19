@@ -6,10 +6,9 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useDebounce } from '@/hooks/useDebounce'
-import { Loader2, Plus, BarChart3, Target, Lightbulb, FileText, CheckCircle2 } from 'lucide-react'
+import { Loader2, Plus, FileText } from 'lucide-react'
 import {
   useExperiences,
-  useExperienceStats,
   useExperienceStore,
   ExperienceCard,
   ExperienceDetailPanelWrapper,
@@ -17,7 +16,6 @@ import {
 } from '@/features/experience'
 import { ExperienceFilters } from '@/features/experience/components/ExperienceFilters'
 import type { ExperienceListParams } from '@/features/experience'
-import { StatsCard } from '@/features/factor/components/StatsCard'
 import { Pagination } from '@/components/ui/pagination'
 
 const DEFAULT_FILTERS: Partial<ExperienceListParams> = {
@@ -51,7 +49,6 @@ export function Component() {
 
   // 获取数据
   const { data, isLoading, isError, error } = useExperiences(queryParams)
-  const { data: stats } = useExperienceStats()
 
   // 处理搜索
   const handleSearch = useCallback((query: string) => {
@@ -85,11 +82,7 @@ export function Component() {
   const hasActiveFilters = useMemo(() => {
     return !!(
       searchQuery ||
-      filters.experience_level ||
-      filters.status ||
-      filters.category ||
-      filters.source_type ||
-      filters.market_regime
+      filters.tags
     )
   }, [searchQuery, filters])
 
@@ -135,32 +128,6 @@ export function Component() {
           新建经验
         </button>
       </div>
-
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatsCard
-            title="总经验"
-            value={stats.total}
-            icon={<BarChart3 className="h-5 w-5" />}
-          />
-          <StatsCard
-            title="战略级"
-            value={stats.by_level?.strategic || 0}
-            icon={<Target className="h-5 w-5" />}
-          />
-          <StatsCard
-            title="战术级"
-            value={stats.by_level?.tactical || 0}
-            icon={<Lightbulb className="h-5 w-5" />}
-          />
-          <StatsCard
-            title="已验证"
-            value={stats.by_status?.validated || 0}
-            icon={<CheckCircle2 className="h-5 w-5" />}
-          />
-        </div>
-      )}
 
       {/* Filters */}
       <ExperienceFilters

@@ -1,5 +1,6 @@
 /**
  * Experience React Query Hooks
+ * 简化版本: 移除 validate/deprecate/curate，以标签为核心管理
  */
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
@@ -9,10 +10,7 @@ import type {
   ExperienceUpdate,
   ExperienceListParams,
   ExperienceQueryParams,
-  ExperienceValidateRequest,
-  ExperienceDeprecateRequest,
   ExperienceLinkRequest,
-  ExperienceCurateRequest,
 } from './types'
 
 // Query Keys
@@ -78,7 +76,7 @@ export function useExperienceLinks(id: number | null) {
 }
 
 /**
- * Hook for experience mutations (create, update, delete, etc.)
+ * Hook for experience mutations (create, update, delete, link)
  */
 export function useExperienceMutations() {
   const queryClient = useQueryClient()
@@ -115,22 +113,6 @@ export function useExperienceMutations() {
     },
   })
 
-  const validateMutation = useMutation({
-    mutationFn: ({ id, request }: { id: number; request?: ExperienceValidateRequest }) =>
-      experienceApi.validate(id, request),
-    onSuccess: () => {
-      invalidateExperiences()
-    },
-  })
-
-  const deprecateMutation = useMutation({
-    mutationFn: ({ id, request }: { id: number; request: ExperienceDeprecateRequest }) =>
-      experienceApi.deprecate(id, request),
-    onSuccess: () => {
-      invalidateExperiences()
-    },
-  })
-
   const linkMutation = useMutation({
     mutationFn: ({ id, request }: { id: number; request: ExperienceLinkRequest }) =>
       experienceApi.link(id, request),
@@ -139,21 +121,11 @@ export function useExperienceMutations() {
     },
   })
 
-  const curateMutation = useMutation({
-    mutationFn: (request: ExperienceCurateRequest) => experienceApi.curate(request),
-    onSuccess: () => {
-      invalidateExperiences()
-    },
-  })
-
   return {
     createExperience: createMutation,
     updateExperience: updateMutation,
     deleteExperience: deleteMutation,
-    validateExperience: validateMutation,
-    deprecateExperience: deprecateMutation,
     linkExperience: linkMutation,
-    curateExperience: curateMutation,
   }
 }
 

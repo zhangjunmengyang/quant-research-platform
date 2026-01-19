@@ -75,7 +75,7 @@ export function FactorFilters({ filters, setFilters, resetFilters, onSearch, sea
     <FilterToolbar
       searchValue={searchValue}
       onSearchChange={onSearch}
-      searchPlaceholder="搜索因子名称..."
+      searchPlaceholder="搜索名称、标签、公式..."
       hasActiveFilters={hasActiveFilters}
       onReset={resetFilters}
     >

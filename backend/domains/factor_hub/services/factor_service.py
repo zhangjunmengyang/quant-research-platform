@@ -169,8 +169,29 @@ class FactorService:
         return self.store.update(filename, **fields)
 
     def delete_factor(self, filename: str) -> bool:
-        """删除因子"""
-        return self.store.delete(filename)
+        """删除因子（同时删除数据库记录和代码文件）"""
+        from pathlib import Path
+
+        # 先获取因子信息，以便知道文件路径
+        factor = self.store.get(filename, include_excluded=True)
+        if not factor:
+            return False
+
+        # 删除数据库记录
+        if not self.store.delete(filename):
+            return False
+
+        # 删除代码文件
+        if factor.code_path:
+            code_path = Path(factor.code_path)
+            if code_path.exists():
+                try:
+                    code_path.unlink()
+                except Exception:
+                    # 文件删除失败不影响整体结果，数据库记录已删除
+                    pass
+
+        return True
 
     def verify_factor(self, filename: str, note: str = "") -> bool:
         """验证因子"""

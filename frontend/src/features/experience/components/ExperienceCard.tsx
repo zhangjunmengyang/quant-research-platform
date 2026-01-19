@@ -2,47 +2,18 @@
  * Experience Card Component
  *
  * 展示单个经验的卡片组件
+ * 简化版本: 以标签为核心管理
  */
 
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
-import {
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  ChevronRight,
-  Target,
-  Lightbulb,
-  FileText,
-} from 'lucide-react'
-import type { Experience, ExperienceLevel, ExperienceStatus } from '../types'
-import {
-  EXPERIENCE_LEVEL_LABELS,
-  EXPERIENCE_STATUS_LABELS,
-  EXPERIENCE_STATUS_COLORS,
-  EXPERIENCE_CATEGORY_LABELS,
-  type ExperienceCategory,
-} from '../types'
+import { ChevronRight, Clock, Tag } from 'lucide-react'
+import type { Experience } from '../types'
 
 interface ExperienceCardProps {
   experience: Experience
   onClick?: () => void
   isSelected?: boolean
-  showActions?: boolean
-}
-
-// 层级图标映射
-const LEVEL_ICONS: Record<ExperienceLevel, React.ComponentType<{ className?: string }>> = {
-  strategic: Target,
-  tactical: Lightbulb,
-  operational: FileText,
-}
-
-// 状态图标映射
-const STATUS_ICONS: Record<ExperienceStatus, React.ComponentType<{ className?: string }>> = {
-  draft: Clock,
-  validated: CheckCircle2,
-  deprecated: AlertCircle,
 }
 
 function formatDate(dateStr?: string) {
@@ -55,21 +26,12 @@ function formatDate(dateStr?: string) {
   })
 }
 
-function formatConfidence(confidence: number) {
-  return `${Math.round(confidence * 100)}%`
-}
-
 export const ExperienceCard = memo(function ExperienceCard({
   experience,
   onClick,
   isSelected = false,
 }: ExperienceCardProps) {
-  const LevelIcon = LEVEL_ICONS[experience.experience_level]
-  const StatusIcon = STATUS_ICONS[experience.status]
-  const statusColorClass = EXPERIENCE_STATUS_COLORS[experience.status]
-
-  const categoryLabel =
-    EXPERIENCE_CATEGORY_LABELS[experience.category as ExperienceCategory] || experience.category
+  const tags = experience.context?.tags || []
 
   return (
     <div
@@ -82,31 +44,8 @@ export const ExperienceCard = memo(function ExperienceCard({
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            {/* 层级标签 */}
-            <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground">
-              <LevelIcon className="h-3 w-3" />
-              {EXPERIENCE_LEVEL_LABELS[experience.experience_level]}
-            </span>
-            {/* 状态标签 */}
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium',
-                statusColorClass
-              )}
-            >
-              <StatusIcon className="h-3 w-3" />
-              {EXPERIENCE_STATUS_LABELS[experience.status]}
-            </span>
-          </div>
-
           {/* 标题 */}
           <h3 className="font-medium text-base line-clamp-2">{experience.title}</h3>
-
-          {/* 分类 */}
-          {categoryLabel && (
-            <p className="text-xs text-muted-foreground mt-1">{categoryLabel}</p>
-          )}
         </div>
 
         {/* 箭头 */}
@@ -133,34 +72,11 @@ export const ExperienceCard = memo(function ExperienceCard({
 
       {/* 底部信息 */}
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        {/* 置信度 */}
-        <div className="flex items-center gap-1">
-          <span className="font-medium">置信度:</span>
-          <span
-            className={cn(
-              experience.confidence >= 0.7
-                ? 'text-green-600'
-                : experience.confidence >= 0.4
-                  ? 'text-yellow-600'
-                  : 'text-red-600'
-            )}
-          >
-            {formatConfidence(experience.confidence)}
-          </span>
-        </div>
-
-        {/* 验证次数 */}
-        {experience.validation_count > 0 && (
+        {/* 标签 */}
+        {tags.length > 0 && (
           <div className="flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" />
-            <span>验证 {experience.validation_count} 次</span>
-          </div>
-        )}
-
-        {/* 上下文标签 */}
-        {experience.context?.tags && experience.context.tags.length > 0 && (
-          <div className="flex items-center gap-1">
-            {experience.context.tags.slice(0, 3).map((tag) => (
+            <Tag className="h-3 w-3" />
+            {tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
                 className="rounded-full bg-muted px-2 py-0.5 text-xs"
@@ -168,9 +84,9 @@ export const ExperienceCard = memo(function ExperienceCard({
                 {tag}
               </span>
             ))}
-            {experience.context.tags.length > 3 && (
+            {tags.length > 3 && (
               <span className="text-muted-foreground">
-                +{experience.context.tags.length - 3}
+                +{tags.length - 3}
               </span>
             )}
           </div>
