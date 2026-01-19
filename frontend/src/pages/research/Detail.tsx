@@ -384,7 +384,7 @@ export function Component() {
                 <div className="text-sm font-medium">
                   找到 {similarChunks.length} 个相似切块
                 </div>
-                {similarChunks.map((chunk, index) => (
+                {similarChunks.map((chunk) => (
                   <div key={chunk.chunk_id} className="rounded-lg border p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-primary">

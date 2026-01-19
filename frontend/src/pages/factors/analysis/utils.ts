@@ -31,9 +31,9 @@ export function getCorrelationPairs(factors: string[], matrix: number[][]): Corr
   for (let i = 0; i < factors.length; i++) {
     for (let j = i + 1; j < factors.length; j++) {
       pairs.push({
-        factor1: factors[i],
-        factor2: factors[j],
-        value: matrix[i][j],
+        factor1: factors[i] ?? '',
+        factor2: factors[j] ?? '',
+        value: matrix[i]?.[j] ?? 0,
       })
     }
   }

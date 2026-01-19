@@ -39,9 +39,9 @@ export interface ListFiltersConfig<T extends Record<string, any>> {
  */
 function parseParams<T extends Record<string, any>>(
   searchParams: URLSearchParams,
-  config: ListFiltersConfig<T>
+  _config: ListFiltersConfig<T>
 ): Partial<T> {
-  const params: any = {}
+  const params: Record<string, unknown> = {}
 
   for (const [key, value] of searchParams.entries()) {
     if (value === '') continue
@@ -84,7 +84,7 @@ function paramsToRecord<T extends Record<string, any>>(filters: Partial<T>): Rec
  */
 export function useListFilters<T extends Record<string, any>>(config: ListFiltersConfig<T>) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { defaultFilters, fields = [], pagination = {} } = config
+  const { defaultFilters, pagination = {} } = config
 
   // 从 URL 解析当前筛选值
   const urlFilters = parseParams<T>(searchParams, config)
@@ -98,11 +98,11 @@ export function useListFilters<T extends Record<string, any>>(config: ListFilter
   // 同步 URL 变化到 state
   useEffect(() => {
     const newUrlFilters = parseParams<T>(searchParams, config)
-    setFiltersState((prev) => ({
+    setFiltersState(() => ({
       ...defaultFilters,
       ...newUrlFilters,
     }))
-  }, [searchParams])
+  }, [searchParams, config, defaultFilters])
 
   // 更新筛选并同步到 URL
   const setFilters = useCallback((newFilters: Partial<T> | ((prev: Partial<T>) => Partial<T>)) => {
@@ -126,7 +126,7 @@ export function useListFilters<T extends Record<string, any>>(config: ListFilter
 
   // 更新单个筛选字段
   const setFilter = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
-    setFilters({ [key]: value } as Partial<T>)
+    setFilters({ [key]: value } as unknown as Partial<T>)
   }, [setFilters])
 
   // 重置筛选
@@ -135,29 +135,31 @@ export function useListFilters<T extends Record<string, any>>(config: ListFilter
   }, [defaultFilters, setFilters])
 
   // 搜索功能
-  const searchValue = (filters as any).search || ''
+  const searchValue = (filters as Record<string, unknown>).search || ''
   const setSearch = useCallback((value: string) => {
-    setFilters({ search: value } as Partial<T>)
+    setFilters({ search: value } as unknown as Partial<T>)
   }, [setFilters])
 
   // 分页
-  const page = (filters as any).page ?? defaultFilters.page ?? 1
-  const pageSize = (filters as any).page_size ?? defaultFilters.page_size ?? pagination.defaultPageSize ?? 20
+  const page = (filters as Record<string, unknown>).page ?? (defaultFilters as Record<string, unknown>).page ?? 1
+  const pageSize = (filters as Record<string, unknown>).page_size ?? (defaultFilters as Record<string, unknown>).page_size ?? pagination.defaultPageSize ?? 20
   const setPage = useCallback((newPage: number) => {
-    setFilters({ page: newPage } as Partial<T>)
+    setFilters({ page: newPage } as unknown as Partial<T>)
   }, [setFilters])
 
   const setPageSize = useCallback((newPageSize: number) => {
-    setFilters({ page_size: newPageSize, page: 1 } as Partial<T>)
+    setFilters({ page_size: newPageSize, page: 1 } as unknown as Partial<T>)
   }, [setFilters])
 
   // 检查是否有活跃筛选（排除分页）
   const hasActiveFilters = useCallback(() => {
-    const { page, page_size, search, ...rest } = filters as any
+    const filtersRecord = filters as Record<string, unknown>
+    const defaultRecord = defaultFilters as Record<string, unknown>
+    const { page: _page, page_size: _pageSize, search, ...rest } = filtersRecord
     return Object.keys(rest).some((key) => {
       const value = rest[key]
-      return value !== undefined && value !== null && value !== '' && value !== defaultFilters[key]
-    }) || (search && search !== defaultFilters.search)
+      return value !== undefined && value !== null && value !== '' && value !== defaultRecord[key]
+    }) || (search && search !== defaultRecord.search)
   }, [filters, defaultFilters])
 
   return {

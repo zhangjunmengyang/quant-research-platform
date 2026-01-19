@@ -38,11 +38,3 @@ llm_configs:
     temperature: 1
     max_tokens: 16384
     openai_compatible: true
-
-  # 示例: 使用 openai_compatible 模式的第三方代理
-  # mt-gpt:
-  #   provider: openai
-  #   model: gpt-4.1
-  #   temperature: 0.6
-  #   max_tokens: 16384
-  #   openai_compatible: true   # 启用兼容模式

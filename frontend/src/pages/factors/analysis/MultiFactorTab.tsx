@@ -58,12 +58,13 @@ export function MultiFactorTab() {
       for (let i = 0; i < n; i++) {
         matrix[i] = []
         for (let j = 0; j < n; j++) {
+          const row = matrix[i]!
           if (i === j) {
-            matrix[i][j] = 1
+            row[j] = 1
           } else if (j < i) {
-            matrix[i][j] = matrix[j][i]
+            row[j] = matrix[j]?.[i] ?? 0
           } else {
-            matrix[i][j] = Math.random() * 1.6 - 0.8
+            row[j] = Math.random() * 1.6 - 0.8
           }
         }
       }

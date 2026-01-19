@@ -142,7 +142,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
         <span
           className={cn(
             'font-medium',
-            value && value >= 1 ? 'text-success' : 'text-destructive'
+            value && (value as number) >= 1 ? 'text-success' : 'text-destructive'
           )}
         >
           {value ? Number(value).toFixed(2) : '-'}
@@ -159,7 +159,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
         <span
           className={cn(
             'font-medium',
-            value && value > 0 ? 'text-success' : 'text-destructive'
+            value && (value as number) > 0 ? 'text-success' : 'text-destructive'
           )}
         >
           {formatPercent(value as number | undefined)}
@@ -188,7 +188,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
         <span
           className={cn(
             'font-medium',
-            value && value > 0 ? 'text-success' : 'text-destructive'
+            value && (value as number) > 0 ? 'text-success' : 'text-destructive'
           )}
         >
           {value ? Number(value).toFixed(2) : '-'}
@@ -247,7 +247,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
         </button>
       ),
     },
-  ] as const
+  ]
 }
 
 export function Component() {
@@ -269,7 +269,7 @@ export function Component() {
     setSearchParams(params)
   }, [filters, setSearchParams])
 
-  const { data: stats, isLoading: statsLoading } = useStrategyStats()
+  const { data: stats } = useStrategyStats()
   const { data, isLoading, isError, error } = useStrategies(filters)
   const { deleteStrategy } = useStrategyMutations()
 

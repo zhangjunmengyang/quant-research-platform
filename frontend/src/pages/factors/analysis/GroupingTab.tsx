@@ -322,7 +322,7 @@ export function GroupingTab() {
                           name: 'NAV (log)'
                         },
                         series: [
-                          ...result.labels.map((label, idx) => ({
+                          ...result.labels.map((label) => ({
                             name: label,
                             type: 'line' as const,
                             data: result.curve_data.map(d => d.values[label] || 0),

@@ -35,7 +35,6 @@ import { useExperienceStore } from '../store'
 import type { Experience, ExperienceLevel, ExperienceStatus } from '../types'
 import {
   EXPERIENCE_LEVEL_LABELS,
-  EXPERIENCE_LEVEL_DESCRIPTIONS,
   EXPERIENCE_STATUS_LABELS,
   EXPERIENCE_STATUS_COLORS,
   EXPERIENCE_CATEGORY_LABELS,

@@ -128,26 +128,8 @@ function CopyButton({ text, className }: { text: string; className?: string }) {
   )
 }
 
-// 代码块组件
-function CodeBlock({ code, language = 'json', title }: { code: string; language?: string; title?: string }) {
-  return (
-    <div className="rounded-lg border bg-muted/30 overflow-hidden">
-      {title && (
-        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/50">
-          <span className="text-sm font-medium">{title}</span>
-          <CopyButton text={code} />
-        </div>
-      )}
-      <pre className={cn('p-4 overflow-x-auto text-sm', !title && 'relative')}>
-        {!title && <CopyButton text={code} className="absolute top-2 right-2" />}
-        <code className={`language-${language}`}>{code}</code>
-      </pre>
-    </div>
-  )
-}
-
 // 配置模板生成
-function generateConfigTemplates(serverName: string, displayName: string, host: string, port: number) {
+function generateConfigTemplates(serverName: string, _displayName: string, host: string, port: number) {
   const mcpUrl = `http://${host === 'localhost' ? '127.0.0.1' : host}:${port}/mcp`
   const sseUrl = `http://${host === 'localhost' ? '127.0.0.1' : host}:${port}/sse`
 

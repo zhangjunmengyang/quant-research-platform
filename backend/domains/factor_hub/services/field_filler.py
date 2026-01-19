@@ -259,6 +259,15 @@ class FieldFiller:
         except Exception as e:
             return False, "", str(e)
 
+    def _is_task_cancelled(self, task_id: Optional[str]) -> bool:
+        """Check if the task has been cancelled"""
+        if not task_id:
+            return False
+        from ...mcp_core.server.sse import get_task_manager, TaskStatus
+        manager = get_task_manager()
+        task = manager.get_task(task_id)
+        return task is not None and task.status == TaskStatus.CANCELLED
+
     async def _fill_single_factor(
         self,
         factor: Factor,
@@ -273,9 +282,31 @@ class FieldFiller:
     ) -> FillResult:
         """填充单个因子的单个字段"""
         async with semaphore:
+            # Check if task is cancelled before processing
+            if self._is_task_cancelled(task_id):
+                return FillResult(
+                    filename=factor.filename,
+                    field=field,
+                    old_value=str(getattr(factor, field, '')),
+                    new_value="",
+                    success=False,
+                    error="Task cancelled",
+                )
+
             # 非首个请求时，先等待延迟
             if not is_first and delay > 0:
                 await asyncio.sleep(delay)
+
+            # Check again after delay
+            if self._is_task_cancelled(task_id):
+                return FillResult(
+                    filename=factor.filename,
+                    field=field,
+                    old_value=str(getattr(factor, field, '')),
+                    new_value="",
+                    success=False,
+                    error="Task cancelled",
+                )
 
             factor_dict = factor.to_dict()
             # 添加 code
