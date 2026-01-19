@@ -25,6 +25,7 @@ class ModelConfig(BaseModel):
     model: str = "gpt-4"
     temperature: float = 0.6
     max_tokens: int = 8192
+    openai_compatible: bool = False  # 是否使用 OpenAI 兼容模式
 
 
 class LLMSettings(BaseSettings):
@@ -126,6 +127,7 @@ class LLMSettings(BaseSettings):
             "provider": base.provider,
             "temperature": temperature if temperature is not None else base.temperature,
             "max_tokens": max_tokens if max_tokens is not None else base.max_tokens,
+            "openai_compatible": base.openai_compatible,
         }
 
 

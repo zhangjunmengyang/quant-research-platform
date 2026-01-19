@@ -18,6 +18,7 @@ from langchain_core.messages import (
     AIMessage,
 )
 
+from .compatible import ChatOpenAICompatible
 from .config import get_llm_settings, LLMSettings
 from ..observability.llm_logger import get_llm_logger
 
@@ -53,11 +54,13 @@ class LLMClient:
         model_key: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
-    ) -> ChatOpenAI:
+    ) -> BaseChatModel:
         """
         创建 LangChain 模型实例
 
-        使用 OpenAI 兼容接口 (通过代理)
+        根据配置选择:
+        - openai_compatible=True: 使用 ChatOpenAICompatible (兼容不支持新 API 参数的代理)
+        - openai_compatible=False: 使用标准 ChatOpenAI
         """
         config = self.settings.resolve_config(
             model_key=model_key,
@@ -65,7 +68,11 @@ class LLMClient:
             max_tokens=max_tokens,
         )
 
-        return ChatOpenAI(
+        model_class = (
+            ChatOpenAICompatible if config.get("openai_compatible") else ChatOpenAI
+        )
+
+        return model_class(
             model=config["model"],
             temperature=config["temperature"],
             openai_api_base=self.settings.api_url,
