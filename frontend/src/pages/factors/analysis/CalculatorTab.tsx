@@ -3,7 +3,7 @@
  * 因子分析页 - 因子计算器 Tab 组件
  */
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Loader2,
   Play,
@@ -90,7 +90,7 @@ export function CalculatorTab() {
   // 页面加载时自动计算默认因子
   const [hasAutoCalculated, setHasAutoCalculated] = useState(false)
 
-  const handleCalculate = async () => {
+  const handleCalculate = useCallback(async () => {
     if (!selectedSymbol || factorConfigs.length === 0) return
 
     const validConfigs = factorConfigs.filter((f) => f.factor)
@@ -137,7 +137,7 @@ export function CalculatorTab() {
       data_type: dataType,
       factors: allResults,
     })
-  }
+  }, [selectedSymbol, factorConfigs, dataType, dateRange, factorCalculation])
 
   // 页面加载时自动计算默认因子
   useEffect(() => {
@@ -145,7 +145,7 @@ export function CalculatorTab() {
       setHasAutoCalculated(true)
       handleCalculate()
     }
-  }, [symbolsLoading, symbols.length, factors.length, hasAutoCalculated])
+  }, [symbolsLoading, symbols.length, factors.length, hasAutoCalculated, handleCalculate])
 
   // Generate chart series
   const chartSeries = useMemo(() => {

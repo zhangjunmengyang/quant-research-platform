@@ -61,6 +61,48 @@ export interface FillResult {
   // preview 模式返回
   preview?: boolean
   generated?: Record<string, Record<string, string>>  // {filename: {field: value}}
+  // 异步任务模式返回
+  task_id?: string
+  status?: string
+}
+
+// SSE 进度相关类型
+export type FillTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+
+export interface FillProgress {
+  task_id: string
+  status: FillTaskStatus
+  progress: number  // 0-100
+  message: string
+  current_step: string | null  // 当前字段名
+  total_steps: number | null   // 总待填充数量
+  current_step_num: number | null  // 当前已完成数量
+  data?: FillProgressData | null
+  error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FillProgressData {
+  type: 'factor_completed' | 'completed'
+  factor?: string
+  field?: string
+  success?: boolean
+  value?: string | null
+  error?: string | null
+  // completed 类型
+  success_count?: number
+  fail_count?: number
+  fields?: string[]
+}
+
+export interface FillLog {
+  factor: string
+  field: string
+  success: boolean
+  value?: string | null
+  error?: string | null
+  timestamp: Date
 }
 
 export interface IngestRequest {
@@ -270,6 +312,17 @@ export const pipelineApi = {
     const { data } = await apiClient.get<ApiResponse<LLMModelsResponse>>(`${BASE_URL}/models`)
     if (!data.success || !data.data) {
       throw new Error(data.error || 'Failed to fetch models')
+    }
+    return data.data
+  },
+
+  /**
+   * Get active fill task (running or pending)
+   */
+  getActiveFillTask: async (): Promise<FillProgress | null> => {
+    const { data } = await apiClient.get<ApiResponse<FillProgress | null>>(`${BASE_URL}/fill/active`)
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to get active fill task')
     }
     return data.data
   },

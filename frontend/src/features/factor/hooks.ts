@@ -2,6 +2,7 @@
  * Factor React Query Hooks
  */
 
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { factorApi } from './api'
 import type {
@@ -10,6 +11,7 @@ import type {
   FactorVerifyRequest,
   FactorGroupAnalysisRequest,
 } from './types'
+import type { FillProgress, FillLog, FillProgressData } from './pipeline-api'
 
 // Query Keys
 export const factorKeys = {
@@ -189,4 +191,81 @@ export function useUpdateFactor() {
       queryClient.invalidateQueries({ queryKey: factorKeys.all })
     },
   })
+}
+
+/**
+ * Hook for subscribing to fill task progress via SSE
+ */
+export function useFillProgress(taskId: string | null) {
+  const [progress, setProgress] = useState<FillProgress | null>(null)
+  const [logs, setLogs] = useState<FillLog[]>([])
+  const [isConnected, setIsConnected] = useState(false)
+
+  const reset = useCallback(() => {
+    setProgress(null)
+    setLogs([])
+    setIsConnected(false)
+  }, [])
+
+  useEffect(() => {
+    if (!taskId) {
+      reset()
+      return
+    }
+
+    const eventSource = new EventSource(`/api/v1/pipeline/fill/${taskId}/progress`)
+
+    eventSource.addEventListener('progress', (event) => {
+      try {
+        const data: FillProgress = JSON.parse(event.data)
+        setProgress(data)
+
+        // 收集日志
+        if (data.data?.type === 'factor_completed') {
+          const progressData = data.data as FillProgressData
+          setLogs((prev) => [
+            ...prev,
+            {
+              factor: progressData.factor || '',
+              field: progressData.field || '',
+              success: progressData.success || false,
+              value: progressData.value,
+              error: progressData.error,
+              timestamp: new Date(),
+            },
+          ])
+        }
+      } catch {
+        // ignore parse errors
+      }
+    })
+
+    eventSource.onopen = () => {
+      setIsConnected(true)
+    }
+
+    eventSource.onerror = () => {
+      setIsConnected(false)
+      eventSource.close()
+    }
+
+    return () => {
+      eventSource.close()
+      setIsConnected(false)
+    }
+  }, [taskId, reset])
+
+  const isRunning = progress?.status === 'running' || progress?.status === 'pending'
+  const isCompleted = progress?.status === 'completed'
+  const isFailed = progress?.status === 'failed'
+
+  return {
+    progress,
+    logs,
+    isConnected,
+    isRunning,
+    isCompleted,
+    isFailed,
+    reset,
+  }
 }

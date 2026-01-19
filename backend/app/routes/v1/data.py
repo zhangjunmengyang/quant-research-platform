@@ -339,7 +339,22 @@ async def calculate_factor(
 ):
     """计算因子"""
     try:
-        # Get kline data with optional date range
+        # 先检查币种是否存在（不带日期过滤）
+        full_df = await run_sync(
+            loader.get_kline,
+            request.symbol,
+            data_type=request.data_type,
+        )
+        if full_df is None or full_df.empty:
+            raise HTTPException(
+                status_code=404, detail=f"币种数据不存在: {request.symbol}"
+            )
+
+        # 获取数据的实际时间范围
+        data_start = full_df['candle_begin_time'].min()
+        data_end = full_df['candle_begin_time'].max()
+
+        # 再获取指定日期范围的数据
         df = await run_sync(
             loader.get_kline,
             request.symbol,
@@ -348,8 +363,17 @@ async def calculate_factor(
             end_date=request.end_date,
         )
         if df is None or df.empty:
+            # 币种存在但日期范围内无数据
+            date_range_msg = ""
+            if request.start_date and request.end_date:
+                date_range_msg = f" (请求: {request.start_date} ~ {request.end_date})"
+            elif request.start_date:
+                date_range_msg = f" (请求: {request.start_date} 之后)"
+            elif request.end_date:
+                date_range_msg = f" (请求: {request.end_date} 之前)"
             raise HTTPException(
-                status_code=404, detail=f"币种数据不存在: {request.symbol}"
+                status_code=404,
+                detail=f"该日期范围内没有数据{date_range_msg}，数据可用范围: {str(data_start)[:10]} ~ {str(data_end)[:10]}"
             )
 
         # Calculate factor

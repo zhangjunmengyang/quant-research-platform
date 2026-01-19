@@ -10,16 +10,19 @@ Provides REST API endpoints for factor data cleaning pipeline operations:
 NOTE: 所有同步服务调用都使用 run_sync 包装，避免阻塞 event loop。
 """
 
+import asyncio
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from enum import Enum
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from starlette.responses import StreamingResponse
 
 from app.schemas.common import ApiResponse
 from app.core.deps import get_factor_store, get_field_filler
 from app.core.async_utils import run_sync
+from domains.mcp_core.server.sse import get_task_manager, TaskStatus
 
 router = APIRouter()
 
@@ -444,6 +447,7 @@ async def fill_fields(
     统一填充接口：
     - 传入 factors 列表时，只填充指定因子
     - 不传 factors 时，填充所有因子
+    - 非 dry_run/preview 模式下，返回 task_id，通过 SSE 订阅进度
     """
     import traceback
     try:
@@ -492,66 +496,188 @@ async def fill_fields(
                 message="Dry run - no changes made",
             )
 
-        # Execute fill
-        # preview=True 时不保存到数据库，只生成内容返回
-        result = await filler.fill_fields_async(
+        # preview 模式：同步执行，返回生成的值
+        if request.preview:
+            result = await filler.fill_fields_async(
+                factors=factors,
+                fields=fields_to_fill,
+                mode=request.mode.value,
+                concurrency=request.concurrency,
+                delay=request.delay,
+                save_to_store=False,
+            )
+
+            # 转换结果为可序列化格式
+            serialized_result = {}
+            generated_values: Dict[str, Dict[str, str]] = {}
+
+            for field, field_result in result.items():
+                serialized_result[field] = {
+                    "field": field_result.field,
+                    "success_count": field_result.success_count,
+                    "fail_count": field_result.fail_count,
+                    "results": [
+                        {
+                            "filename": r.filename,
+                            "field": r.field,
+                            "old_value": r.old_value,
+                            "new_value": r.new_value,
+                            "success": r.success,
+                            "error": r.error,
+                        }
+                        for r in field_result.results
+                    ],
+                }
+                for r in field_result.results:
+                    if r.success and r.new_value:
+                        if r.filename not in generated_values:
+                            generated_values[r.filename] = {}
+                        generated_values[r.filename][r.field] = r.new_value
+
+            return ApiResponse(
+                data={
+                    "total_factors": len(factors),
+                    "factors": [f.filename for f in factors],
+                    "fields": fields_to_fill,
+                    "result": serialized_result,
+                    "preview": True,
+                    "generated": generated_values,
+                },
+                message="Preview completed",
+            )
+
+        # 非 preview 模式：异步执行，返回 task_id
+        manager = get_task_manager()
+        task_id = manager.create_task()
+
+        # 计算待填充数量
+        to_fill_counts = {}
+        for field in fields_to_fill:
+            if request.mode == FillMode.incremental:
+                empty_count = sum(
+                    1 for f in factors if getattr(f, field, None) in [None, "", 0]
+                )
+                to_fill_counts[field] = empty_count
+            else:
+                to_fill_counts[field] = len(factors)
+
+        total_to_fill = sum(to_fill_counts.values())
+
+        # 后台执行填充任务
+        asyncio.create_task(_execute_fill_task(
+            task_id=task_id,
             factors=factors,
             fields=fields_to_fill,
             mode=request.mode.value,
             concurrency=request.concurrency,
             delay=request.delay,
-            save_to_store=not request.preview,  # preview 模式不保存
-        )
-
-        # 转换结果为可序列化格式
-        serialized_result = {}
-        # preview 模式下，提取生成的值供前端使用
-        generated_values: Dict[str, Dict[str, str]] = {}  # {filename: {field: value}}
-
-        for field, field_result in result.items():
-            serialized_result[field] = {
-                "field": field_result.field,
-                "success_count": field_result.success_count,
-                "fail_count": field_result.fail_count,
-                "results": [
-                    {
-                        "filename": r.filename,
-                        "field": r.field,
-                        "old_value": r.old_value,
-                        "new_value": r.new_value,
-                        "success": r.success,
-                        "error": r.error,
-                    }
-                    for r in field_result.results
-                ],
-            }
-            # 收集生成的值
-            for r in field_result.results:
-                if r.success and r.new_value:
-                    if r.filename not in generated_values:
-                        generated_values[r.filename] = {}
-                    generated_values[r.filename][r.field] = r.new_value
-
-        response_data = {
-            "total_factors": len(factors),
-            "factors": [f.filename for f in factors],
-            "fields": fields_to_fill,
-            "result": serialized_result,
-        }
-
-        # preview 模式下，额外返回生成的值
-        if request.preview:
-            response_data["preview"] = True
-            response_data["generated"] = generated_values
+            filler=filler,
+            total_to_fill=total_to_fill,
+        ))
 
         return ApiResponse(
-            data=response_data,
-            message="Preview completed" if request.preview else "Fill operation completed",
+            data={
+                "task_id": task_id,
+                "status": "pending",
+                "total_factors": len(factors),
+                "fields": fields_to_fill,
+                "to_fill": to_fill_counts,
+            },
+            message="Fill task submitted",
         )
 
     except Exception as e:
         print(f"Fill API error: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _execute_fill_task(
+    task_id: str,
+    factors: List,
+    fields: List[str],
+    mode: str,
+    concurrency: int,
+    delay: float,
+    filler,
+    total_to_fill: int,
+):
+    """后台执行填充任务，推送实时进度"""
+    manager = get_task_manager()
+
+    try:
+        # 标记任务开始
+        manager.start_task(task_id)
+        await manager.update_progress(
+            task_id,
+            status=TaskStatus.RUNNING,
+            progress=0,
+            message="开始填充...",
+            total_steps=total_to_fill,
+            current_step_num=0,
+        )
+
+        # 执行填充（带进度回调）
+        result = await filler.fill_fields_async(
+            factors=factors,
+            fields=fields,
+            mode=mode,
+            concurrency=concurrency,
+            delay=delay,
+            save_to_store=True,
+            task_id=task_id,  # 传递 task_id 用于进度推送
+        )
+
+        # 汇总结果
+        total_success = sum(r.success_count for r in result.values())
+        total_fail = sum(r.fail_count for r in result.values())
+
+        # 标记任务完成
+        await manager.complete_task(
+            task_id,
+            data={
+                "type": "completed",
+                "success_count": total_success,
+                "fail_count": total_fail,
+                "fields": fields,
+            },
+        )
+
+    except Exception as e:
+        await manager.fail_task(task_id, str(e))
+
+
+@router.get("/fill/active")
+async def get_active_fill_task():
+    """获取当前活跃的填充任务（running 或 pending 状态）"""
+    manager = get_task_manager()
+    tasks = manager.list_tasks()
+
+    # 找到最近的 running 或 pending 任务
+    for task in sorted(tasks, key=lambda t: t.created_at, reverse=True):
+        if task.status in (TaskStatus.RUNNING, TaskStatus.PENDING):
+            return ApiResponse(data=task.to_dict())
+
+    return ApiResponse(data=None, message="No active fill task")
+
+
+@router.get("/fill/{task_id}/progress")
+async def fill_progress(task_id: str):
+    """SSE 端点：订阅填充任务进度"""
+    manager = get_task_manager()
+
+    async def event_generator():
+        async for event in manager.subscribe(task_id):
+            yield event
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/review", response_model=ApiResponse[ReviewResult])

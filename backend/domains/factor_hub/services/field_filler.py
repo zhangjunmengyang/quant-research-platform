@@ -267,6 +267,9 @@ class FieldFiller:
         semaphore: asyncio.Semaphore,
         delay: float,
         is_first: bool,
+        task_id: Optional[str] = None,
+        progress_counter: Optional[Dict[str, int]] = None,
+        total_to_fill: int = 0,
     ) -> FillResult:
         """填充单个因子的单个字段"""
         async with semaphore:
@@ -316,9 +319,25 @@ class FieldFiller:
                             )
 
                     logger.info(f"  {factor.filename}: {field}={new_value[:50]}...")
+
+                    # 推送进度
+                    if task_id and progress_counter is not None:
+                        await self._push_progress(
+                            task_id, progress_counter, total_to_fill,
+                            factor.filename, field, True, new_value[:100] if new_value else "", None
+                        )
+
                     return result
                 else:
                     logger.error(f"  {factor.filename}: 失败 - {error}")
+
+                    # 推送进度（失败）
+                    if task_id and progress_counter is not None:
+                        await self._push_progress(
+                            task_id, progress_counter, total_to_fill,
+                            factor.filename, field, False, None, error
+                        )
+
                     return FillResult(
                         filename=factor.filename,
                         field=field,
@@ -330,6 +349,14 @@ class FieldFiller:
 
             except Exception as e:
                 logger.error(f"  {factor.filename}: 异常 - {e}")
+
+                # 推送进度（异常）
+                if task_id and progress_counter is not None:
+                    await self._push_progress(
+                        task_id, progress_counter, total_to_fill,
+                        factor.filename, field, False, None, str(e)
+                    )
+
                 return FillResult(
                     filename=factor.filename,
                     field=field,
@@ -339,6 +366,46 @@ class FieldFiller:
                     error=str(e),
                 )
 
+    async def _push_progress(
+        self,
+        task_id: str,
+        progress_counter: Dict[str, int],
+        total_to_fill: int,
+        factor_name: str,
+        field: str,
+        success: bool,
+        value: Optional[str],
+        error: Optional[str],
+    ):
+        """推送单个因子填充进度到 SSE"""
+        from ...mcp_core.server.sse import get_task_manager
+
+        manager = get_task_manager()
+
+        # 更新计数器
+        progress_counter["completed"] += 1
+        completed = progress_counter["completed"]
+
+        # 计算进度百分比
+        progress = (completed / total_to_fill * 100) if total_to_fill > 0 else 100
+
+        await manager.update_progress(
+            task_id,
+            progress=progress,
+            message=f"填充 {field}: {factor_name}",
+            current_step=field,
+            current_step_num=completed,
+            total_steps=total_to_fill,
+            data={
+                "type": "factor_completed",
+                "factor": factor_name,
+                "field": field,
+                "success": success,
+                "value": value,
+                "error": error,
+            },
+        )
+
     async def fill_field_async(
         self,
         factors: List[Factor],
@@ -347,6 +414,9 @@ class FieldFiller:
         concurrency: int = 1,
         delay: float = 15.0,
         save_to_store: bool = True,
+        task_id: Optional[str] = None,
+        progress_counter: Optional[Dict[str, int]] = None,
+        total_to_fill: int = 0,
     ) -> FieldFillResult:
         """
         异步填充单个字段
@@ -358,6 +428,9 @@ class FieldFiller:
             concurrency: 并发数（同时进行的 LLM 请求数）
             delay: 每个请求之间的间隔（秒）
             save_to_store: 是否保存到 store
+            task_id: 任务ID（用于 SSE 进度推送）
+            progress_counter: 进度计数器（跨字段共享）
+            total_to_fill: 总待填充数量
 
         Returns:
             FieldFillResult 填充结果
@@ -393,6 +466,9 @@ class FieldFiller:
                 semaphore=semaphore,
                 delay=delay,
                 is_first=(i == 0),
+                task_id=task_id,
+                progress_counter=progress_counter,
+                total_to_fill=total_to_fill,
             )
             for i, factor in enumerate(target_factors)
         ]
@@ -419,6 +495,7 @@ class FieldFiller:
         concurrency: int = 1,
         delay: float = 15.0,
         save_to_store: bool = True,
+        task_id: Optional[str] = None,
     ) -> Dict[str, FieldFillResult]:
         """
         异步填充多个字段（按依赖顺序）
@@ -430,6 +507,7 @@ class FieldFiller:
             concurrency: 并发数
             delay: 请求间隔
             save_to_store: 是否保存
+            task_id: 任务ID（用于 SSE 进度推送）
 
         Returns:
             {field: FieldFillResult}
@@ -439,6 +517,17 @@ class FieldFiller:
 
         # 保存原始因子文件名列表，用于后续重新加载时筛选
         target_filenames = {f.filename for f in factors}
+
+        # 计算总待填充数量（用于进度计算）
+        total_to_fill = 0
+        for field in sorted_fields:
+            for factor in factors:
+                current_value = getattr(factor, field, '')
+                if mode == 'full' or not (current_value and str(current_value).strip()):
+                    total_to_fill += 1
+
+        # 进度计数器（跨字段共享）
+        progress_counter = {"completed": 0}
 
         results = {}
         for field in sorted_fields:
@@ -459,6 +548,9 @@ class FieldFiller:
                 concurrency=concurrency,
                 delay=delay,
                 save_to_store=save_to_store,
+                task_id=task_id,
+                progress_counter=progress_counter,
+                total_to_fill=total_to_fill,
             )
             results[field] = field_result
 
