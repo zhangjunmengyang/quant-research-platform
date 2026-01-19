@@ -40,7 +40,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useLogTopics, useLogQuery, useLogSQLQuery, useLogFieldValues, FilterBuilder } from '@/features/log'
+import { useLogTopics, useLogQuery, useLogSQLQuery, FilterBuilder } from '@/features/log'
 import type { LogEntry, LogQueryParams, LogFilterCondition } from '@/features/log'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -626,7 +626,7 @@ export function Component() {
 
   // Hooks
   const { data: topics } = useLogTopics()
-  const { data: queryResult, isLoading: queryLoading, refetch } = useLogQuery(queryParams, mode === 'simple')
+  const { data: queryResult, isLoading: queryLoading } = useLogQuery(queryParams, mode === 'simple')
   const sqlMutation = useLogSQLQuery()
 
   // Build topic options
@@ -670,8 +670,8 @@ export function Component() {
 
   // Auto-select first topic when topics are loaded and no topic is selected
   useEffect(() => {
-    if (topics && topics.length > 0 && !queryParams.topic) {
-      setQueryParams((prev) => ({ ...prev, topic: topics[0].name }))
+    if (topics && topics.length > 0 && !queryParams.topic && topics[0]) {
+      setQueryParams((prev) => ({ ...prev, topic: topics[0]!.name }))
     }
   }, [topics, queryParams.topic])
 
@@ -802,19 +802,6 @@ export function Component() {
     })
   }
 
-  const handleClearFilters = () => {
-    setAdvancedFilters([{ id: generateFilterId(), field: '', operator: '=', value: '' }])
-    const now = new Date()
-    const start = new Date(now.getTime() - 1 * 60 * 60 * 1000)
-    setTimeRange('1')
-    setQueryParams({
-      page: 1,
-      page_size: 50,
-      start_time: start.toISOString(),
-      end_time: now.toISOString(),
-    })
-  }
-
   const handleDownload = () => {
     if (!currentLogs) return
 
@@ -860,7 +847,6 @@ export function Component() {
 
   const logs = sortedLogs
 
-  const totalPages = queryResult ? Math.ceil(queryResult.total / queryResult.page_size) : 1
   const currentPage = queryParams.page ?? 1
 
   return (

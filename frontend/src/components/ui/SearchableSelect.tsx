@@ -75,7 +75,7 @@ export function SearchableSelect({
     filteredOptions.forEach((opt) => {
       if (opt.group) {
         if (!groups[opt.group]) groups[opt.group] = []
-        groups[opt.group].push(opt)
+        groups[opt.group]!.push(opt)
       } else {
         ungrouped.push(opt)
       }
@@ -120,7 +120,7 @@ export function SearchableSelect({
     if (e.key === 'Escape') {
       setIsOpen(false)
       setSearchQuery('')
-    } else if (e.key === 'Enter' && filteredOptions.length === 1) {
+    } else if (e.key === 'Enter' && filteredOptions.length === 1 && filteredOptions[0]) {
       handleSelect(filteredOptions[0].value)
     }
   }

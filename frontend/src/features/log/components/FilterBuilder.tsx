@@ -3,7 +3,7 @@
  * 日志高级筛选构建器 - 支持多条件、多操作符筛选
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Plus, Trash2, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -104,7 +104,7 @@ export function FilterBuilder({
   return (
     <div className={cn('space-y-0', className)}>
       {/* 筛选条件列表 - 无边框设计 */}
-      {filters.map((filter, index) => (
+      {filters.map((filter) => (
         <div
           key={filter.id}
           className="flex items-center gap-2 py-1.5"

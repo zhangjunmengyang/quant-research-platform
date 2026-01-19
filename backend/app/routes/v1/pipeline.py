@@ -680,6 +680,28 @@ async def fill_progress(task_id: str):
     )
 
 
+@router.post("/fill/{task_id}/cancel")
+async def cancel_fill_task(task_id: str):
+    """Cancel a running fill task"""
+    manager = get_task_manager()
+    task = manager.get_task(task_id)
+
+    if task is None:
+        raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+
+    if task.status not in (TaskStatus.RUNNING, TaskStatus.PENDING):
+        return ApiResponse(
+            data={"task_id": task_id, "status": task.status.value},
+            message=f"Task is not running (status: {task.status.value})",
+        )
+
+    await manager.cancel_task(task_id)
+    return ApiResponse(
+        data={"task_id": task_id, "status": "cancelled"},
+        message="Task cancelled",
+    )
+
+
 @router.post("/review", response_model=ApiResponse[ReviewResult])
 async def review_factors(
     request: ReviewRequest,

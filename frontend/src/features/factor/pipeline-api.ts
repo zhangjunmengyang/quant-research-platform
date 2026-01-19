@@ -326,4 +326,16 @@ export const pipelineApi = {
     }
     return data.data
   },
+
+  /**
+   * Cancel a running fill task
+   */
+  cancelFillTask: async (taskId: string): Promise<void> => {
+    const { data } = await apiClient.post<ApiResponse<{ task_id: string; status: string }>>(
+      `${BASE_URL}/fill/${taskId}/cancel`
+    )
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to cancel fill task')
+    }
+  },
 }

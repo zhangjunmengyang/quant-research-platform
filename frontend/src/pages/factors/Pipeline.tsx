@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Settings,
   Sparkles,
+  Square,
   X,
   XCircle,
   Zap,
@@ -643,10 +644,14 @@ function FillProgressPanel({
   progress,
   logs,
   onClose,
+  onCancel,
+  isCancelling,
 }: {
   progress: FillProgress
   logs: FillLog[]
   onClose: () => void
+  onCancel: () => void
+  isCancelling: boolean
 }) {
   const logsEndRef = useRef<HTMLDivElement>(null)
 
@@ -658,6 +663,7 @@ function FillProgressPanel({
   const isRunning = progress.status === 'running' || progress.status === 'pending'
   const isCompleted = progress.status === 'completed'
   const isFailed = progress.status === 'failed'
+  const isCancelled = progress.status === 'cancelled'
 
   const progressPercent = Math.round(progress.progress || 0)
   const currentNum = progress.current_step_num || 0
@@ -677,16 +683,32 @@ function FillProgressPanel({
           {isRunning && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
           {isCompleted && <CheckCircle2 className="h-4 w-4 text-green-500" />}
           {isFailed && <XCircle className="h-4 w-4 text-red-500" />}
+          {isCancelled && <XCircle className="h-4 w-4 text-orange-500" />}
           <span className="text-sm font-medium">
             {isRunning && '填充进行中...'}
             {isCompleted && '填充完成'}
             {isFailed && '填充失败'}
+            {isCancelled && '已停止'}
           </span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
             {currentNum} / {totalSteps}
           </span>
+          {isRunning && (
+            <button
+              onClick={onCancel}
+              disabled={isCancelling}
+              className="flex items-center gap-1 text-sm text-orange-600 hover:text-orange-700 disabled:opacity-50"
+            >
+              {isCancelling ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Square className="h-3 w-3" />
+              )}
+              停止
+            </button>
+          )}
           {!isRunning && (
             <button
               onClick={onClose}
@@ -703,7 +725,7 @@ function FillProgressPanel({
         <div
           className={cn(
             'h-full transition-all duration-300',
-            isFailed ? 'bg-red-500' : 'bg-primary'
+            isFailed ? 'bg-red-500' : isCancelled ? 'bg-orange-500' : 'bg-primary'
           )}
           style={{ width: `${progressPercent}%` }}
         />
@@ -801,12 +823,25 @@ function FillTab({ status }: { status?: PipelineStatus }) {
     },
   })
 
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => pipelineApi.cancelFillTask(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pipeline-status'] })
+    },
+  })
+
   // 任务完成后刷新状态
   useEffect(() => {
     if (isCompleted) {
       queryClient.invalidateQueries({ queryKey: ['pipeline-status'] })
     }
   }, [isCompleted, queryClient])
+
+  const handleCancel = () => {
+    if (taskId) {
+      cancelMutation.mutate(taskId)
+    }
+  }
 
   const fieldOptions: { value: FillableField; label: string }[] = [
     { value: 'style', label: '风格分类' },
@@ -984,6 +1019,8 @@ function FillTab({ status }: { status?: PipelineStatus }) {
             progress={progress}
             logs={logs}
             onClose={handleCloseProgress}
+            onCancel={handleCancel}
+            isCancelling={cancelMutation.isPending}
           />
         )}
 

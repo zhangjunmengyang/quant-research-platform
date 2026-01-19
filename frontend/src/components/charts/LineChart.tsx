@@ -110,7 +110,7 @@ export function LineChart({
       series: series.map((s, idx) => ({
         name: s.name,
         type: 'line' as const,
-        data: allTimes.map((time) => seriesDataMaps[idx].get(time) ?? null),
+        data: allTimes.map((time) => seriesDataMaps[idx]?.get(time) ?? null),
         smooth: true,
         showSymbol: false,
         itemStyle: s.color ? { color: s.color } : undefined,

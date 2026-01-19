@@ -11,7 +11,6 @@ import {
   LineChart as LineChartIcon,
   Loader2,
   Play,
-  Plus,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'

@@ -98,10 +98,10 @@ export interface CreateResourceHooksConfig<
  * 创建资源 hooks 的结果
  */
 export interface ResourceHooks<
-  T,
+  _T,
   ListParams,
-  UpdateData,
-  DeleteResponse = void
+  _UpdateData,
+  _DeleteResponse = void
 > {
   /** 列表 hook */
   useList: (params: ListParams) => ReturnType<typeof useQuery>
@@ -115,10 +115,10 @@ export interface ResourceHooks<
  * Mutations hooks 的返回类型
  */
 interface ResourceMutations<
-  T,
-  ListParams,
-  UpdateData,
-  DeleteResponse = void
+  _T,
+  _ListParams,
+  _UpdateData,
+  _DeleteResponse = void
 > {
   /** Mutations hooks */
   useMutations: () => {
@@ -183,6 +183,9 @@ export function createResourceHooks<
       staleTime,
     })
 
+  // Pre-compute action names to ensure consistent hook order
+  const actionNames = customActions ? Object.keys(customActions).sort() : []
+
   /**
    * Mutations hook (correctly defined as a custom Hook)
    */
@@ -198,43 +201,52 @@ export function createResourceHooks<
       queryClient.invalidateQueries({ queryKey: keys.all })
     }
 
-    const mutations: Record<string, ReturnType<typeof useMutation> | undefined> = {}
+    // Always call useMutation to avoid conditional hooks
+    const updateMutation = useMutation({
+      mutationFn: updateItem ?? (async () => { throw new Error('Update not configured') }),
+      onSuccess: (data) => {
+        const itemId = extractId(data as T)
+        queryClient.setQueryData(keys.detail(itemId), data)
+        invalidateListAndStats()
+      },
+    })
 
-    // 更新 mutation
-    if (updateItem) {
-      mutations.update = useMutation({
-        mutationFn: updateItem,
-        onSuccess: (data) => {
-          const itemId = extractId(data as T)
-          queryClient.setQueryData(keys.detail(itemId), data)
+    const deleteMutation = useMutation({
+      mutationFn: deleteItem ?? (async () => { throw new Error('Delete not configured') }),
+      onSuccess: () => {
+        invalidateAll()
+      },
+    })
+
+    // Create all custom action mutations upfront with fixed order
+    // This ensures hooks are always called in the same order
+    const customMutations = actionNames.map((name) =>
+      // eslint-disable-next-line react-hooks/rules-of-hooks
+      useMutation({
+        mutationFn: customActions![name]!,
+        onSuccess: () => {
           invalidateListAndStats()
         },
       })
+    )
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mutations: Record<string, any> = {}
+
+    if (updateItem) {
+      mutations.update = updateMutation
     }
 
-    // 删除 mutation
     if (deleteItem) {
-      mutations.delete = useMutation({
-        mutationFn: deleteItem,
-        onSuccess: () => {
-          invalidateAll()
-        },
-      })
+      mutations.delete = deleteMutation
     }
 
-    // 自定义 actions
-    if (customActions) {
-      Object.entries(customActions).forEach(([name, actionFn]) => {
-        mutations[name] = useMutation({
-          mutationFn: actionFn,
-          onSuccess: () => {
-            invalidateListAndStats()
-          },
-        })
-      })
-    }
+    // Map custom mutations back to their names
+    actionNames.forEach((name, index) => {
+      mutations[name] = customMutations[index]
+    })
 
-    return mutations as ResourceHooksWithMutations<T, ListParams, UpdateData, DeleteResponse>['useMutations'] extends () => infer R ? R : never
+    return mutations
   }
 
   const hooks: ResourceHooksWithMutations<T, ListParams, UpdateData, DeleteResponse> = {

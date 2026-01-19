@@ -31,7 +31,6 @@ import {
   EXPERIENCE_CATEGORY_LABELS,
   DEFAULT_EXPERIENCE_CONTENT,
   DEFAULT_EXPERIENCE_CONTEXT,
-  type ExperienceCategory,
 } from '../types'
 
 interface ExperienceCreateDialogProps {

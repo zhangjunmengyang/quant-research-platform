@@ -7,7 +7,6 @@ import { useState, useEffect } from 'react'
 import {
   Loader2,
   Plus,
-  Trash2,
   Settings,
   ChevronDown,
   ChevronUp,
@@ -23,7 +22,7 @@ import {
 import { SearchableSelect } from '@/components/ui/SearchableSelect'
 import { cn } from '@/lib/utils'
 import type { BacktestRequest, StrategyItem, FactorItem } from '@/features/strategy'
-import { ACCOUNT_TYPE_OPTIONS, HOLD_PERIOD_OPTIONS, MARKET_OPTIONS, SORT_OPTIONS } from './constants'
+import { ACCOUNT_TYPE_OPTIONS } from './constants'
 import { StrategyConfigCard } from './StrategyConfigCard'
 
 export interface TaskCreateViewProps {

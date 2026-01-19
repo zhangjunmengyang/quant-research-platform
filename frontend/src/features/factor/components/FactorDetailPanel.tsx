@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useFactorStore, useFactorMutations } from '../'
 import { factorApi } from '../api'
 import { pipelineApi, type FillableField } from '../pipeline-api'
@@ -32,7 +32,6 @@ interface FactorDetailPanelProps {
 }
 
 export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
-  const queryClient = useQueryClient()
   const { verifyFactor, unverifyFactor, updateFactor, excludeFactor, unexcludeFactor } = useFactorMutations()
   const [fullFactor, setFullFactor] = useState<Factor | null>(null)
   const [loading, setLoading] = useState(true)
