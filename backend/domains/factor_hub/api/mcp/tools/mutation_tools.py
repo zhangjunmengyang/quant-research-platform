@@ -164,6 +164,8 @@ class CreateFactorTool(BaseTool):
         try:
             code_content = params.pop("code_content")
             filename = params.pop("filename", "")
+            if filename:
+                filename = self.normalize_filename(filename)
 
             # 收集所有额外字段
             extra_fields = {k: v for k, v in params.items() if v is not None}
@@ -237,7 +239,7 @@ class UpdateFactorTool(BaseTool):
         properties = {
             "filename": {
                 "type": "string",
-                "description": "因子文件名（主键）"
+                "description": "因子文件名（如 Momentum_5d，不含 .py 后缀）"
             },
             **FACTOR_FIELDS_SCHEMA
         }
@@ -249,7 +251,7 @@ class UpdateFactorTool(BaseTool):
 
     async def execute(self, **params) -> ToolResult:
         try:
-            filename = params.pop("filename")
+            filename = self.normalize_filename(params.pop("filename"))
 
             # 验证因子存在
             factor = self.factor_service.get_factor(filename)
@@ -324,7 +326,7 @@ class DeleteFactorTool(BaseTool):
             "properties": {
                 "filename": {
                     "type": "string",
-                    "description": "因子文件名"
+                    "description": "因子文件名（如 Momentum_5d，不含 .py 后缀）"
                 }
             },
             "required": ["filename"]
@@ -332,7 +334,7 @@ class DeleteFactorTool(BaseTool):
 
     async def execute(self, **params) -> ToolResult:
         try:
-            filename = params["filename"]
+            filename = self.normalize_filename(params["filename"])
 
             # 验证因子存在
             factor = self.factor_service.get_factor(filename)

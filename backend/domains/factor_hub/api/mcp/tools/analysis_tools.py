@@ -33,7 +33,7 @@ class GetFactorICTool(BaseTool):
             "properties": {
                 "filename": {
                     "type": "string",
-                    "description": "因子文件名",
+                    "description": "因子文件名（如 Momentum_5d，不含 .py 后缀）",
                 },
             },
             "required": ["filename"],
@@ -41,6 +41,7 @@ class GetFactorICTool(BaseTool):
 
     async def execute(self, filename: str) -> ToolResult:
         try:
+            filename = self.normalize_filename(filename)
             # 从因子知识库获取因子信息
             factor = self.factor_service.get_factor(filename)
             if not factor:
@@ -91,7 +92,7 @@ class CompareFactorsTool(BaseTool):
                 "filenames": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "因子文件名列表",
+                    "description": "因子文件名列表（不含 .py 后缀）",
                 },
             },
             "required": ["filenames"],
@@ -101,6 +102,9 @@ class CompareFactorsTool(BaseTool):
         try:
             if len(filenames) < 2:
                 return ToolResult.fail("至少需要2个因子进行对比")
+
+            # 规范化所有文件名
+            filenames = [self.normalize_filename(f) for f in filenames]
 
             comparisons = []
             for filename in filenames:
@@ -148,7 +152,7 @@ class SuggestSimilarFactorsTool(BaseTool):
             "properties": {
                 "filename": {
                     "type": "string",
-                    "description": "参考因子文件名",
+                    "description": "参考因子文件名（如 Momentum_5d，不含 .py 后缀）",
                 },
                 "limit": {
                     "type": "integer",
@@ -172,6 +176,7 @@ class SuggestSimilarFactorsTool(BaseTool):
         by: str = "style",
     ) -> ToolResult:
         try:
+            filename = self.normalize_filename(filename)
             # 获取参考因子
             ref_factor = self.factor_service.get_factor(filename)
             if not ref_factor:
@@ -242,7 +247,7 @@ class GetFactorCorrelationTool(BaseTool):
                 "factor_names": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "因子名称列表（至少2个）",
+                    "description": "因子名称列表（至少2个，不含 .py 后缀）",
                 },
                 "correlation_threshold": {
                     "type": "number",
@@ -261,6 +266,9 @@ class GetFactorCorrelationTool(BaseTool):
         try:
             if len(factor_names) < 2:
                 return ToolResult.fail("至少需要2个因子进行相关性分析")
+
+            # 规范化所有因子名
+            factor_names = [self.normalize_filename(f) for f in factor_names]
 
             from ....services import get_multi_factor_analysis_service
 
@@ -311,7 +319,7 @@ class MultiFactorAnalyzeTool(BaseTool):
                 "factor_names": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "因子名称列表（至少2个）",
+                    "description": "因子名称列表（至少2个，不含 .py 后缀）",
                 },
                 "synthesis_method": {
                     "type": "string",
@@ -337,6 +345,9 @@ class MultiFactorAnalyzeTool(BaseTool):
         try:
             if len(factor_names) < 2:
                 return ToolResult.fail("至少需要2个因子进行多因子分析")
+
+            # 规范化所有因子名
+            factor_names = [self.normalize_filename(f) for f in factor_names]
 
             from ....services import get_multi_factor_analysis_service
 
@@ -434,12 +445,17 @@ class AnalyzeFactorGroupsTool(BaseTool):
         method: str = "pct",
     ) -> ToolResult:
         try:
+            # 规范化 factor_dict 中的因子名
+            normalized_factor_dict = {
+                self.normalize_filename(k): v for k, v in factor_dict.items()
+            }
+
             from ....services import get_factor_group_analysis_service
 
             service = get_factor_group_analysis_service()
             # 使用异步方法避免阻塞事件循环
             results = await service.analyze_multiple_factors_async(
-                factor_dict=factor_dict,
+                factor_dict=normalized_factor_dict,
                 data_type=data_type,
                 bins=bins,
                 method=method,

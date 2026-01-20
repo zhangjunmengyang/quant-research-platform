@@ -185,7 +185,7 @@ class GetFactorTool(BaseTool):
             "properties": {
                 "filename": {
                     "type": "string",
-                    "description": "因子文件名（如 Momentum_5d.py）"
+                    "description": "因子文件名（如 Momentum_5d，不含 .py 后缀）"
                 },
                 "include_code": {
                     "type": "boolean",
@@ -198,7 +198,7 @@ class GetFactorTool(BaseTool):
 
     async def execute(self, **params) -> ToolResult:
         try:
-            filename = params["filename"]
+            filename = self.normalize_filename(params["filename"])
             include_code = params.get("include_code", True)
 
             factor = self.factor_service.get_factor(filename)
