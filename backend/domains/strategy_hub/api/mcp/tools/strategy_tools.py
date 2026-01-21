@@ -206,34 +206,7 @@ class RunBacktestTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return """运行因子策略回测。
-
-执行回测并等待完成，直接返回回测结果。
-回测完成后策略会自动入库，可通过 get_strategy 查看详情。
-
-策略配置说明:
-- factor_list: 因子列表，每个因子格式为 [因子名, 排序方式, 参数]
-  - 排序方式: True=升序(小值优先), False=降序(大值优先)
-- long_select_coin_num: 多头选币数量（比例或绝对数量）
-- short_select_coin_num: 空头选币数量（0=不做空）
-- hold_period: 持仓周期（如 "1H", "4H", "24H"）
-- market: 市场类型（"swap_swap", "spot_swap", "spot_spot"）
-
-示例:
-```json
-{
-  "name": "动量策略",
-  "strategy_list": [{
-    "factor_list": [["Momentum", true, {"n": 20}]],
-    "long_select_coin_num": 0.1,
-    "short_select_coin_num": 0,
-    "hold_period": "1H",
-    "market": "swap_swap"
-  }],
-  "start_date": "2024-01-01",
-  "end_date": "2024-12-31"
-}
-```"""
+        return "运行因子策略回测"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -252,26 +225,48 @@ class RunBacktestTool(BaseTool):
                         "properties": {
                             "factor_list": {
                                 "type": "array",
-                                "description": "因子列表，每个因子为 [名称, 排序方向, 参数]",
+                                "description": (
+                                    "因子列表，每个因子为 [名称, 排序方向, 参数, 权重]。"
+                                    "排序方向: True=因子值小的做多/大的做空, False=反之。"
+                                    "参数: 计算窗口(小时)，如 1200。权重: 固定为 1。"
+                                    "示例: [[\"Momentum\", true, 1200, 1]]"
+                                ),
                             },
                             "long_select_coin_num": {
                                 "type": "number",
-                                "description": "多头选币数量（比例或绝对数）",
+                                "description": "多头选币数量。[0,1): 比例(如 0.1=10%); >=1: 绝对数量",
                                 "default": 0.1,
                             },
                             "short_select_coin_num": {
                                 "type": "number",
-                                "description": "空头选币数量（0表示不做空）",
+                                "description": "空头选币数量(0=不做空)。[0,1): 比例; >=1: 绝对数量",
+                                "default": 0,
+                            },
+                            "long_cap_weight": {
+                                "type": "number",
+                                "description": "多头仓位权重。实际占比=long/(long+short)。纯多头: long=1,short=0",
+                                "default": 1,
+                            },
+                            "short_cap_weight": {
+                                "type": "number",
+                                "description": "空头仓位权重。多空平衡: long=1,short=1; 纯空头: long=0,short=1",
                                 "default": 0,
                             },
                             "hold_period": {
                                 "type": "string",
-                                "description": "持仓周期",
+                                "description": "持仓周期，如 \"1H\", \"4H\", \"24H\"",
                                 "default": "1H",
                             },
                             "market": {
                                 "type": "string",
-                                "description": "市场类型",
+                                "description": (
+                                    "币池与交易类型: "
+                                    "spot_spot(现货币池+现货交易), "
+                                    "swap_swap(合约币池+合约交易), "
+                                    "spot_swap(现货币池+优先合约), "
+                                    "mix_spot(合并币池+优先现货), "
+                                    "mix_swap(合并币池+优先合约)"
+                                ),
                                 "default": "swap_swap",
                             },
                         },
@@ -279,25 +274,16 @@ class RunBacktestTool(BaseTool):
                 },
                 "start_date": {
                     "type": "string",
-                    "description": "回测开始日期 (YYYY-MM-DD)",
+                    "description": "回测开始日期 (YYYY-MM-DD)，不传则使用数据最早日期",
                 },
                 "end_date": {
                     "type": "string",
-                    "description": "回测结束日期 (YYYY-MM-DD)",
-                },
-                "initial_usdt": {
-                    "type": "number",
-                    "description": "初始资金",
-                    "default": 10000,
+                    "description": "回测结束日期 (YYYY-MM-DD)，不传则使用数据最新日期",
                 },
                 "leverage": {
                     "type": "number",
-                    "description": "杠杆倍数",
-                    "default": 1.0,
-                },
-                "description": {
-                    "type": "string",
-                    "description": "策略描述（可选）",
+                    "description": "杠杆倍数，仅合约交易有效",
+                    "default": 1,
                 },
             },
             "required": ["name", "strategy_list"],
@@ -309,9 +295,7 @@ class RunBacktestTool(BaseTool):
         strategy_list: list,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        initial_usdt: float = 10000,
         leverage: float = 1.0,
-        description: Optional[str] = None,
     ) -> ToolResult:
         try:
             from domains.strategy_hub.services.backtest_runner import (
@@ -325,9 +309,7 @@ class RunBacktestTool(BaseTool):
                 strategy_list=strategy_list,
                 start_date=start_date,
                 end_date=end_date,
-                initial_usdt=initial_usdt,
                 leverage=leverage,
-                description=description,
             )
 
             # 执行回测并等待完成
