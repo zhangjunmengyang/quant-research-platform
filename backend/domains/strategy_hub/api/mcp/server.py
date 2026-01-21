@@ -23,8 +23,6 @@ from .tools.strategy_tools import (
     SearchStrategiesTool,
     GetStrategyStatsTool,
     RunBacktestTool,
-    GetBacktestStatusTool,
-    CancelBacktestTool,
 )
 from .tools.analysis_tools import (
     RunParamSearchTool,
@@ -60,8 +58,6 @@ class StrategyHubMCPServer(BaseMCPServer):
 
         # 回测工具
         self.register_tool(RunBacktestTool(), "mutation")
-        self.register_tool(GetBacktestStatusTool(), "query")
-        self.register_tool(CancelBacktestTool(), "mutation")
 
         # 分析类工具
         self.register_tool(RunParamSearchTool(), "mutation")

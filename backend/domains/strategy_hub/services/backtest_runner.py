@@ -367,6 +367,46 @@ class BacktestRunner:
         logger.info(f"提交回测任务: {task_id} - {request.name}, execution_id: {request.execution_id}")
         return task_id
 
+    async def run_and_wait(self, request: BacktestRequest) -> Optional[Strategy]:
+        """
+        提交回测任务并等待完成
+
+        同步模式：提交任务后阻塞等待结果，适用于 MCP 工具调用。
+
+        Args:
+            request: 回测请求
+
+        Returns:
+            完成的策略对象，失败时返回 None
+
+        Raises:
+            Exception: 回测执行失败时抛出异常
+        """
+        import asyncio
+
+        task_id = self.submit(request)
+        future = self._futures.get(task_id)
+
+        if future is None:
+            raise RuntimeError(f"任务提交失败: {task_id}")
+
+        # 在事件循环中非阻塞等待线程池任务完成
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, future.result)
+        except Exception as e:
+            # 获取任务状态以获取详细错误信息
+            task_info = self.get_status(task_id)
+            error_msg = task_info.error_message if task_info else str(e)
+            raise RuntimeError(f"回测执行失败: {error_msg}") from e
+
+        # 获取结果
+        strategy = self.get_result(task_id)
+        if strategy is None:
+            raise RuntimeError(f"回测完成但无法获取结果: {task_id}")
+
+        return strategy
+
     def get_status(self, task_id: str) -> Optional[TaskInfo]:
         """
         获取任务状态

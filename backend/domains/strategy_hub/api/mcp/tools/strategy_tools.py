@@ -208,8 +208,8 @@ class RunBacktestTool(BaseTool):
     def description(self) -> str:
         return """运行因子策略回测。
 
-提交回测任务后返回任务ID，可通过 get_backtest_status 查询进度。
-回测完成后策略会自动入库，可通过 get_strategy 查看结果。
+执行回测并等待完成，直接返回回测结果。
+回测完成后策略会自动入库，可通过 get_strategy 查看详情。
 
 策略配置说明:
 - factor_list: 因子列表，每个因子格式为 [因子名, 排序方式, 参数]
@@ -330,126 +330,26 @@ class RunBacktestTool(BaseTool):
                 description=description,
             )
 
-            # 提交回测任务
+            # 执行回测并等待完成
             runner = get_backtest_runner()
-            task_id = runner.submit(request)
+            strategy = await runner.run_and_wait(request)
 
+            # 返回回测结果摘要
             return ToolResult.ok({
-                "task_id": task_id,
-                "message": f"回测任务已提交: {name}",
-                "status": "pending",
+                "strategy_id": strategy.id,
+                "name": strategy.name,
+                "status": "completed",
+                "summary": {
+                    "annual_return": strategy.annual_return,
+                    "max_drawdown": strategy.max_drawdown,
+                    "sharpe_ratio": strategy.sharpe_ratio,
+                    "win_rate": strategy.win_rate,
+                    "cumulative_return": strategy.cumulative_return,
+                },
+                "message": f"回测完成: {name}",
             })
         except Exception as e:
-            logger.exception("提交回测失败")
-            return ToolResult.fail(str(e))
-
-
-class GetBacktestStatusTool(BaseTool):
-    """获取回测状态工具"""
-
-    category = "query"
-
-    @property
-    def name(self) -> str:
-        return "get_backtest_status"
-
-    @property
-    def description(self) -> str:
-        return "查询回测任务的执行状态"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "task_id": {
-                    "type": "string",
-                    "description": "任务ID（由 run_backtest 返回）",
-                },
-            },
-            "required": ["task_id"],
-        }
-
-    async def execute(self, task_id: str) -> ToolResult:
-        try:
-            from domains.strategy_hub.services.backtest_runner import get_backtest_runner
-
-            runner = get_backtest_runner()
-            task_info = runner.get_status(task_id)
-
-            if not task_info:
-                return ToolResult.fail(f"任务不存在: {task_id}")
-
-            result = {
-                "task_id": task_id,
-                "status": task_info.status.value,
-            }
-
-            if task_info.created_at:
-                result["created_at"] = task_info.created_at.isoformat()
-            if task_info.started_at:
-                result["started_at"] = task_info.started_at.isoformat()
-            if task_info.completed_at:
-                result["completed_at"] = task_info.completed_at.isoformat()
-            if task_info.error_message:
-                result["error"] = task_info.error_message
-
-            # 如果已完成，获取结果摘要
-            if task_info.status.value == "completed":
-                strategy = runner.get_result(task_id)
-                if strategy:
-                    result["summary"] = {
-                        "annual_return": strategy.annual_return,
-                        "max_drawdown": strategy.max_drawdown,
-                        "sharpe_ratio": strategy.sharpe_ratio,
-                        "win_rate": strategy.win_rate,
-                    }
-
-            return ToolResult.ok(result)
-        except Exception as e:
-            logger.exception("查询回测状态失败")
-            return ToolResult.fail(str(e))
-
-
-class CancelBacktestTool(BaseTool):
-    """取消回测任务工具"""
-
-    category = "mutation"
-
-    @property
-    def name(self) -> str:
-        return "cancel_backtest"
-
-    @property
-    def description(self) -> str:
-        return "取消正在运行的回测任务"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "task_id": {
-                    "type": "string",
-                    "description": "任务ID",
-                },
-            },
-            "required": ["task_id"],
-        }
-
-    async def execute(self, task_id: str) -> ToolResult:
-        try:
-            from domains.strategy_hub.services.backtest_runner import get_backtest_runner
-
-            runner = get_backtest_runner()
-            success = runner.cancel(task_id)
-
-            if success:
-                return ToolResult.ok({"message": f"任务 {task_id} 已取消"})
-            else:
-                return ToolResult.fail(f"取消失败，任务可能已完成或不存在: {task_id}")
-        except Exception as e:
-            logger.exception("取消回测失败")
+            logger.exception("回测执行失败")
             return ToolResult.fail(str(e))
 
 
