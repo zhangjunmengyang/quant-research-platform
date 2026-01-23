@@ -16,6 +16,7 @@ import {
   BookOpen,
   ChevronDown,
   Database,
+  Eye,
   FileText,
   FileTextIcon,
   FlaskConical,
@@ -43,7 +44,10 @@ const navigation: NavGroup[] = [
   {
     titleKey: 'nav.data',
     defaultOpen: true,
-    items: [{ labelKey: 'nav.dataOverview', href: '/data', icon: Database }],
+    items: [
+      { labelKey: 'nav.dataOverview', href: '/data', icon: Database },
+      { labelKey: 'nav.dataMonitor', href: '/data/monitor', icon: Eye },
+    ],
   },
   // Information Layer (Factor + Strategy)
   {

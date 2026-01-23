@@ -39,6 +39,7 @@
     "platformName": "Quant Platform",
     "data": "Data",
     "dataOverview": "Data Overview",
+    "dataMonitor": "Data Monitor",
     "information": "Information",
     "factorOverview": "Factor Overview",
     "factorAnalysis": "Factor Analysis",
@@ -135,7 +136,10 @@
     "open": "Open",
     "close": "Close",
     "high": "High",
-    "low": "Low"
+    "low": "Low",
+    "newCoinsDescription": "{{count}} new coins listed in the last {{days}} days",
+    "noNewCoins": "No new coins listed in the selected time range",
+    "showingNewCoins": "Showing {{count}} new coins from the last {{days}} days"
   },
   "research": {
     "title": "Research Library",

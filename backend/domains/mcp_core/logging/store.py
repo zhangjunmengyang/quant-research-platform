@@ -187,6 +187,7 @@ class LogStore:
         Args:
             entry: 日志条目
         """
+        should_flush = False
         async with self._buffer_lock:
             # 防止缓冲区无限增长
             if len(self._buffer) >= MAX_BUFFER_SIZE:
@@ -195,8 +196,11 @@ class LogStore:
                 logger.warning("log_buffer_overflow", dropped=MAX_BUFFER_SIZE // 2)
 
             self._buffer.append(entry)
-            if len(self._buffer) >= self.batch_size:
-                await self._flush()
+            should_flush = len(self._buffer) >= self.batch_size
+
+        # 在锁外触发 flush，避免死锁
+        if should_flush:
+            await self._flush()
 
     async def write_batch(self, entries: list[LogEntry]):
         """
@@ -205,6 +209,7 @@ class LogStore:
         Args:
             entries: 日志条目列表
         """
+        should_flush = False
         async with self._buffer_lock:
             # 防止缓冲区无限增长
             remaining_capacity = MAX_BUFFER_SIZE - len(self._buffer)
@@ -213,8 +218,11 @@ class LogStore:
                 logger.warning("log_batch_truncated", kept=len(entries))
 
             self._buffer.extend(entries)
-            if len(self._buffer) >= self.batch_size:
-                await self._flush()
+            should_flush = len(self._buffer) >= self.batch_size
+
+        # 在锁外触发 flush，避免死锁
+        if should_flush:
+            await self._flush()
 
     async def _flush_loop(self):
         """后台刷新循环"""
