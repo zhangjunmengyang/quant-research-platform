@@ -1,12 +1,17 @@
 """
 缓存隔离机制
 
-通过线程本地存储实现多任务并行回测的缓存隔离。
+通过环境变量实现多任务回测的缓存隔离。
 
-注意：环境变量 os.environ 在多线程环境下是全局共享的，会导致并发冲突。
-本模块使用 threading.local() 实现线程安全的缓存路径隔离。
+注意: 使用环境变量而非 threading.local()，因为回测引擎的选币阶段
+使用 ProcessPoolExecutor 在子进程中运行，子进程无法继承线程本地变量，
+但会继承环境变量。
+
+限制: 当前实现不支持同一进程内的多线程并行回测（环境变量是进程级共享的）。
+如需支持，需要修改回测引擎的选币代码，将缓存路径作为参数传递。
 """
 
+import os
 import shutil
 import logging
 import threading
@@ -18,32 +23,34 @@ from domains.mcp_core.paths import get_data_dir
 
 logger = logging.getLogger(__name__)
 
-# 线程本地存储，用于存储每个线程的缓存目录
-_thread_local = threading.local()
+# 环境变量名
+_ENV_CACHE_DIR = "BACKTEST_CACHE_DIR"
+
+# 用于保护环境变量操作的锁（同一进程内串行）
+_env_lock = threading.Lock()
 
 
 def get_thread_cache_dir() -> Optional[str]:
     """
-    获取当前线程的缓存目录（线程安全）
+    获取当前的缓存目录
 
     Returns:
         缓存目录路径字符串，如果未设置则返回 None
     """
-    return getattr(_thread_local, "cache_dir", None)
+    return os.environ.get(_ENV_CACHE_DIR)
 
 
 def set_thread_cache_dir(cache_dir: Optional[str]):
     """
-    设置当前线程的缓存目录（线程安全）
+    设置缓存目录
 
     Args:
         cache_dir: 缓存目录路径，None 表示清除
     """
     if cache_dir is None:
-        if hasattr(_thread_local, "cache_dir"):
-            delattr(_thread_local, "cache_dir")
+        os.environ.pop(_ENV_CACHE_DIR, None)
     else:
-        _thread_local.cache_dir = cache_dir
+        os.environ[_ENV_CACHE_DIR] = cache_dir
 
 
 @contextmanager
@@ -53,10 +60,10 @@ def isolated_cache(
     cleanup_on_exit: bool = False,
 ):
     """
-    缓存隔离上下文管理器（线程安全）
+    缓存隔离上下文管理器
 
-    使用线程本地存储注入隔离的缓存路径，支持多线程并行回测。
-    回测引擎的 path_kit.py 需要调用 get_thread_cache_dir() 获取缓存路径。
+    使用环境变量注入隔离的缓存路径，支持子进程继承。
+    回测引擎的 path_kit.py 会读取 BACKTEST_CACHE_DIR 环境变量。
 
     Args:
         task_id: 任务ID
@@ -72,26 +79,28 @@ def isolated_cache(
     task_dir = base_dir / task_id / "cache"
     task_dir.mkdir(parents=True, exist_ok=True)
 
-    # 保存旧的线程本地缓存目录
-    old_cache_dir = get_thread_cache_dir()
+    # 使用锁保护环境变量操作（串行执行回测任务）
+    with _env_lock:
+        # 保存旧的缓存目录
+        old_cache_dir = get_thread_cache_dir()
 
-    # 设置新的缓存目录（线程安全）
-    set_thread_cache_dir(str(task_dir))
-    logger.info(f"[线程 {threading.current_thread().name}] 设置缓存隔离目录: {task_dir}")
+        # 设置新的缓存目录
+        set_thread_cache_dir(str(task_dir))
+        logger.info(f"设置缓存隔离目录: {task_dir}")
 
-    try:
-        yield task_dir
-    finally:
-        # 恢复线程本地缓存目录
-        set_thread_cache_dir(old_cache_dir)
+        try:
+            yield task_dir
+        finally:
+            # 恢复缓存目录
+            set_thread_cache_dir(old_cache_dir)
 
-        # 清理缓存目录
-        if cleanup_on_exit and task_dir.exists():
-            try:
-                shutil.rmtree(task_dir)
-                logger.info(f"清理缓存目录: {task_dir}")
-            except Exception as e:
-                logger.warning(f"清理缓存目录失败: {e}")
+            # 清理缓存目录
+            if cleanup_on_exit and task_dir.exists():
+                try:
+                    shutil.rmtree(task_dir)
+                    logger.info(f"清理缓存目录: {task_dir}")
+                except Exception as e:
+                    logger.warning(f"清理缓存目录失败: {e}")
 
 
 def get_cache_dir() -> Path:

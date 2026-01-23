@@ -44,7 +44,7 @@ class FactorStore(BaseStore[Factor]):
         'created_at', 'updated_at', 'backtest_sharpe', 'backtest_ic',
         'backtest_ir', 'turnover', 'decay', 'market_regime',
         'best_holding_period', 'tags', 'code_complexity',
-        'last_backtest_date', 'excluded', 'exclude_reason'
+        'last_backtest_date', 'excluded', 'exclude_reason', 'param_analysis'
     }
 
     numeric_fields = {
@@ -146,10 +146,10 @@ class FactorStore(BaseStore[Factor]):
                         ic, rank_ic, verified, verify_note, created_at, updated_at,
                         backtest_sharpe, backtest_ic, backtest_ir, turnover, decay,
                         market_regime, best_holding_period, tags, code_complexity,
-                        last_backtest_date, excluded, exclude_reason
+                        last_backtest_date, excluded, exclude_reason, param_analysis
                     ) VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                     )
                 ''', (
                     factor.filename, factor.factor_type, factor.uuid, factor.style,
@@ -160,7 +160,8 @@ class FactorStore(BaseStore[Factor]):
                     factor.backtest_sharpe, factor.backtest_ic, factor.backtest_ir,
                     factor.turnover, factor.decay, factor.market_regime,
                     factor.best_holding_period, factor.tags, factor.code_complexity,
-                    factor.last_backtest_date, bool(factor.excluded), factor.exclude_reason
+                    factor.last_backtest_date, bool(factor.excluded), factor.exclude_reason,
+                    factor.param_analysis
                 ))
             return True
         except psycopg2.IntegrityError:

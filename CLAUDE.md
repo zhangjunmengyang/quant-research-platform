@@ -34,14 +34,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 应当以长期主义视角维护项目，避免临时方案和遗留任务。
 - 应当及时清理冗余、废弃的代码、文件结构，以维护仓库整洁。
 
-### 必须使用 SubAgent 的场景
-
-| 场景 | SubAgent | 说明 |
-|------|----------|------|
-| 探索代码库 | `subagent_type=Explore` | 搜索文件、理解代码结构 |
-| 规划实现 | `subagent_type=Plan` | 设计方案、分析依赖 |
-| 多步骤任务 | `subagent_type=general-purpose` | 实现功能、重构代码 |
-
 ### 反模式 (避免)
 
 - 自己逐个读取文件探索代码库 -> 应使用 Explore agent

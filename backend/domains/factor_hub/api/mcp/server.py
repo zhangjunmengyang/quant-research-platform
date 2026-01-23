@@ -32,12 +32,13 @@ from .tools.mutation_tools import (
 from .tools.analysis_tools import (
     GetFactorICTool,
     CompareFactorsTool,
-    SuggestSimilarFactorsTool,
     # 多因子分析工具
     GetFactorCorrelationTool,
     MultiFactorAnalyzeTool,
     # 分组分析工具
     AnalyzeFactorGroupsTool,
+    # 参数分析工具（支持一维柱状图和二维热力图）
+    RunFactorParamAnalysisTool,
 )
 from .resources.factor_resources import FactorResourceProvider
 
@@ -73,7 +74,6 @@ class FactorHubMCPServer(BaseMCPServer):
         # 分析工具
         self.register_tool(GetFactorICTool(), "analysis")
         self.register_tool(CompareFactorsTool(), "analysis")
-        self.register_tool(SuggestSimilarFactorsTool(), "analysis")
 
         # 多因子分析工具
         self.register_tool(GetFactorCorrelationTool(), "analysis")
@@ -81,6 +81,9 @@ class FactorHubMCPServer(BaseMCPServer):
 
         # 分组分析工具
         self.register_tool(AnalyzeFactorGroupsTool(), "analysis")
+
+        # 参数分析工具（支持一维柱状图和二维热力图）
+        self.register_tool(RunFactorParamAnalysisTool(), "analysis")
 
         logger.info(f"注册了 {len(self.tool_registry)} 个因子知识库工具")
 

@@ -73,9 +73,9 @@ class FactorService:
 
         # 验证状态筛选
         if verify_filter == "已验证":
-            filter_condition['verified'] = 1
+            filter_condition['verified'] = True
         elif verify_filter == "未验证":
-            filter_condition['verified'] = 0
+            filter_condition['verified'] = False
 
         # 排序
         order = f"{order_by} DESC" if order_desc else order_by

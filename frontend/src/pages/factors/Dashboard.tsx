@@ -3,7 +3,7 @@
  * 因子概览页 - 展示统计信息和完整因子列表
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loader2, RotateCcw, Check, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -17,7 +17,7 @@ import type { FactorListParams } from '@/features/factor/types'
 import { pipelineApi } from '@/features/factor/pipeline-api'
 import { FactorFilters } from '@/features/factor/components/FactorFilters'
 import { FactorDetailPanelWrapper } from '@/features/factor/components/FactorDetailPanel'
-import { ResizableTable, type TableColumn } from '@/components/ui/ResizableTable'
+import { ResizableTable, type TableColumn, type SortState } from '@/components/ui/ResizableTable'
 import { ColumnSelector } from '@/components/ui/ColumnSelector'
 import { Pagination } from '@/components/ui/pagination'
 import { cn, stripPyExtension } from '@/lib/utils'
@@ -42,7 +42,6 @@ export function Component() {
     setColumnWidth,
     resetColumnConfig,
   } = useFactorStore()
-  const [searchQuery, setSearchQuery] = useState('')
 
   // 从 URL 读取 filters
   const filters = useMemo(
@@ -74,22 +73,13 @@ export function Component() {
     queryFn: pipelineApi.getStatus,
   })
 
-  // Filter by search query (client-side)
-  // 搜索范围: filename, style, tags, formula, input_data, description, analysis
-  const filteredItems = useMemo(() => {
-    if (!data?.items || !searchQuery) return data?.items || []
-    const query = searchQuery.toLowerCase()
-    return data.items.filter(
-      (factor) =>
-        factor.filename.toLowerCase().includes(query) ||
-        factor.style?.toLowerCase().includes(query) ||
-        factor.tags?.toLowerCase().includes(query) ||
-        factor.formula?.toLowerCase().includes(query) ||
-        factor.input_data?.toLowerCase().includes(query) ||
-        factor.description?.toLowerCase().includes(query) ||
-        factor.analysis?.toLowerCase().includes(query)
-    )
-  }, [data?.items, searchQuery])
+  // 搜索处理函数 - 更新 URL 中的 search 参数
+  const handleSearch = useCallback(
+    (query: string) => {
+      setFilters({ search: query || undefined, page: 1 })
+    },
+    [setFilters]
+  )
 
   const handlePageChange = (page: number) => {
     setFilters({ page })
@@ -144,15 +134,14 @@ export function Component() {
           filters={filters}
           setFilters={setFilters}
           resetFilters={resetFilters}
-          onSearch={setSearchQuery}
-          searchValue={searchQuery}
+          onSearch={handleSearch}
+          searchValue={filters.search || ''}
         />
 
         {/* Toolbar */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             共 {data?.total ?? 0} 个因子
-            {searchQuery && ` (筛选后 ${filteredItems.length} 个)`}
           </p>
           <div className="flex items-center gap-2">
             <ColumnSelector
@@ -191,11 +180,22 @@ export function Component() {
           </div>
         ) : (
           <FactorTable
-            factors={filteredItems}
+            factors={data?.items || []}
             onSelect={openDetailPanel}
             visibleColumns={visibleColumns}
             columnWidths={columnWidths}
             onColumnWidthChange={setColumnWidth}
+            sortState={{
+              field: filters.order_by || 'filename',
+              order: filters.order_desc ? 'desc' : 'asc',
+            }}
+            onSortChange={(sort) =>
+              setFilters({
+                order_by: sort.field,
+                order_desc: sort.order === 'desc',
+                page: 1,
+              })
+            }
           />
         )}
 
@@ -227,6 +227,8 @@ interface FactorTableProps {
   visibleColumns: string[]
   columnWidths: Record<string, number>
   onColumnWidthChange: (columnKey: string, width: number) => void
+  sortState: SortState
+  onSortChange: (sort: SortState) => void
 }
 
 function FactorTable({
@@ -235,6 +237,8 @@ function FactorTable({
   visibleColumns,
   columnWidths,
   onColumnWidthChange,
+  sortState,
+  onSortChange,
 }: FactorTableProps) {
   // 构建表格列配置
   const tableColumns = useMemo<TableColumn<Factor>[]>(() => {
@@ -249,6 +253,7 @@ function FactorTable({
           width: columnWidths[colDef.key] ?? colDef.width ?? 100,
           minWidth: 50,
           maxWidth: 500,
+          sortable: colDef.sortable,
         }
 
         // 根据列类型配置渲染函数
@@ -406,6 +411,8 @@ function FactorTable({
       onRowClick={onSelect}
       onColumnWidthChange={onColumnWidthChange}
       emptyText="暂无因子"
+      sortState={sortState}
+      onSortChange={onSortChange}
     />
   )
 }

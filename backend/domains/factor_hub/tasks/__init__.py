@@ -2,10 +2,8 @@
 """
 任务模块，包含各阶段的具体任务实现：
 - diff_catalog: 发现未入库因子
-- extract_metadata: 元信息提取
-- generate_analysis: 分析生成
 - review: 代码审核
-- update_field: 批量字段更新
+- ingest: 因子入库
 
 注意：使用延迟导入避免循环依赖和路径问题
 """
@@ -19,15 +17,6 @@ __all__ = [
     'run_review',
     'ReviewResult',
     'ReviewSummary',
-    # extract_metadata
-    'run_extract',
-    'ExtractedMetadata',
-    # generate_analysis
-    'run_generate_analysis',
-    'GeneratedAnalysis',
-    # update_field
-    'run_update_field',
-    'FieldUpdate',
 ]
 
 
@@ -38,14 +27,5 @@ def __getattr__(name):
         return locals()[name]
     elif name in ('run_review', 'ReviewResult', 'ReviewSummary'):
         from .review import run_review, ReviewResult, ReviewSummary
-        return locals()[name]
-    elif name in ('run_extract', 'ExtractedMetadata'):
-        from .extract_metadata import run_extract, ExtractedMetadata
-        return locals()[name]
-    elif name in ('run_generate_analysis', 'GeneratedAnalysis'):
-        from .generate_analysis import run_generate_analysis, GeneratedAnalysis
-        return locals()[name]
-    elif name in ('run_update_field', 'FieldUpdate'):
-        from .update_field import run_update_field, FieldUpdate
         return locals()[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

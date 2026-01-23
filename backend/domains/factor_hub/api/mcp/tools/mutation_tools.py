@@ -200,10 +200,7 @@ class CreateFactorTool(BaseTool):
             if success:
                 return ToolResult(
                     success=True,
-                    data={
-                        "filename": factor_name,
-                        "message": message
-                    }
+                    data={"filename": factor_name}
                 )
             else:
                 return ToolResult(success=False, error=message)
@@ -296,7 +293,6 @@ class UpdateFactorTool(BaseTool):
                 data={
                     "filename": filename,
                     "updated_fields": total_fields,
-                    "message": f"成功更新 {len(total_fields)} 个字段"
                 }
             )
 
@@ -349,10 +345,7 @@ class DeleteFactorTool(BaseTool):
             if success:
                 return ToolResult(
                     success=True,
-                    data={
-                        "filename": filename,
-                        "message": f"因子 {filename} 已删除"
-                    }
+                    data={"filename": filename}
                 )
             else:
                 return ToolResult(success=False, error="删除失败")

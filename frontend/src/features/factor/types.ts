@@ -52,7 +52,107 @@ export interface Factor {
   // Timestamps
   created_at?: string
   updated_at?: string
+
+  // 参数分析结果 (JSON 字符串)
+  param_analysis?: string
 }
+
+// ============= 参数分析类型 (新版本 - 复用 run_backtest 结构) =============
+
+/** 因子列表项: [因子名, 排序方向, 参数, 权重] */
+export type FactorListItem = [string, boolean, number, number]
+
+/** 过滤因子配置: [因子名, 参数, 过滤条件, 是否正排序] */
+export type FilterItem = [string, number, string, boolean]
+
+/** 策略配置（与 run_backtest 相同结构） */
+export interface StrategyConfig {
+  factor_list: FactorListItem[]
+  hold_period?: string
+  market?: string
+  long_select_coin_num?: number
+  short_select_coin_num?: number
+  long_cap_weight?: number
+  short_cap_weight?: number
+  // 前置过滤
+  filter_list?: FilterItem[]
+  long_filter_list?: FilterItem[]
+  short_filter_list?: FilterItem[]
+  // 后置过滤
+  filter_list_post?: FilterItem[]
+  long_filter_list_post?: FilterItem[]
+  short_filter_list_post?: FilterItem[]
+}
+
+/** 参数分析配置 */
+export interface ParamAnalysisConfig {
+  /** 策略配置列表 */
+  strategy_list: StrategyConfig[]
+  /** 参数网格: { 路径表达式: 值列表 } */
+  param_grid: Record<string, (string | number)[]>
+  /** 回测开始日期 */
+  start_date?: string
+  /** 回测结束日期 */
+  end_date?: string
+  /** 杠杆倍数 */
+  leverage?: number
+}
+
+/** 参数分析结果项（动态字段由 grid_keys 决定） */
+export interface ParamAnalysisResult {
+  /** 回测指标 */
+  annual_return?: number
+  max_drawdown?: number
+  sharpe_ratio?: number
+  win_rate?: number
+  cumulative_return?: number
+  error?: string
+  /** 动态参数字段（由 grid_keys 决定） */
+  [key: string]: string | number | undefined
+}
+
+/** 参数分析数据 */
+export interface ParamAnalysisData {
+  updated_at: string
+  /** 图表类型: bar=柱状图(1维), heatmap=热力图(2维) */
+  chart_type: 'bar' | 'heatmap'
+  /** 配置信息 */
+  config: ParamAnalysisConfig
+  /** 参数网格维度的键名列表 */
+  grid_keys: string[]
+  /** 所有参数组合的结果 */
+  results: ParamAnalysisResult[]
+  /** 最优参数组合的结果（包含 grid_keys 对应的参数值和指标） */
+  best_result: ParamAnalysisResult
+  /** 评价指标 */
+  indicator: string
+  /** ECharts 图表配置 */
+  chart: EChartsOption
+}
+
+/** 类型守卫：判断是否为二维分析 */
+export function isParamAnalysis2D(data: ParamAnalysisData): boolean {
+  return data.chart_type === 'heatmap'
+}
+
+/** 从 grid_key 提取显示名称（去掉 $ 前缀） */
+export function getGridKeyDisplayName(key: string): string {
+  // "$window" -> "window"
+  // "$hold" -> "hold"
+  return key.startsWith('$') ? key.slice(1) : key
+}
+
+// ECharts 配置类型 (简化版)
+export interface EChartsOption {
+  title?: Record<string, unknown>
+  tooltip?: Record<string, unknown>
+  xAxis?: Record<string, unknown>
+  yAxis?: Record<string, unknown>
+  series?: Array<Record<string, unknown>>
+  grid?: Record<string, unknown>
+  visualMap?: Record<string, unknown>
+}
+
 
 export interface FactorUpdate {
   style?: string

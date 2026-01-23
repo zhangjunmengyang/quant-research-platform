@@ -5,8 +5,7 @@
 """
 
 import re
-from typing import Any, Dict, List, Optional
-from datetime import datetime
+from typing import Any, Dict
 
 from .base import BaseTool, ToolResult
 
@@ -22,13 +21,13 @@ class ListFactorsTool(BaseTool):
     def description(self) -> str:
         return """获取因子列表，支持多种筛选条件和分页。
 
-可用筛选条件：
+可用筛选条件:
 - search: 按文件名搜索
-- style: 按风格筛选（如"动量"、"反转"、"波动性"等）
+- style: 按风格筛选(如"动量"、"反转"、"波动性"等)
 - score_min/score_max: 按评分范围筛选
-- verified: 是否已验证（true/false）
+- verified: 是否已验证(true/false)
 
-返回因子列表和总数。"""
+返回因子名称列表和总数。如需因子详情，请使用 get_factor 工具。"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -129,29 +128,14 @@ class ListFactorsTool(BaseTool):
                 page_size=page_size,
             )
 
-            # 转换为字典
-            factor_list = []
-            for f in factors:
-                factor_list.append({
-                    "filename": f.filename,
-                    "uuid": f.uuid,
-                    "style": f.style,
-                    "formula": f.formula,
-                    "description": f.description,
-                    "llm_score": f.llm_score,
-                    "ic": f.ic,
-                    "rank_ic": f.rank_ic,
-                    "verified": bool(f.verified),
-                    "created_at": str(f.created_at) if f.created_at else None,
-                })
+            # 只返回因子名列表
+            factor_names = [f.filename for f in factors]
 
             return ToolResult(
                 success=True,
                 data={
-                    "factors": factor_list,
+                    "factors": factor_names,
                     "total": total,
-                    "page": page,
-                    "page_size": page_size,
                     "pages": (total + page_size - 1) // page_size,
                 }
             )
@@ -209,27 +193,23 @@ class GetFactorTool(BaseTool):
                     error=f"因子不存在: {filename}"
                 )
 
-            data = {
-                "filename": factor.filename,
-                "uuid": factor.uuid,
-                "style": factor.style,
-                "formula": factor.formula,
-                "input_data": factor.input_data,
-                "value_range": factor.value_range,
-                "description": factor.description,
-                "analysis": factor.analysis,
-                "llm_score": factor.llm_score,
-                "ic": factor.ic,
-                "rank_ic": factor.rank_ic,
-                "verified": bool(factor.verified),
-                "verify_note": factor.verify_note,
-                "code_path": factor.code_path,
-                "created_at": str(factor.created_at) if factor.created_at else None,
-                "updated_at": str(factor.updated_at) if factor.updated_at else None,
-            }
+            # 使用 to_dict() 获取完整字段
+            data = factor.to_dict()
 
-            if include_code:
-                data["code_content"] = factor.code_content or ""
+            # 转换日期时间字段为字符串
+            if data.get("created_at"):
+                data["created_at"] = str(data["created_at"])
+            if data.get("updated_at"):
+                data["updated_at"] = str(data["updated_at"])
+
+            # 确保 verified 和 excluded 为布尔值
+            data["verified"] = bool(data.get("verified"))
+            data["excluded"] = bool(data.get("excluded"))
+
+            # 根据参数决定是否包含代码
+            if not include_code:
+                data.pop("code_content", None)
+                data.pop("code_path", None)
 
             return ToolResult(success=True, data=data)
 
@@ -407,7 +387,6 @@ class SearchByCodeTool(BaseTool):
                 data={
                     "pattern": pattern,
                     "matches": matches,
-                    "count": len(matches),
                 }
             )
 

@@ -665,6 +665,10 @@ class BacktestRunner:
         """
         result = {}
 
+        # 提取回测配置中的日期（实际使用的日期）
+        result["actual_start_date"] = getattr(conf, "start_date", None)
+        result["actual_end_date"] = getattr(conf, "end_date", None)
+
         # 从 conf.report 获取策略评价指标
         if conf.report is not None and not conf.report.empty:
             report = conf.report.iloc[0] if len(conf.report) > 0 else conf.report
@@ -753,6 +757,12 @@ class BacktestRunner:
         if not strategy:
             logger.error(f"策略不存在: {task_id}")
             return
+
+        # 更新实际使用的日期（如果原本为空）
+        if not strategy.start_date and result.get("actual_start_date"):
+            strategy.start_date = result["actual_start_date"]
+        if not strategy.end_date and result.get("actual_end_date"):
+            strategy.end_date = result["actual_end_date"]
 
         # 更新绩效指标
         strategy.cumulative_return = result.get("cumulative_return", 0.0)
@@ -998,6 +1008,25 @@ class BacktestRunner:
                         logger.warning(f"跳过格式不正确的因子配置: {factor}")
                         continue
                 engine_stg["factor_list"] = converted_factors
+
+            # 转换 filter_list 系列格式
+            # 引擎内部使用 set() 对 filter_list 去重，要求元素是 hashable (tuple)
+            # MCP 格式: [["PctChange", 24, "pct:<0.8"], ...]  (list of list)
+            # 引擎格式: [("PctChange", 24, "pct:<0.8"), ...]  (list of tuple)
+            filter_keys = [
+                "filter_list",
+                "long_filter_list",
+                "short_filter_list",
+                "filter_list_post",
+                "long_filter_list_post",
+                "short_filter_list_post",
+            ]
+            for key in filter_keys:
+                if key in engine_stg and engine_stg[key]:
+                    engine_stg[key] = [
+                        tuple(item) if isinstance(item, list) else item
+                        for item in engine_stg[key]
+                    ]
 
             engine_list.append(engine_stg)
         return engine_list

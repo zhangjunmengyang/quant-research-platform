@@ -232,6 +232,22 @@ class RunBacktestTool(BaseTool):
                                     "示例: [[\"Momentum\", true, 1200, 1]]"
                                 ),
                             },
+                            "filter_list": {
+                                "type": "array",
+                                "description": (
+                                    "前置过滤因子列表，每个过滤因子为 [名称, 参数, 过滤条件, 排序方向]。"
+                                    "参数: 计算窗口(小时)。"
+                                    "过滤条件: \"pct:<0.2\"(百分位<20%), \"rank:<10\"(排名<10), \"val:>100\"(原值>100)。"
+                                    "排序方向: true=升序(值小排名高), false=降序(值大排名高)。对val无效，对pct/rank有效。"
+                                    "示例: [[\"QuoteVolumeMean\", 24, \"pct:<0.2\", true]] 保留成交量最低的20%"
+                                ),
+                            },
+                            "filter_list_post": {
+                                "type": "array",
+                                "description": (
+                                    "后置过滤因子列表（在选币后应用），格式同 filter_list。"
+                                ),
+                            },
                             "long_select_coin_num": {
                                 "type": "number",
                                 "description": "多头选币数量。[0,1): 比例(如 0.1=10%); >=1: 绝对数量",

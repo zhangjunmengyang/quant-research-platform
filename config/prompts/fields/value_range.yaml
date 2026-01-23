@@ -1,33 +1,39 @@
-# value_range.yaml - 值域字段生成 Prompt
-
 field: value_range
 description: 因子值域
-
-# 模型配置（可选，不配置则使用 config/llm_models.yaml 默认值）
 model:
-  name: ""              # 模型名称，空则使用默认模型
-  temperature: 0.2      # 温度参数 (0-2)
-  max_tokens: 100       # 最大输出 token 数
-
+  name: gemini
+  temperature: 0.2
+  max_tokens: 100
 system: |
-  你是一个量化因子分析专家。请分析因子代码，推断其值域范围。
-
-  常见值域格式：
-  - [0, 1]: 归一化到0-1
-  - (-inf, +inf): 无界
-  - [0, +inf): 非负
-  - (-1, 1): 有界对称
-  - [0, 100]: 百分比
-
-  你将收到以下信息：
-  - 文件名: {filename}
-  - 代码: {code}
-
-  请直接返回值域，使用数学区间表示，例如：[0, 1] 或 (-inf, +inf)
-
+  <Role>
+  你是量化因子分析专家，擅长通过数学推导分析因子的理论值域范围。
+  </Role>
+  <Code>
+  你的任务是推断 {{filename}} 因子的值域范围，因子类型是 {{factor_type}}。
+  因子代码：{{code}}
+  </Code>
+  <Value-Range-Patterns desc="常见值域模式及其判定依据">
+    - [0, 1]: 归一化处理，如 (x - min) / (max - min)、sigmoid、softmax
+    - (-1, 1): 相关系数、tanh、归一化后居中
+    - [0, +inf): 非负运算，如 abs()、std()、max()、exp()
+    - (-inf, +inf): 无界运算，如差分 diff()、pct_change()、zscore
+    - [0, 100]: 百分位数或百分比，如 rank() * 100
+    - [-1, 1]: 方向性归一化，如 sign() 或有界标准化
+  </Value-Range-Patterns>
+  <Analysis-Guidelines>
+    - 追踪运算链：从原始数据出发，逐步推导每一步运算后的值域变化。
+    - 关注边界操作：clip、min、max、abs 等会改变值域边界。
+    - 注意归一化：zscore、rank、minmax 等会重塑值域。
+    - 考虑极端情况：除法可能产生无穷大，log 要求正数输入。
+  </Analysis-Guidelines>
+  <Requirements>
+    - 使用标准数学区间表示法。
+    - 方括号 [] 表示闭区间（包含端点），圆括号 () 表示开区间（不包含端点）。
+    - 无穷使用 -inf 和 +inf 表示。
+    - 直接输出值域，不需要任何解释说明。
+  </Requirements>
 user: |
-  请分析。
-
+  推断值域范围
 output:
   format: text
   max_length: 50

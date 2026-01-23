@@ -563,7 +563,7 @@ _healthcheck_local:
 	@failed=0; \
 	printf "  API .............. "; \
 	api_ok=0; \
-	for i in 1 2 3 4 5; do \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
 		if curl -sf http://localhost:8000/health >/dev/null 2>&1; then \
 			printf "OK\n"; \
 			api_ok=1; \

@@ -11,8 +11,6 @@ from .strategy_tools import (
     GetStrategyStatsTool,
 )
 from .analysis_tools import (
-    RunParamSearchTool,
-    AnalyzeParamsTool,
     CompareBacktestLiveTool,
     CompareStrategyCoinsTool,
     CompareEquityCurvesTool,
@@ -24,9 +22,7 @@ __all__ = [
     "GetStrategyTool",
     "SearchStrategiesTool",
     "GetStrategyStatsTool",
-    # 分析工具
-    "RunParamSearchTool",
-    "AnalyzeParamsTool",
+    # 分析工具 (参数搜索已移至 factor-hub)
     "CompareBacktestLiveTool",
     "CompareStrategyCoinsTool",
     "CompareEquityCurvesTool",

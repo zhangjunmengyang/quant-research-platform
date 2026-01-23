@@ -7,6 +7,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Dict, Any, List
+import json
 
 
 class FactorType:
@@ -76,6 +77,8 @@ class Factor:
     # 排除状态
     excluded: int = 0  # 是否被排除
     exclude_reason: str = ""  # 排除原因
+    # 参数分析结果 (JSON 字符串)
+    param_analysis: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -111,6 +114,7 @@ class Factor:
             'last_backtest_date': self.last_backtest_date,
             'excluded': self.excluded,
             'exclude_reason': self.exclude_reason,
+            'param_analysis': self.param_analysis,
         }
 
     @classmethod
@@ -187,6 +191,24 @@ class Factor:
         if self.backtest_ic and self.backtest_ir:
             return self.backtest_ir
         return None
+
+    @property
+    def has_param_analysis(self) -> bool:
+        """是否有参数分析数据"""
+        return bool(self.param_analysis)
+
+    def get_param_analysis(self) -> Optional[Dict[str, Any]]:
+        """获取参数分析数据（解析 JSON）"""
+        if not self.param_analysis:
+            return None
+        try:
+            return json.loads(self.param_analysis)
+        except json.JSONDecodeError:
+            return None
+
+    def set_param_analysis(self, data: Dict[str, Any]):
+        """设置参数分析数据"""
+        self.param_analysis = json.dumps(data, ensure_ascii=False)
 
 
 @dataclass

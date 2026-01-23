@@ -3,7 +3,7 @@
  * 数据概览页 - 展示数据统计、币种列表和K线详情
  */
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Loader2,
@@ -16,9 +16,6 @@ import {
   ArrowLeft,
   TrendingUp,
   TrendingDown,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -29,10 +26,10 @@ import type { Symbol } from '@/features/data'
 import { StatsCard } from '@/features/factor/components/StatsCard'
 import { KlineChart } from '@/components/charts'
 import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
+import { ResizableTable, type TableColumn, type SortState } from '@/components/ui/ResizableTable'
 
 // 排序字段类型
 type SortField = 'symbol' | 'type' | 'first_candle_time' | 'last_candle_time' | 'kline_count'
-type SortOrder = 'asc' | 'desc'
 
 // 获取类型排序值（用于排序: 仅现货=0, 仅合约=1, 都有=2）
 function getTypeSortValue(symbol: Symbol): number {
@@ -66,8 +63,19 @@ export function Component() {
   const [filterType, setFilterType] = useState<'all' | 'spot' | 'swap'>('all')
 
   // 排序状态
-  const [sortField, setSortField] = useState<SortField>('first_candle_time')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [sortState, setSortState] = useState<SortState>({
+    field: 'first_candle_time',
+    order: 'desc',
+  })
+
+  // 列宽状态
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    symbol: 180,
+    type: 120,
+    first_candle_time: 150,
+    last_candle_time: 150,
+    kline_count: 120,
+  })
 
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1)
@@ -158,7 +166,7 @@ export function Component() {
     // 排序
     result = [...result].sort((a, b) => {
       let compareResult = 0
-      switch (sortField) {
+      switch (sortState.field as SortField) {
         case 'symbol':
           compareResult = a.symbol.localeCompare(b.symbol)
           break
@@ -179,11 +187,11 @@ export function Component() {
           compareResult = (a.kline_count || 0) - (b.kline_count || 0)
           break
       }
-      return sortOrder === 'asc' ? compareResult : -compareResult
+      return sortState.order === 'asc' ? compareResult : -compareResult
     })
 
     return result
-  }, [symbols, searchQuery, filterType, sortField, sortOrder])
+  }, [symbols, searchQuery, filterType, sortState])
 
   // 分页数据
   const paginatedSymbols = useMemo(() => {
@@ -258,26 +266,16 @@ export function Component() {
     }
   }, [klineData])
 
-  // 点击排序
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortOrder('desc')
-    }
+  // 处理排序变化
+  const handleSortChange = useCallback((newSort: SortState) => {
+    setSortState(newSort)
     setCurrentPage(1)
-  }
+  }, [])
 
-  // 渲染排序图标
-  const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 text-muted-foreground/50" />
-    }
-    return sortOrder === 'asc'
-      ? <ArrowUp className="h-4 w-4" />
-      : <ArrowDown className="h-4 w-4" />
-  }
+  // 处理列宽变化
+  const handleColumnWidthChange = useCallback((columnKey: string, width: number) => {
+    setColumnWidths((prev) => ({ ...prev, [columnKey]: width }))
+  }, [])
 
   // 点击币种 - 使用 URL 参数（优先 swap）
   const handleSymbolClick = (symbol: Symbol, dataType?: 'spot' | 'swap') => {
@@ -746,100 +744,15 @@ export function Component() {
           <div className="flex h-32 items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
-        ) : filteredAndSortedSymbols.length === 0 ? (
-          <div className="flex h-32 items-center justify-center text-muted-foreground">
-            暂无数据
-          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full" style={{ minWidth: '800px' }}>
-              <thead className="sticky top-0 bg-card z-10">
-                <tr className="border-b bg-background">
-                  <th
-                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('symbol')}
-                  >
-                    <div className="flex items-center gap-2">
-                      币种
-                      {renderSortIcon('symbol')}
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-center text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('type')}
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                      类型
-                      {renderSortIcon('type')}
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('first_candle_time')}
-                  >
-                    <div className="flex items-center gap-2">
-                      上线时间
-                      {renderSortIcon('first_candle_time')}
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('last_candle_time')}
-                  >
-                    <div className="flex items-center gap-2">
-                      最新数据
-                      {renderSortIcon('last_candle_time')}
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-right text-sm font-medium text-muted-foreground cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('kline_count')}
-                  >
-                    <div className="flex items-center justify-end gap-2">
-                      K线数量
-                      {renderSortIcon('kline_count')}
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {paginatedSymbols.map((symbol, index) => (
-                  <tr
-                    key={`${symbol.symbol}-${index}`}
-                    className="hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => handleSymbolClick(symbol)}
-                  >
-                    <td className="px-4 py-3 bg-background font-medium text-primary hover:underline">
-                      {symbol.symbol}
-                    </td>
-                    <td className="px-4 py-3 bg-background text-center">
-                      <div className="flex justify-center gap-1">
-                        {symbol.has_spot && (
-                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-muted text-warning">
-                            现货
-                          </span>
-                        )}
-                        {symbol.has_swap && (
-                          <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-info-muted text-info">
-                            合约
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 bg-background text-sm text-muted-foreground whitespace-nowrap">
-                      {symbol.first_candle_time?.slice(0, 10) ?? '-'}
-                    </td>
-                    <td className="px-4 py-3 bg-background text-sm text-muted-foreground whitespace-nowrap">
-                      {symbol.last_candle_time?.slice(0, 10) ?? '-'}
-                    </td>
-                    <td className="px-4 py-3 bg-background text-right text-sm">
-                      {symbol.kline_count?.toLocaleString() ?? '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SymbolTable
+            symbols={paginatedSymbols}
+            columnWidths={columnWidths}
+            onColumnWidthChange={handleColumnWidthChange}
+            sortState={sortState}
+            onSortChange={handleSortChange}
+            onRowClick={handleSymbolClick}
+          />
         )}
 
         {/* Pagination */}
@@ -898,5 +811,127 @@ export function Component() {
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * Symbol Table - 使用 ResizableTable 组件
+ */
+interface SymbolTableProps {
+  symbols: Symbol[]
+  columnWidths: Record<string, number>
+  onColumnWidthChange: (key: string, width: number) => void
+  sortState: SortState
+  onSortChange: (sort: SortState) => void
+  onRowClick: (symbol: Symbol) => void
+}
+
+function SymbolTable({
+  symbols,
+  columnWidths,
+  onColumnWidthChange,
+  sortState,
+  onSortChange,
+  onRowClick,
+}: SymbolTableProps) {
+  const columns = useMemo<TableColumn<Symbol>[]>(
+    () => [
+      {
+        key: 'symbol',
+        label: '币种',
+        width: columnWidths.symbol ?? 180,
+        minWidth: 100,
+        maxWidth: 300,
+        sortable: true,
+        render: (value) => (
+          <span className="font-medium text-primary">{value as string}</span>
+        ),
+      },
+      {
+        key: 'type',
+        label: '类型',
+        width: columnWidths.type ?? 120,
+        minWidth: 80,
+        maxWidth: 200,
+        align: 'center',
+        sortable: true,
+        render: (_, row) => (
+          <div className="flex justify-center gap-1">
+            {row.has_spot && (
+              <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-warning-muted text-warning">
+                现货
+              </span>
+            )}
+            {row.has_swap && (
+              <span className="rounded-full px-2 py-0.5 text-xs font-medium bg-info-muted text-info">
+                合约
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: 'first_candle_time',
+        label: '上线时间',
+        width: columnWidths.first_candle_time ?? 150,
+        minWidth: 100,
+        maxWidth: 200,
+        sortable: true,
+        render: (value) => (
+          <span className="text-sm text-muted-foreground">
+            {(value as string)?.slice(0, 10) ?? '-'}
+          </span>
+        ),
+      },
+      {
+        key: 'last_candle_time',
+        label: '最新数据',
+        width: columnWidths.last_candle_time ?? 150,
+        minWidth: 100,
+        maxWidth: 200,
+        sortable: true,
+        render: (value) => (
+          <span className="text-sm text-muted-foreground">
+            {(value as string)?.slice(0, 10) ?? '-'}
+          </span>
+        ),
+      },
+      {
+        key: 'kline_count',
+        label: 'K线数量',
+        width: columnWidths.kline_count ?? 120,
+        minWidth: 80,
+        maxWidth: 200,
+        align: 'right',
+        sortable: true,
+        render: (value) => (
+          <span className="text-sm">
+            {(value as number)?.toLocaleString() ?? '-'}
+          </span>
+        ),
+      },
+    ],
+    [columnWidths]
+  )
+
+  if (symbols.length === 0) {
+    return (
+      <div className="flex h-32 items-center justify-center text-muted-foreground">
+        暂无数据
+      </div>
+    )
+  }
+
+  return (
+    <ResizableTable
+      columns={columns}
+      data={symbols}
+      rowKey="symbol"
+      onRowClick={onRowClick}
+      onColumnWidthChange={onColumnWidthChange}
+      sortState={sortState}
+      onSortChange={onSortChange}
+      emptyText="暂无数据"
+    />
   )
 }
