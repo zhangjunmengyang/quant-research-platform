@@ -234,8 +234,9 @@ sections/
 
 # 新位置
 private/
-  factors/code/      # 因子代码 (.py)
-  sections/          # 截面因子 (.py)
+  factors/      # 因子代码 (.py)
+  sections/     # 截面因子 (.py)
+  metadata/     # 因子元数据 (YAML)
 ```
 
 `private/` 目录已被 gitignore，需通过独立的私有仓库管理。详见 `private/.gitkeep`。

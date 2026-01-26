@@ -57,11 +57,11 @@ def get_config_dir() -> Path:
 
 def get_factors_dir() -> Path:
     """
-    获取因子代码目录（私有数据目录/factors/code）
+    获取因子代码目录（私有数据目录/factors）
 
     自动创建目录（如果不存在）。
     """
-    factors_dir = get_private_data_dir() / "factors" / "code"
+    factors_dir = get_private_data_dir() / "factors"
     factors_dir.mkdir(parents=True, exist_ok=True)
     return factors_dir
 
@@ -85,6 +85,17 @@ def get_backend_dir() -> Path:
 def get_domain_dir(domain_name: str) -> Path:
     """获取指定业务域目录"""
     return get_backend_dir() / "domains" / domain_name
+
+
+def get_metadata_dir() -> Path:
+    """
+    获取因子元数据目录（私有数据目录/metadata）
+
+    自动创建目录（如果不存在）。
+    """
+    metadata_dir = get_private_data_dir() / "metadata"
+    metadata_dir.mkdir(parents=True, exist_ok=True)
+    return metadata_dir
 
 
 def get_private_data_dir() -> Path:
@@ -111,6 +122,7 @@ __all__ = [
     "get_config_dir",
     "get_factors_dir",
     "get_sections_dir",
+    "get_metadata_dir",
     "get_backend_dir",
     "get_domain_dir",
     "get_private_data_dir",

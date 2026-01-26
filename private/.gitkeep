@@ -6,17 +6,13 @@ This directory stores private data managed via a separate git repository.
 
 ```
 private/
-  factors/
-    code/       # Factor code (.py)
-    metadata/   # Factor metadata (YAML)
-  sections/     # Section factors (.py)
-  notes/        # Research notes (Markdown)
-  strategies/
-    configs/        # Strategy configs (YAML)
-    equity_curves/  # Equity curves (JSON)
-  experiences/
-    all/        # Experience data (YAML)
-  config/       # Private configs
+  factors/            # Factor code (.py)
+  sections/           # Section factors (.py)
+  metadata/           # Factor metadata (YAML)
+  notes/              # Research notes (Markdown)
+  strategies/         # Strategy data
+  experiences/        # Experience data (YAML)
+  config/             # Private configs
 ```
 
 ## Setup
