@@ -220,3 +220,22 @@ make healthcheck prod     # 健康检查
 ## License
 
 MIT
+
+---
+
+## Important Update
+
+**Factor and section files have been moved to the `private/` directory.**
+
+```
+# Old location (deprecated)
+factors/
+sections/
+
+# New location
+private/
+  factors/code/      # Factor code (.py)
+  sections/          # Section factors (.py)
+```
+
+The `private/` directory is gitignored and should be managed via a separate private repository. See `private/.gitkeep` for setup instructions.
