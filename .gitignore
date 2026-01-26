@@ -95,13 +95,4 @@ docs/*
 update_min_qty.py
 
 # 私有数据目录（通过独立 Git 仓库管理）
-/private/factors/
-/private/sections/
-/private/notes/
-/private/strategies/
-/private/experiences/
-/private/config/
-
-# 保留目录结构和说明
-!/private/README.md
-!/private/**/.gitkeep
+/private/
