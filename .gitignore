@@ -94,7 +94,6 @@ docs/*
 .claude/
 update_min_qty.py
 
-# 私有数据目录（通过独立 Git 仓库管理，保留目录结构）
-/private/**
-!/private/**/
-!/private/**/.gitkeep
+# 私有数据目录（通过独立 Git 仓库管理）
+/private/*
+!/private/.gitkeep

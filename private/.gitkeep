@@ -1,0 +1,29 @@
+# Private Data Directory
+
+This directory stores private data managed via a separate git repository.
+
+## Directory Structure
+
+```
+private/
+  factors/
+    code/       # Factor code (.py)
+    metadata/   # Factor metadata (YAML)
+  sections/     # Section factors (.py)
+  notes/        # Research notes (Markdown)
+  strategies/
+    configs/        # Strategy configs (YAML)
+    equity_curves/  # Equity curves (JSON)
+  experiences/
+    all/        # Experience data (YAML)
+  config/       # Private configs
+```
+
+## Setup
+
+```bash
+cd private
+git init
+git remote add origin <your-private-repo>
+git pull origin main
+```
