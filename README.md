@@ -223,19 +223,19 @@ MIT
 
 ---
 
-## Important Update
+## 重要更新
 
-**Factor and section files have been moved to the `private/` directory.**
+**因子和截面因子文件已迁移至 `private/` 目录。**
 
 ```
-# Old location (deprecated)
+# 旧位置（已废弃）
 factors/
 sections/
 
-# New location
+# 新位置
 private/
-  factors/code/      # Factor code (.py)
-  sections/          # Section factors (.py)
+  factors/code/      # 因子代码 (.py)
+  sections/          # 截面因子 (.py)
 ```
 
-The `private/` directory is gitignored and should be managed via a separate private repository. See `private/.gitkeep` for setup instructions.
+`private/` 目录已被 gitignore，需通过独立的私有仓库管理。详见 `private/.gitkeep`。
