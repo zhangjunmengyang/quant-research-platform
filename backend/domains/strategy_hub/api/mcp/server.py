@@ -23,12 +23,8 @@ from .tools.strategy_tools import (
     SearchStrategiesTool,
     GetStrategyStatsTool,
     RunBacktestTool,
-    GetBacktestStatusTool,
-    CancelBacktestTool,
 )
 from .tools.analysis_tools import (
-    RunParamSearchTool,
-    AnalyzeParamsTool,
     CompareBacktestLiveTool,
     CompareStrategyCoinsTool,
     CompareEquityCurvesTool,
@@ -60,12 +56,8 @@ class StrategyHubMCPServer(BaseMCPServer):
 
         # 回测工具
         self.register_tool(RunBacktestTool(), "mutation")
-        self.register_tool(GetBacktestStatusTool(), "query")
-        self.register_tool(CancelBacktestTool(), "mutation")
 
-        # 分析类工具
-        self.register_tool(RunParamSearchTool(), "mutation")
-        self.register_tool(AnalyzeParamsTool(), "query")
+        # 分析类工具 (参数搜索/分析已移至 factor-hub)
         self.register_tool(CompareBacktestLiveTool(), "query")
         self.register_tool(CompareStrategyCoinsTool(), "query")
         self.register_tool(CompareEquityCurvesTool(), "query")

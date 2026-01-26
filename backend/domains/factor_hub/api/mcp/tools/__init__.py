@@ -20,12 +20,13 @@ from .mutation_tools import (
 from .analysis_tools import (
     GetFactorICTool,
     CompareFactorsTool,
-    SuggestSimilarFactorsTool,
-    # 多因子分析工具
+    # 多因子分析工具 (placeholder)
     GetFactorCorrelationTool,
     MultiFactorAnalyzeTool,
     # 因子分箱分析工具
     AnalyzeFactorGroupsTool,
+    # 因子参数分析工具（支持一维柱状图和二维热力图）
+    RunFactorParamAnalysisTool,
 )
 
 __all__ = [
@@ -46,10 +47,11 @@ __all__ = [
     # 分析工具
     'GetFactorICTool',
     'CompareFactorsTool',
-    'SuggestSimilarFactorsTool',
-    # 多因子分析工具
+    # 多因子分析工具 (placeholder)
     'GetFactorCorrelationTool',
     'MultiFactorAnalyzeTool',
     # 因子分箱分析工具
     'AnalyzeFactorGroupsTool',
+    # 因子参数分析工具（支持一维柱状图和二维热力图）
+    'RunFactorParamAnalysisTool',
 ]

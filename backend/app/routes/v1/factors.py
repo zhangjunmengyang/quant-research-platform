@@ -74,7 +74,7 @@ async def list_factors(
         filter_condition["llm_score"] = score_filters if len(score_filters) > 1 else score_filters[0]
 
     if verified is not None:
-        filter_condition["verified"] = 1 if verified else 0
+        filter_condition["verified"] = verified
 
     # 处理排除状态筛选
     include_excluded = False

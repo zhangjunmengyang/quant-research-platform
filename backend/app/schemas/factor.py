@@ -63,6 +63,9 @@ class Factor(FactorBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+    # 参数分析结果 (JSON 字符串)
+    param_analysis: Optional[str] = Field(None, description="参数分析结果 JSON")
+
     class Config:
         from_attributes = True
 

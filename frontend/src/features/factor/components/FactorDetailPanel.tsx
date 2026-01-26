@@ -9,10 +9,12 @@ import { useMutation } from '@tanstack/react-query'
 import { useFactorStore, useFactorMutations } from '../'
 import { factorApi } from '../api'
 import { pipelineApi, type FillableField } from '../pipeline-api'
-import type { Factor, FactorUpdate } from '../types'
+import type { Factor, FactorUpdate, ParamAnalysisData, StrategyConfig } from '../types'
+import { isParamAnalysis2D } from '../types'
 import { cn, stripPyExtension } from '@/lib/utils'
-import { Loader2, X, Copy, Check, Edit2, Save, Sparkles, Ban, Undo2, Trash2 } from 'lucide-react'
+import { Loader2, X, Copy, Check, Edit2, Save, Sparkles, Ban, Undo2, Trash2, BarChart3 } from 'lucide-react'
 import { toast } from '@/components/ui/toast'
+import { BaseChart } from '@/components/charts'
 
 // 可自动生成的字段
 const AUTO_FILL_FIELDS: { value: FillableField; label: string }[] = [
@@ -702,6 +704,11 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
                 )}
               </section>
 
+              {/* Parameter Analysis Section */}
+              {displayFactor.param_analysis && (
+                <ParamAnalysisSection paramAnalysisJson={displayFactor.param_analysis} />
+              )}
+
               {/* Code - Full Source */}
               {displayFactor.code_content && (
                 <section>
@@ -748,6 +755,344 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Parameter Analysis Section Component
+ * 展示因子参数敏感性分析结果（支持一维柱状图和二维热力图）
+ * 新版本：复用 run_backtest 的 strategy_list 结构
+ */
+function ParamAnalysisSection({ paramAnalysisJson }: { paramAnalysisJson: string }) {
+  const [showAllResults, setShowAllResults] = useState(false)
+
+  const paramAnalysis = useMemo<ParamAnalysisData | null>(() => {
+    try {
+      return JSON.parse(paramAnalysisJson)
+    } catch {
+      return null
+    }
+  }, [paramAnalysisJson])
+
+  if (!paramAnalysis) {
+    return null
+  }
+
+  const { config, grid_keys, best_result, results, indicator, chart, updated_at } = paramAnalysis
+  const is2D = isParamAnalysis2D(paramAnalysis)
+
+  // 安全检查：旧版本数据可能没有这些字段
+  if (!config || !grid_keys || !best_result) {
+    return (
+      <section>
+        <div className="mb-3 flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-muted-foreground">参数敏感性分析</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">数据格式不兼容，请重新运行参数分析</p>
+      </section>
+    )
+  }
+
+  // 从 strategy_list 中提取第一个策略的配置
+  const firstStrategy: StrategyConfig | undefined = config.strategy_list?.[0]
+
+  // 指标名称映射
+  const indicatorLabels: Record<string, string> = {
+    annual_return: '年化收益',
+    sharpe_ratio: '夏普比率',
+    max_drawdown: '最大回撤',
+    win_rate: '胜率',
+  }
+
+  // 格式化数值显示
+  const formatValue = (key: string, value: number | undefined) => {
+    if (value === undefined || value === null) return '-'
+    if (key === 'sharpe_ratio') return value.toFixed(2)
+    return `${(value * 100).toFixed(2)}%`
+  }
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <BarChart3 className="h-4 w-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold text-muted-foreground">
+          参数敏感性分析
+        </h3>
+        <span className={cn(
+          "px-1.5 py-0.5 text-xs rounded",
+          is2D ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+        )}>
+          {is2D ? '热力图' : '柱状图'}
+        </span>
+        {updated_at && (
+          <span className="text-xs text-muted-foreground">
+            更新于 {new Date(updated_at).toLocaleDateString('zh-CN')}
+          </span>
+        )}
+      </div>
+
+      {/* 回测配置卡片 */}
+      <div className="mb-4 rounded-lg border bg-slate-50/50 p-4">
+        <h4 className="text-xs font-medium text-muted-foreground mb-3">回测配置</h4>
+
+        {/* 基础配置 */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">持仓周期</span>
+            <span className="font-medium font-mono text-xs">{firstStrategy?.hold_period || '-'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">市场类型</span>
+            <span className="font-medium font-mono text-xs">{firstStrategy?.market || '-'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">多头选币</span>
+            <span className="font-medium font-mono text-xs">{firstStrategy?.long_select_coin_num ?? '-'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">空头选币</span>
+            <span className="font-medium font-mono text-xs">{firstStrategy?.short_select_coin_num ?? '-'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">多头仓位权重</span>
+            <span className="font-medium font-mono text-xs">{firstStrategy?.long_cap_weight ?? '-'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">空头仓位权重</span>
+            <span className="font-medium font-mono text-xs">{firstStrategy?.short_cap_weight ?? '-'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">评价指标</span>
+            <span className="font-medium">{indicatorLabels[indicator] || indicator}</span>
+          </div>
+          {config.leverage && config.leverage !== 1 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">杠杆倍数</span>
+              <span className="font-medium">{config.leverage}x</span>
+            </div>
+          )}
+          {config.start_date && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">开始日期</span>
+              <span className="font-medium">{config.start_date}</span>
+            </div>
+          )}
+          {config.end_date && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">结束日期</span>
+              <span className="font-medium">{config.end_date}</span>
+            </div>
+          )}
+        </div>
+
+        {/* 选币因子 - 原始格式 */}
+        {firstStrategy?.factor_list && firstStrategy.factor_list.length > 0 && (
+          <div className="mt-3 pt-3 border-t">
+            <span className="text-xs text-muted-foreground">选币因子:</span>
+            <div className="mt-1 space-y-1">
+              {firstStrategy.factor_list.map((factor, idx) => (
+                <code key={idx} className="block text-xs bg-slate-100 px-2 py-1 rounded font-mono text-slate-700">
+                  {JSON.stringify(factor)}
+                </code>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 前置过滤因子 - 原始格式 */}
+        {firstStrategy?.filter_list && firstStrategy.filter_list.length > 0 && (
+          <div className="mt-3 pt-3 border-t">
+            <span className="text-xs text-muted-foreground">前置过滤:</span>
+            <div className="mt-1 space-y-1">
+              {firstStrategy.filter_list.map((filter, idx) => (
+                <code key={idx} className="block text-xs bg-slate-100 px-2 py-1 rounded font-mono text-slate-700">
+                  {JSON.stringify(filter)}
+                </code>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 后置过滤因子 - 原始格式 */}
+        {firstStrategy?.filter_list_post && firstStrategy.filter_list_post.length > 0 && (
+          <div className="mt-3 pt-3 border-t">
+            <span className="text-xs text-muted-foreground">后置过滤:</span>
+            <div className="mt-1 space-y-1">
+              {firstStrategy.filter_list_post.map((filter, idx) => (
+                <code key={idx} className="block text-xs bg-slate-100 px-2 py-1 rounded font-mono text-slate-700">
+                  {JSON.stringify(filter)}
+                </code>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 遍历参数 */}
+        <div className="mt-3 pt-3 border-t">
+          <span className="text-xs text-muted-foreground">遍历参数:</span>
+          <div className="mt-1 space-y-1">
+            {grid_keys.map((key) => {
+              const values = config.param_grid[key]
+              return (
+                <div key={key} className="flex items-center gap-2 text-xs">
+                  <span className="font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded shrink-0">
+                    {key}
+                  </span>
+                  <span className="text-muted-foreground">=</span>
+                  <span className="font-mono text-slate-700">
+                    [{values?.map(v => JSON.stringify(v)).join(', ')}]
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* 最优参数摘要 */}
+      <div className="mb-4 rounded-lg border bg-green-50/50 p-4">
+        <div className="flex items-center flex-wrap gap-2 mb-3">
+          <span className="text-sm font-medium text-green-800">最优参数组合</span>
+          {grid_keys.map((key) => {
+            const value = best_result[key]
+            return (
+              <span key={key} className="inline-flex items-center gap-1">
+                <span className="text-xs text-green-600 font-mono">{key}:</span>
+                <span className="rounded-full bg-green-600 px-2.5 py-0.5 text-xs font-semibold text-white">
+                  {String(value)}
+                </span>
+              </span>
+            )
+          })}
+        </div>
+        <div className="grid grid-cols-4 gap-3 text-sm">
+          <div>
+            <span className="text-muted-foreground">年化收益</span>
+            <p className={cn(
+              "font-medium",
+              best_result.annual_return !== undefined && (best_result.annual_return as number) < 0 && "text-red-600"
+            )}>
+              {formatValue('annual_return', best_result.annual_return as number | undefined)}
+            </p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">夏普比率</span>
+            <p className={cn(
+              "font-medium",
+              best_result.sharpe_ratio !== undefined && (best_result.sharpe_ratio as number) < 0 && "text-red-600"
+            )}>
+              {formatValue('sharpe_ratio', best_result.sharpe_ratio as number | undefined)}
+            </p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">最大回撤</span>
+            <p className="font-medium text-red-600">{formatValue('max_drawdown', best_result.max_drawdown as number | undefined)}</p>
+          </div>
+          <div>
+            <span className="text-muted-foreground">胜率</span>
+            <p className="font-medium">{formatValue('win_rate', best_result.win_rate as number | undefined)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ECharts 图表 */}
+      <div className="mb-4 rounded-lg border bg-white p-2">
+        <BaseChart
+          option={chart as Parameters<typeof BaseChart>[0]['option']}
+          style={{ height: is2D ? '360px' : '280px' }}
+        />
+      </div>
+
+      {/* 完整分析结果 */}
+      {results && results.length > 0 && (
+        <div className="rounded-lg border">
+          <button
+            onClick={() => setShowAllResults(!showAllResults)}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-slate-50 transition-colors"
+          >
+            <span>全部参数结果 ({results.length})</span>
+            <span className={cn(
+              "transition-transform",
+              showAllResults && "rotate-180"
+            )}>
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          </button>
+          {showAllResults && (
+            <div className="border-t overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    {grid_keys.map((key) => (
+                      <th key={key} className="px-4 py-2 text-left font-medium text-muted-foreground whitespace-nowrap font-mono">
+                        {key}
+                      </th>
+                    ))}
+                    <th className="px-4 py-2 text-right font-medium text-muted-foreground">年化收益</th>
+                    <th className="px-4 py-2 text-right font-medium text-muted-foreground">夏普比率</th>
+                    <th className="px-4 py-2 text-right font-medium text-muted-foreground">最大回撤</th>
+                    <th className="px-4 py-2 text-right font-medium text-muted-foreground">胜率</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.map((result, idx) => {
+                    // 判断是否为最优结果
+                    const isBest = grid_keys.every((key) => result[key] === best_result[key])
+                    // 生成唯一 key
+                    const rowKey = grid_keys.map((k) => result[k]).join('-') || idx
+                    return (
+                      <tr
+                        key={rowKey}
+                        className={cn(
+                          "border-t",
+                          isBest && "bg-green-50"
+                        )}
+                      >
+                        {grid_keys.map((key) => (
+                          <td key={key} className="px-4 py-2">
+                            <span className={cn(
+                              "font-medium",
+                              isBest && "text-green-700"
+                            )}>
+                              {String(result[key])}
+                            </span>
+                          </td>
+                        ))}
+                        <td className={cn(
+                          "px-4 py-2 text-right",
+                          result.annual_return !== undefined && (result.annual_return as number) < 0 && "text-red-600"
+                        )}>
+                          {result.error ? (
+                            <span className="text-red-500 text-xs">{result.error}</span>
+                          ) : (
+                            formatValue('annual_return', result.annual_return as number | undefined)
+                          )}
+                        </td>
+                        <td className={cn(
+                          "px-4 py-2 text-right",
+                          result.sharpe_ratio !== undefined && (result.sharpe_ratio as number) < 0 && "text-red-600"
+                        )}>
+                          {formatValue('sharpe_ratio', result.sharpe_ratio as number | undefined)}
+                        </td>
+                        <td className="px-4 py-2 text-right text-red-600">
+                          {formatValue('max_drawdown', result.max_drawdown as number | undefined)}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {formatValue('win_rate', result.win_rate as number | undefined)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   )
 }
 

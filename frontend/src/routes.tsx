@@ -13,6 +13,7 @@ const StrategiesBacktest = () => import('@/pages/strategies/Backtest')
 const StrategiesAnalysis = () => import('@/pages/strategies/Analysis')
 
 const DataOverview = () => import('@/pages/data/Overview')
+const DataMonitor = () => import('@/pages/data/Monitor')
 
 const MCPDashboard = () => import('@/pages/mcp/Dashboard')
 const MCPDetail = () => import('@/pages/mcp/Detail')
@@ -62,7 +63,10 @@ export const router = createBrowserRouter([
       // Data Hub
       {
         path: 'data',
-        children: [{ index: true, lazy: DataOverview }],
+        children: [
+          { index: true, lazy: DataOverview },
+          { path: 'monitor', lazy: DataMonitor },
+        ],
       },
       // Factor Hub
       {

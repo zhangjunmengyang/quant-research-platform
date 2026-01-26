@@ -1,9 +1,12 @@
 /**
- * ResizableTable - 支持列宽拖拽调整的表格组件
+ * ResizableTable - 支持列宽拖拽调整和表头排序的表格组件
  */
 
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
+import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+export type SortOrder = 'asc' | 'desc'
 
 export interface TableColumn<T> {
   key: string
@@ -15,6 +18,11 @@ export interface TableColumn<T> {
   align?: 'left' | 'center' | 'right'
   sortable?: boolean
   fixed?: 'left' | 'right'
+}
+
+export interface SortState {
+  field: string
+  order: SortOrder
 }
 
 interface ResizableTableProps<T> {
@@ -29,6 +37,9 @@ interface ResizableTableProps<T> {
   rowClassName?: string | ((row: T, index: number) => string)
   stickyHeader?: boolean
   maxHeight?: number | string
+  // 排序相关
+  sortState?: SortState
+  onSortChange?: (sort: SortState) => void
 }
 
 export function ResizableTable<T>({
@@ -43,6 +54,8 @@ export function ResizableTable<T>({
   rowClassName,
   stickyHeader = false,
   maxHeight,
+  sortState,
+  onSortChange,
 }: ResizableTableProps<T>) {
   // 列宽状态
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -141,6 +154,38 @@ export function ResizableTable<T>({
     }
   }, [resizing, handleResizeMove, handleResizeEnd])
 
+  // 处理排序点击
+  const handleSortClick = useCallback(
+    (columnKey: string) => {
+      if (!onSortChange) return
+      if (sortState?.field === columnKey) {
+        // 切换排序方向
+        onSortChange({
+          field: columnKey,
+          order: sortState.order === 'asc' ? 'desc' : 'asc',
+        })
+      } else {
+        // 新字段，默认降序
+        onSortChange({ field: columnKey, order: 'desc' })
+      }
+    },
+    [sortState, onSortChange]
+  )
+
+  // 渲染排序图标
+  const renderSortIcon = (columnKey: string, isSortable: boolean) => {
+    if (!isSortable || !onSortChange) return null
+
+    if (sortState?.field !== columnKey) {
+      return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />
+    }
+    return sortState.order === 'asc' ? (
+      <ArrowUp className="h-3.5 w-3.5" />
+    ) : (
+      <ArrowDown className="h-3.5 w-3.5" />
+    )
+  }
+
   // 计算总宽度
   const totalWidth = columns.reduce((sum, col) => {
     const w = columnWidths[col.key] ?? col.width
@@ -188,29 +233,44 @@ export function ResizableTable<T>({
           {/* 表头 - 白色背景 */}
           <thead className={cn(stickyHeader && 'sticky top-0 z-10')}>
             <tr className={cn('border-b bg-background', headerClassName)}>
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  className={cn(
-                    'relative px-3 py-3 text-sm font-medium text-muted-foreground select-none',
-                    col.align === 'center' && 'text-center',
-                    col.align === 'right' && 'text-right',
-                    !col.align && 'text-left'
-                  )}
-                  style={{ width: columnWidths[col.key] ?? col.width }}
-                >
-                  <span className="truncate block">{col.label}</span>
-
-                  {/* 拖拽手柄 */}
-                  <div
+              {columns.map((col) => {
+                const isSortable = col.sortable && onSortChange
+                return (
+                  <th
+                    key={col.key}
                     className={cn(
-                      'absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 transition-colors',
-                      resizing === col.key && 'bg-primary'
+                      'relative px-3 py-3 text-sm font-medium text-muted-foreground select-none',
+                      col.align === 'center' && 'text-center',
+                      col.align === 'right' && 'text-right',
+                      !col.align && 'text-left',
+                      isSortable && 'cursor-pointer hover:bg-muted/50'
                     )}
-                    onMouseDown={(e) => handleResizeStart(e, col.key)}
-                  />
-                </th>
-              ))}
+                    style={{ width: columnWidths[col.key] ?? col.width }}
+                    onClick={() => isSortable && handleSortClick(col.key)}
+                  >
+                    <div
+                      className={cn(
+                        'flex items-center gap-1.5',
+                        col.align === 'center' && 'justify-center',
+                        col.align === 'right' && 'justify-end'
+                      )}
+                    >
+                      <span className="truncate">{col.label}</span>
+                      {renderSortIcon(col.key, !!col.sortable)}
+                    </div>
+
+                    {/* 拖拽手柄 */}
+                    <div
+                      className={cn(
+                        'absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 transition-colors',
+                        resizing === col.key && 'bg-primary'
+                      )}
+                      onMouseDown={(e) => handleResizeStart(e, col.key)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </th>
+                )
+              })}
             </tr>
           </thead>
 

@@ -206,34 +206,7 @@ class RunBacktestTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return """运行因子策略回测。
-
-提交回测任务后返回任务ID，可通过 get_backtest_status 查询进度。
-回测完成后策略会自动入库，可通过 get_strategy 查看结果。
-
-策略配置说明:
-- factor_list: 因子列表，每个因子格式为 [因子名, 排序方式, 参数]
-  - 排序方式: True=升序(小值优先), False=降序(大值优先)
-- long_select_coin_num: 多头选币数量（比例或绝对数量）
-- short_select_coin_num: 空头选币数量（0=不做空）
-- hold_period: 持仓周期（如 "1H", "4H", "24H"）
-- market: 市场类型（"swap_swap", "spot_swap", "spot_spot"）
-
-示例:
-```json
-{
-  "name": "动量策略",
-  "strategy_list": [{
-    "factor_list": [["Momentum", true, {"n": 20}]],
-    "long_select_coin_num": 0.1,
-    "short_select_coin_num": 0,
-    "hold_period": "1H",
-    "market": "swap_swap"
-  }],
-  "start_date": "2024-01-01",
-  "end_date": "2024-12-31"
-}
-```"""
+        return "运行因子策略回测"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -252,26 +225,64 @@ class RunBacktestTool(BaseTool):
                         "properties": {
                             "factor_list": {
                                 "type": "array",
-                                "description": "因子列表，每个因子为 [名称, 排序方向, 参数]",
+                                "description": (
+                                    "因子列表，每个因子为 [名称, 排序方向, 参数, 权重]。"
+                                    "排序方向: True=因子值小的做多/大的做空, False=反之。"
+                                    "参数: 计算窗口(小时)，如 1200。权重: 固定为 1。"
+                                    "示例: [[\"Momentum\", true, 1200, 1]]"
+                                ),
+                            },
+                            "filter_list": {
+                                "type": "array",
+                                "description": (
+                                    "前置过滤因子列表，每个过滤因子为 [名称, 参数, 过滤条件, 排序方向]。"
+                                    "参数: 计算窗口(小时)。"
+                                    "过滤条件: \"pct:<0.2\"(百分位<20%), \"rank:<10\"(排名<10), \"val:>100\"(原值>100)。"
+                                    "排序方向: true=升序(值小排名高), false=降序(值大排名高)。对val无效，对pct/rank有效。"
+                                    "示例: [[\"QuoteVolumeMean\", 24, \"pct:<0.2\", true]] 保留成交量最低的20%"
+                                ),
+                            },
+                            "filter_list_post": {
+                                "type": "array",
+                                "description": (
+                                    "后置过滤因子列表（在选币后应用），格式同 filter_list。"
+                                ),
                             },
                             "long_select_coin_num": {
                                 "type": "number",
-                                "description": "多头选币数量（比例或绝对数）",
+                                "description": "多头选币数量。[0,1): 比例(如 0.1=10%); >=1: 绝对数量",
                                 "default": 0.1,
                             },
                             "short_select_coin_num": {
                                 "type": "number",
-                                "description": "空头选币数量（0表示不做空）",
+                                "description": "空头选币数量(0=不做空)。[0,1): 比例; >=1: 绝对数量",
+                                "default": 0,
+                            },
+                            "long_cap_weight": {
+                                "type": "number",
+                                "description": "多头仓位权重。实际占比=long/(long+short)。纯多头: long=1,short=0",
+                                "default": 1,
+                            },
+                            "short_cap_weight": {
+                                "type": "number",
+                                "description": "空头仓位权重。多空平衡: long=1,short=1; 纯空头: long=0,short=1",
                                 "default": 0,
                             },
                             "hold_period": {
                                 "type": "string",
-                                "description": "持仓周期",
+                                "description": "持仓周期，如 \"1H\", \"4H\", \"24H\"",
                                 "default": "1H",
                             },
                             "market": {
                                 "type": "string",
-                                "description": "市场类型",
+                                "description": (
+                                    "币池与交易类型: "
+                                    "spot_spot(现货币池+现货交易), "
+                                    "swap_swap(合约币池+合约交易), "
+                                    "spot_swap(现货币池+优先合约), "
+                                    "mix_spot(合并币池+优先现货), "
+                                    "mix_swap(合并币池+优先合约)"
+                                ),
                                 "default": "swap_swap",
                             },
                         },
@@ -279,25 +290,16 @@ class RunBacktestTool(BaseTool):
                 },
                 "start_date": {
                     "type": "string",
-                    "description": "回测开始日期 (YYYY-MM-DD)",
+                    "description": "回测开始日期 (YYYY-MM-DD)，不传则使用数据最早日期",
                 },
                 "end_date": {
                     "type": "string",
-                    "description": "回测结束日期 (YYYY-MM-DD)",
-                },
-                "initial_usdt": {
-                    "type": "number",
-                    "description": "初始资金",
-                    "default": 10000,
+                    "description": "回测结束日期 (YYYY-MM-DD)，不传则使用数据最新日期",
                 },
                 "leverage": {
                     "type": "number",
-                    "description": "杠杆倍数",
-                    "default": 1.0,
-                },
-                "description": {
-                    "type": "string",
-                    "description": "策略描述（可选）",
+                    "description": "杠杆倍数，仅合约交易有效",
+                    "default": 1,
                 },
             },
             "required": ["name", "strategy_list"],
@@ -309,9 +311,7 @@ class RunBacktestTool(BaseTool):
         strategy_list: list,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        initial_usdt: float = 10000,
         leverage: float = 1.0,
-        description: Optional[str] = None,
     ) -> ToolResult:
         try:
             from domains.strategy_hub.services.backtest_runner import (
@@ -325,131 +325,29 @@ class RunBacktestTool(BaseTool):
                 strategy_list=strategy_list,
                 start_date=start_date,
                 end_date=end_date,
-                initial_usdt=initial_usdt,
                 leverage=leverage,
-                description=description,
             )
 
-            # 提交回测任务
+            # 执行回测并等待完成
             runner = get_backtest_runner()
-            task_id = runner.submit(request)
+            strategy = await runner.run_and_wait(request)
 
+            # 返回回测结果摘要
             return ToolResult.ok({
-                "task_id": task_id,
-                "message": f"回测任务已提交: {name}",
-                "status": "pending",
+                "strategy_id": strategy.id,
+                "name": strategy.name,
+                "status": "completed",
+                "summary": {
+                    "annual_return": strategy.annual_return,
+                    "max_drawdown": strategy.max_drawdown,
+                    "sharpe_ratio": strategy.sharpe_ratio,
+                    "win_rate": strategy.win_rate,
+                    "cumulative_return": strategy.cumulative_return,
+                },
+                "message": f"回测完成: {name}",
             })
         except Exception as e:
-            logger.exception("提交回测失败")
-            return ToolResult.fail(str(e))
-
-
-class GetBacktestStatusTool(BaseTool):
-    """获取回测状态工具"""
-
-    category = "query"
-
-    @property
-    def name(self) -> str:
-        return "get_backtest_status"
-
-    @property
-    def description(self) -> str:
-        return "查询回测任务的执行状态"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "task_id": {
-                    "type": "string",
-                    "description": "任务ID（由 run_backtest 返回）",
-                },
-            },
-            "required": ["task_id"],
-        }
-
-    async def execute(self, task_id: str) -> ToolResult:
-        try:
-            from domains.strategy_hub.services.backtest_runner import get_backtest_runner
-
-            runner = get_backtest_runner()
-            task_info = runner.get_status(task_id)
-
-            if not task_info:
-                return ToolResult.fail(f"任务不存在: {task_id}")
-
-            result = {
-                "task_id": task_id,
-                "status": task_info.status.value,
-            }
-
-            if task_info.created_at:
-                result["created_at"] = task_info.created_at.isoformat()
-            if task_info.started_at:
-                result["started_at"] = task_info.started_at.isoformat()
-            if task_info.completed_at:
-                result["completed_at"] = task_info.completed_at.isoformat()
-            if task_info.error_message:
-                result["error"] = task_info.error_message
-
-            # 如果已完成，获取结果摘要
-            if task_info.status.value == "completed":
-                strategy = runner.get_result(task_id)
-                if strategy:
-                    result["summary"] = {
-                        "annual_return": strategy.annual_return,
-                        "max_drawdown": strategy.max_drawdown,
-                        "sharpe_ratio": strategy.sharpe_ratio,
-                        "win_rate": strategy.win_rate,
-                    }
-
-            return ToolResult.ok(result)
-        except Exception as e:
-            logger.exception("查询回测状态失败")
-            return ToolResult.fail(str(e))
-
-
-class CancelBacktestTool(BaseTool):
-    """取消回测任务工具"""
-
-    category = "mutation"
-
-    @property
-    def name(self) -> str:
-        return "cancel_backtest"
-
-    @property
-    def description(self) -> str:
-        return "取消正在运行的回测任务"
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "task_id": {
-                    "type": "string",
-                    "description": "任务ID",
-                },
-            },
-            "required": ["task_id"],
-        }
-
-    async def execute(self, task_id: str) -> ToolResult:
-        try:
-            from domains.strategy_hub.services.backtest_runner import get_backtest_runner
-
-            runner = get_backtest_runner()
-            success = runner.cancel(task_id)
-
-            if success:
-                return ToolResult.ok({"message": f"任务 {task_id} 已取消"})
-            else:
-                return ToolResult.fail(f"取消失败，任务可能已完成或不存在: {task_id}")
-        except Exception as e:
-            logger.exception("取消回测失败")
+            logger.exception("回测执行失败")
             return ToolResult.fail(str(e))
 
 

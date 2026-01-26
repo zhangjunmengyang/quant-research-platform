@@ -6,14 +6,14 @@
 import type { FactorStats } from '@/features/factor'
 import type { PipelineStatus } from '@/features/factor/pipeline-api'
 
-// 字段标签映射
+// 字段标签映射 (与 FactorDetailPanel 保持一致)
 const FIELD_LABELS: Record<string, string> = {
-  style: '风格分类',
-  formula: '计算公式',
+  style: '风格',
+  formula: '公式',
   input_data: '输入数据',
-  value_range: '值域范围',
-  description: '因子描述',
-  analysis: '因子分析',
+  value_range: '值域',
+  description: '刻画特征',
+  analysis: '深度分析',
   llm_score: 'LLM评分',
 }
 

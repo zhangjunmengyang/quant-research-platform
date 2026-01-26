@@ -32,16 +32,6 @@ const EXCLUDED_OPTIONS: SelectOption[] = [
   { value: 'all', label: '全部' },
 ]
 
-// 排序选项
-const ORDER_BY_OPTIONS: SelectOption[] = [
-  { value: 'filename', label: '按名称' },
-  { value: 'factor_type', label: '按类型' },
-  { value: 'style', label: '按风格' },
-  { value: 'llm_score', label: '按评分' },
-  { value: 'created_at', label: '按创建时间' },
-  { value: 'updated_at', label: '按更新时间' },
-]
-
 interface FactorFiltersProps {
   filters: Partial<FactorListParams>
   setFilters: (filters: Partial<FactorListParams>) => void
@@ -117,12 +107,6 @@ export function FactorFilters({ filters, setFilters, resetFilters, onSearch, sea
             page: 1,
           })
         }
-      />
-      <FilterSelect
-        label="排序"
-        options={ORDER_BY_OPTIONS}
-        value={filters.order_by || 'filename'}
-        onChange={(value) => setFilters({ order_by: value, page: 1 })}
       />
     </FilterToolbar>
   )

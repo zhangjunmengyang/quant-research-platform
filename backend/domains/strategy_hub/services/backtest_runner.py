@@ -367,6 +367,46 @@ class BacktestRunner:
         logger.info(f"提交回测任务: {task_id} - {request.name}, execution_id: {request.execution_id}")
         return task_id
 
+    async def run_and_wait(self, request: BacktestRequest) -> Optional[Strategy]:
+        """
+        提交回测任务并等待完成
+
+        同步模式：提交任务后阻塞等待结果，适用于 MCP 工具调用。
+
+        Args:
+            request: 回测请求
+
+        Returns:
+            完成的策略对象，失败时返回 None
+
+        Raises:
+            Exception: 回测执行失败时抛出异常
+        """
+        import asyncio
+
+        task_id = self.submit(request)
+        future = self._futures.get(task_id)
+
+        if future is None:
+            raise RuntimeError(f"任务提交失败: {task_id}")
+
+        # 在事件循环中非阻塞等待线程池任务完成
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, future.result)
+        except Exception as e:
+            # 获取任务状态以获取详细错误信息
+            task_info = self.get_status(task_id)
+            error_msg = task_info.error_message if task_info else str(e)
+            raise RuntimeError(f"回测执行失败: {error_msg}") from e
+
+        # 获取结果
+        strategy = self.get_result(task_id)
+        if strategy is None:
+            raise RuntimeError(f"回测完成但无法获取结果: {task_id}")
+
+        return strategy
+
     def get_status(self, task_id: str) -> Optional[TaskInfo]:
         """
         获取任务状态
@@ -625,6 +665,10 @@ class BacktestRunner:
         """
         result = {}
 
+        # 提取回测配置中的日期（实际使用的日期）
+        result["actual_start_date"] = getattr(conf, "start_date", None)
+        result["actual_end_date"] = getattr(conf, "end_date", None)
+
         # 从 conf.report 获取策略评价指标
         if conf.report is not None and not conf.report.empty:
             report = conf.report.iloc[0] if len(conf.report) > 0 else conf.report
@@ -713,6 +757,12 @@ class BacktestRunner:
         if not strategy:
             logger.error(f"策略不存在: {task_id}")
             return
+
+        # 更新实际使用的日期（如果原本为空）
+        if not strategy.start_date and result.get("actual_start_date"):
+            strategy.start_date = result["actual_start_date"]
+        if not strategy.end_date and result.get("actual_end_date"):
+            strategy.end_date = result["actual_end_date"]
 
         # 更新绩效指标
         strategy.cumulative_return = result.get("cumulative_return", 0.0)
@@ -958,6 +1008,25 @@ class BacktestRunner:
                         logger.warning(f"跳过格式不正确的因子配置: {factor}")
                         continue
                 engine_stg["factor_list"] = converted_factors
+
+            # 转换 filter_list 系列格式
+            # 引擎内部使用 set() 对 filter_list 去重，要求元素是 hashable (tuple)
+            # MCP 格式: [["PctChange", 24, "pct:<0.8"], ...]  (list of list)
+            # 引擎格式: [("PctChange", 24, "pct:<0.8"), ...]  (list of tuple)
+            filter_keys = [
+                "filter_list",
+                "long_filter_list",
+                "short_filter_list",
+                "filter_list_post",
+                "long_filter_list_post",
+                "short_filter_list_post",
+            ]
+            for key in filter_keys:
+                if key in engine_stg and engine_stg[key]:
+                    engine_stg[key] = [
+                        tuple(item) if isinstance(item, list) else item
+                        for item in engine_stg[key]
+                    ]
 
             engine_list.append(engine_stg)
         return engine_list

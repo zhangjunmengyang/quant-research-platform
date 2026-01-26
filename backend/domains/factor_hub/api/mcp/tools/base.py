@@ -27,6 +27,17 @@ class BaseTool(DomainBaseTool):
     service_path = "domains.factor_hub.services.factor_service:get_factor_service"
     service_attr = "factor_service"
 
+    @staticmethod
+    def normalize_filename(filename: str) -> str:
+        """
+        规范化因子文件名，移除可能的 .py 后缀。
+
+        数据库中存储的 filename 不含 .py 后缀，此方法确保输入参数的一致性。
+        """
+        if filename.endswith(".py"):
+            return filename[:-3]
+        return filename
+
 
 # 重新导出供其他模块使用
 __all__ = [
