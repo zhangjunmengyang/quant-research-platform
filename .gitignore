@@ -99,3 +99,4 @@ docs/*
 
 # Claude Code 本地配置
 .claude/
+update_min_qty.py
