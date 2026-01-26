@@ -51,6 +51,27 @@ def create_start_handler() -> Callable:
                 unchanged=sync_stats.get("unchanged", 0),
             )
 
+            # Sync private data from files (factors metadata, notes, strategies, experiences)
+            try:
+                from domains.mcp_core.sync import SyncManager
+                sync_manager = SyncManager()
+
+                # Only import if private-data directory exists
+                if sync_manager.data_dir.exists():
+                    import_stats = sync_manager.import_all()
+                    for data_type, stats in import_stats.items():
+                        created = stats.get("created", 0)
+                        updated = stats.get("updated", 0)
+                        if created > 0 or updated > 0:
+                            logger.info(
+                                f"{data_type}_synced",
+                                component="sync_manager",
+                                created=created,
+                                updated=updated,
+                            )
+            except Exception as e:
+                logger.warning("private_data_sync_skipped", component="sync_manager", error=str(e))
+
             stats = factor_store.get_stats()
             logger.info(
                 "factor_store_initialized",
@@ -89,6 +110,21 @@ def create_stop_handler() -> Callable:
 
     async def stop_app() -> None:
         logger.info("api_stopping", component="api")
+
+        # Export private data to files before shutdown
+        try:
+            from domains.mcp_core.sync import SyncManager
+            sync_manager = SyncManager()
+            export_stats = sync_manager.export_all()
+            total_exported = sum(s.get("exported", 0) for s in export_stats.values())
+            if total_exported > 0:
+                logger.info(
+                    "private_data_exported",
+                    component="sync_manager",
+                    total=total_exported,
+                )
+        except Exception as e:
+            logger.warning("private_data_export_error", component="sync_manager", error=str(e))
 
         # Stop SSE task manager
         try:

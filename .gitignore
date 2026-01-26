@@ -82,13 +82,6 @@ backend/data/
 backups/*
 !backups/.gitkeep
 
-# 因子文件（保留目录结构）
-factors/*
-!factors/.gitkeep
-
-# Sections 目录（保留目录结构）
-sections/*
-!sections/.gitkeep
 
 # 本地开发 PID 文件
 .pids/
@@ -100,3 +93,15 @@ docs/*
 # Claude Code 本地配置
 .claude/
 update_min_qty.py
+
+# 私有数据目录（通过独立 Git 仓库管理）
+/private/factors/
+/private/sections/
+/private/notes/
+/private/strategies/
+/private/experiences/
+/private/config/
+
+# 保留目录结构和说明
+!/private/README.md
+!/private/**/.gitkeep

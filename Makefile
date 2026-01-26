@@ -748,3 +748,18 @@ mcp-tools-json:
 
 mcp-tools-summary:
 	@uv run python scripts/list_mcp_tools.py --summary
+
+# ============================================
+# 私有数据同步
+# ============================================
+sync-export:
+	@echo "导出私有数据..."
+	@PYTHONPATH=backend uv run python scripts/data_sync.py export --all
+
+sync-import:
+	@echo "导入私有数据..."
+	@PYTHONPATH=backend uv run python scripts/data_sync.py import --all
+
+sync-status:
+	@echo "私有数据同步状态..."
+	@PYTHONPATH=backend uv run python scripts/data_sync.py status

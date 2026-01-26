@@ -151,6 +151,18 @@ frontend/src/features/*/    -> 前端模块
 
 知识与经验体系: `docs/architecture/knowledge-experience-system.md`
 
+## 研究任务
+
+执行研究任务时，使用对应的 Skill:
+
+| Skill | 命令 | 用途 |
+|-------|------|------|
+| factor-research | `/factor-research` | 因子优化研究。针对具体因子进行参数优化、逻辑改进和条件分析，使用回测引擎验证效果 |
+| market-research | `/market-research` | 市场规律研究。深入分析币种数据，发现规律，验证假设，生成经验文档 |
+| factor-select | `/factor-select` | 因子圈选与更新。查询筛选因子，批量更新字段值 |
+
+Skill 详情见 `.claude/skills/*/SKILL.md`
+
 ## 代码规范
 
 - **Python**: ruff，类型注解

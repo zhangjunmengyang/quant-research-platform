@@ -57,22 +57,22 @@ def get_config_dir() -> Path:
 
 def get_factors_dir() -> Path:
     """
-    获取因子代码目录（项目根目录/factors）
+    获取因子代码目录（私有数据目录/factors/code）
 
     自动创建目录（如果不存在）。
     """
-    factors_dir = get_project_root() / "factors"
+    factors_dir = get_private_data_dir() / "factors" / "code"
     factors_dir.mkdir(parents=True, exist_ok=True)
     return factors_dir
 
 
 def get_sections_dir() -> Path:
     """
-    获取截面因子目录（项目根目录/sections）
+    获取截面因子目录（私有数据目录/sections）
 
     自动创建目录（如果不存在）。
     """
-    sections_dir = get_project_root() / "sections"
+    sections_dir = get_private_data_dir() / "sections"
     sections_dir.mkdir(parents=True, exist_ok=True)
     return sections_dir
 
@@ -87,6 +87,24 @@ def get_domain_dir(domain_name: str) -> Path:
     return get_backend_dir() / "domains" / domain_name
 
 
+def get_private_data_dir() -> Path:
+    """
+    获取私有数据目录（项目根目录/private）
+
+    用于存储需要与开源代码分离的私有数据：
+    - 因子代码和元数据
+    - 截面因子
+    - 研究笔记
+    - 策略配置
+    - 经验数据
+
+    自动创建目录（如果不存在）。
+    """
+    private_data_dir = get_project_root() / "private"
+    private_data_dir.mkdir(parents=True, exist_ok=True)
+    return private_data_dir
+
+
 __all__ = [
     "get_project_root",
     "get_data_dir",
@@ -95,4 +113,5 @@ __all__ = [
     "get_sections_dir",
     "get_backend_dir",
     "get_domain_dir",
+    "get_private_data_dir",
 ]
