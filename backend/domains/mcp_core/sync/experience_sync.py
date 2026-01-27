@@ -6,6 +6,7 @@
 """
 
 import logging
+import uuid as uuid_lib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -88,6 +89,15 @@ class ExperienceSyncService(BaseSyncService):
         # 导出经验
         for exp in experiences:
             try:
+                # 确保经验有 UUID，如果没有则生成并更新数据库
+                if not exp.uuid:
+                    exp.uuid = str(uuid_lib.uuid4())
+                    try:
+                        self.store.update(exp.id, uuid=exp.uuid)
+                        logger.info(f"generated_uuid_for_experience: {exp.id} -> {exp.uuid}")
+                    except Exception as e:
+                        logger.warning(f"failed_to_persist_uuid: {exp.id}, {e}")
+
                 filepath = self.experiences_dir / f"{exp.uuid}.yaml"
 
                 # 检查是否需要更新
@@ -270,7 +280,11 @@ class ExperienceSyncService(BaseSyncService):
             pass
 
     def _import_links(self) -> None:
-        """导入关联关系"""
+        """
+        导入关联关系（幂等）
+
+        只导入不存在的关联，避免重复插入错误。
+        """
         if self.store is None or not self.links_file.exists():
             return
 
@@ -279,12 +293,103 @@ class ExperienceSyncService(BaseSyncService):
             links = data.get('links', [])
 
             for link_data in links:
+                # 先查找对应的经验
+                exp_uuid = link_data.get('experience_uuid')
+                if not exp_uuid:
+                    continue
+
+                experience = self.store.get_by_uuid(exp_uuid)
+                if not experience:
+                    logger.debug(f"skip_link_import_no_experience: {exp_uuid}")
+                    continue
+
+                # 检查关联是否已存在
+                entity_type = link_data.get('entity_type', '')
+                entity_id = link_data.get('entity_id', '')
+                relation = link_data.get('relation', 'related')
+
+                if self.store.link_exists(experience.id, entity_type, entity_id, relation):
+                    continue
+
+                # 导入新关联
                 from domains.experience_hub.core.models import ExperienceLink
-                link = ExperienceLink.from_dict(link_data)
+                link = ExperienceLink.from_dict({
+                    **link_data,
+                    'experience_id': experience.id
+                })
                 self.store.add_link(link)
-        except AttributeError:
-            # store 可能没有 add_link 方法
-            pass
+        except AttributeError as e:
+            # store 可能没有某些方法
+            logger.debug(f"experience_links_import_skipped: {e}")
+        except Exception as e:
+            logger.error(f"experience_links_import_error: {e}")
+
+    def export_single(self, experience_id: int) -> bool:
+        """
+        导出单个经验
+
+        Args:
+            experience_id: 经验 ID
+
+        Returns:
+            是否成功
+        """
+        if self.store is None:
+            return False
+
+        try:
+            exp = self.store.get(experience_id)
+            if exp is None:
+                return False
+
+            # 确保经验有 UUID
+            if not exp.uuid:
+                exp.uuid = str(uuid_lib.uuid4())
+                try:
+                    self.store.update(exp.id, uuid=exp.uuid)
+                except Exception as e:
+                    logger.warning(f"failed_to_persist_uuid: {exp.id}, {e}")
+
+            self.ensure_dir(self.experiences_dir)
+
+            filepath = self.experiences_dir / f"{exp.uuid}.yaml"
+            data = self._experience_to_yaml(exp)
+            self.write_yaml_atomic(filepath, data)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"experience_export_single_error: {experience_id}, {e}")
+            return False
+
+    def import_single(self, experience_id: int) -> bool:
+        """
+        导入单个经验（通过 ID）
+
+        Args:
+            experience_id: 经验 ID
+
+        Returns:
+            是否成功
+        """
+        if self.store is None:
+            return False
+
+        try:
+            exp = self.store.get(experience_id)
+            if exp is None or not exp.uuid:
+                return False
+
+            filepath = self.experiences_dir / f"{exp.uuid}.yaml"
+            if not filepath.exists():
+                return False
+
+            result = self._import_experience_file(filepath)
+            return result in ("created", "updated", "unchanged")
+
+        except Exception as e:
+            logger.error(f"experience_import_single_error: {experience_id}, {e}")
+            return False
 
     def get_status(self) -> Dict[str, Any]:
         """获取同步状态"""

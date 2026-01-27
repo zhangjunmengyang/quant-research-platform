@@ -41,8 +41,6 @@ export interface Note {
   title: string
   content: string
   tags: string
-  source: string
-  source_ref: string
   note_type: NoteType
   research_session_id?: string | null
   promoted_to_experience_id?: number | null
@@ -55,8 +53,6 @@ export interface NoteCreate {
   title: string
   content: string
   tags?: string
-  source?: string
-  source_ref?: string
   note_type?: NoteType
   research_session_id?: string
 }
@@ -65,8 +61,6 @@ export interface NoteUpdate {
   title?: string
   content?: string
   tags?: string
-  source?: string
-  source_ref?: string
   note_type?: NoteType
   research_session_id?: string
 }
@@ -76,7 +70,6 @@ export interface NoteListParams {
   page_size?: number
   search?: string
   tags?: string
-  source?: string
   note_type?: NoteType
   is_archived?: boolean
   order_by?: string
@@ -101,8 +94,6 @@ export interface ObservationCreate {
   title: string
   content: string
   tags?: string
-  source?: string
-  source_ref?: string
   research_session_id?: string
 }
 
@@ -113,8 +104,6 @@ export interface HypothesisCreate {
   title: string
   content: string
   tags?: string
-  source?: string
-  source_ref?: string
   research_session_id?: string
 }
 
@@ -125,8 +114,6 @@ export interface FindingCreate {
   title: string
   content: string
   tags?: string
-  source?: string
-  source_ref?: string
   research_session_id?: string
 }
 
@@ -145,12 +132,4 @@ export interface ResearchTrail {
   notes: Note[]
   total: number
   by_type: Record<string, number>
-}
-
-// Source type labels
-export const SOURCE_LABELS: Record<string, string> = {
-  factor: '因子',
-  strategy: '策略',
-  backtest: '回测',
-  manual: '手动',
 }

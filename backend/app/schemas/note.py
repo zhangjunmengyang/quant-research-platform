@@ -23,8 +23,6 @@ class NoteBase(BaseModel):
     title: str = Field(..., description="笔记标题", min_length=1, max_length=500)
     content: str = Field("", description="笔记内容（Markdown 格式）")
     tags: str = Field("", description="标签（逗号分隔）")
-    source: str = Field("", description="来源（如 factor, strategy, manual）")
-    source_ref: str = Field("", description="来源引用")
 
 
 class NoteCreate(NoteBase):
@@ -40,8 +38,6 @@ class NoteUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
     content: Optional[str] = None
     tags: Optional[str] = None
-    source: Optional[str] = None
-    source_ref: Optional[str] = None
     note_type: Optional[NoteType] = None
     research_session_id: Optional[str] = None
 
@@ -68,7 +64,6 @@ class NoteListParams(BaseModel):
     page_size: int = Field(20, ge=1, le=100, description="每页数量")
     search: Optional[str] = Field(None, description="搜索关键词")
     tags: Optional[str] = Field(None, description="标签筛选（逗号分隔）")
-    source: Optional[str] = Field(None, description="来源筛选")
     note_type: Optional[NoteType] = Field(None, description="笔记类型筛选")
     is_archived: Optional[bool] = Field(None, description="归档状态筛选")
     order_by: str = Field("updated_at", description="排序字段")
@@ -97,8 +92,6 @@ class ObservationCreate(BaseModel):
     title: str = Field(..., description="观察标题", min_length=1, max_length=500)
     content: str = Field(..., description="观察内容（Markdown 格式）")
     tags: str = Field("", description="标签（逗号分隔）")
-    source: str = Field("", description="来源")
-    source_ref: str = Field("", description="来源引用")
     research_session_id: Optional[str] = Field(None, description="研究会话 ID")
 
 
@@ -108,8 +101,6 @@ class HypothesisCreate(BaseModel):
     title: str = Field(..., description="假设标题", min_length=1, max_length=500)
     content: str = Field(..., description="假设内容（Markdown 格式）")
     tags: str = Field("", description="标签（逗号分隔）")
-    source: str = Field("", description="来源")
-    source_ref: str = Field("", description="来源引用")
     research_session_id: Optional[str] = Field(None, description="研究会话 ID")
 
 
@@ -119,8 +110,6 @@ class FindingCreate(BaseModel):
     title: str = Field(..., description="发现标题", min_length=1, max_length=500)
     content: str = Field(..., description="发现内容（Markdown 格式）")
     tags: str = Field("", description="标签（逗号分隔）")
-    source: str = Field("", description="来源")
-    source_ref: str = Field("", description="来源引用")
     research_session_id: Optional[str] = Field(None, description="研究会话 ID")
 
 

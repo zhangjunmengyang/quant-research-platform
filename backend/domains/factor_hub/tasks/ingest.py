@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from domains.mcp_core.logging import setup_task_logger
+from domains.mcp_core.paths import get_factors_dir
 from ..core.store import get_factor_store, Factor
 from ..services.field_filler import get_field_filler, FIELD_ORDER
 from .diff_catalog import discover_factors
@@ -54,12 +55,11 @@ def run_ingest(
             logger.info("没有待入库的因子")
             return {'added': 0, 'filled': {}}
 
-        # 获取因子目录
+        # 获取因子目录 (private/factors)
         if factor_dir:
             base_dir = Path(factor_dir)
         else:
-            # 从 backend/domains/factor_hub/tasks/ingest.py 向上 5 级到项目根目录
-            base_dir = Path(__file__).parent.parent.parent.parent.parent / "factors"
+            base_dir = get_factors_dir()
 
         pending_files = [base_dir / filename for filename in result.pending]
         pending_files = [f for f in pending_files if f.exists()]

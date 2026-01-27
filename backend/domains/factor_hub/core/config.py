@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
-from domains.mcp_core.paths import get_project_root, get_config_dir, get_factors_dir, get_data_dir
+from domains.mcp_core.paths import get_project_root, get_config_dir, get_factors_dir, get_sections_dir, get_data_dir
 
 
 # 加载项目根目录的 .env 文件
@@ -205,6 +205,11 @@ class ConfigLoader:
     def factors_dir(self) -> Path:
         """获取因子代码目录"""
         return get_factors_dir()
+
+    @property
+    def sections_dir(self) -> Path:
+        """获取截面因子目录"""
+        return get_sections_dir()
 
 
 # 单例实例

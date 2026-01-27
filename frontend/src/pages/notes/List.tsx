@@ -54,6 +54,8 @@ const DEFAULT_FILTERS: NoteListParams = {
   page: 1,
   page_size: 20,
   is_archived: false,
+  order_by: 'updated_at',
+  order_desc: true,
 }
 
 // 归档状态筛选选项
@@ -63,6 +65,23 @@ const ARCHIVE_FILTER_OPTIONS: SelectOption[] = [
   { value: '', label: '全部状态' },
   { value: 'active', label: '活跃笔记' },
   { value: 'archived', label: '已归档' },
+]
+
+// 每页数量选项
+const PAGE_SIZE_OPTIONS: SelectOption[] = [
+  { value: '20', label: '20 条/页' },
+  { value: '50', label: '50 条/页' },
+  { value: '100', label: '100 条/页' },
+]
+
+// 排序选项
+const ORDER_BY_OPTIONS: SelectOption[] = [
+  { value: 'updated_at:desc', label: '更新时间 (最新)' },
+  { value: 'updated_at:asc', label: '更新时间 (最早)' },
+  { value: 'created_at:desc', label: '创建时间 (最新)' },
+  { value: 'created_at:asc', label: '创建时间 (最早)' },
+  { value: 'title:asc', label: '标题 (A-Z)' },
+  { value: 'title:desc', label: '标题 (Z-A)' },
 ]
 
 // 笔记类型筛选选项
@@ -108,6 +127,8 @@ export function Component() {
       ...filters,
       search: searchQuery || undefined,
       is_archived: archiveFilter === undefined ? false : archiveFilter === 'archived',
+      order_by: filters.order_by,
+      order_desc: filters.order_desc,
     }),
     [filters, searchQuery, archiveFilter]
   )
@@ -160,7 +181,6 @@ export function Component() {
         title: newTitle.trim(),
         content: newContent,
         tags: newTags,
-        source: 'manual',
       }
 
       // 根据类型调用不同的 API
@@ -224,6 +244,26 @@ export function Component() {
     setFilters((prev) => ({ ...prev, page }))
   }
 
+  const handlePageSizeChange = (size: string | undefined) => {
+    const pageSize = size ? parseInt(size, 10) : 20
+    setFilters((prev) => ({ ...prev, page_size: pageSize, page: 1 }))
+  }
+
+  const handleOrderByChange = (value: string | undefined) => {
+    if (!value) {
+      setFilters((prev) => ({ ...prev, order_by: 'updated_at', order_desc: true, page: 1 }))
+      return
+    }
+    const [field, direction] = value.split(':')
+    setFilters((prev) => ({ ...prev, order_by: field, order_desc: direction === 'desc', page: 1 }))
+  }
+
+  const getCurrentOrderValue = () => {
+    const field = filters.order_by || 'updated_at'
+    const direction = filters.order_desc ? 'desc' : 'asc'
+    return `${field}:${direction}`
+  }
+
   const handleDelete = async (e: React.MouseEvent, note: Note) => {
     e.stopPropagation()
     if (confirm(`确定要删除笔记"${note.title}"吗?`)) {
@@ -260,7 +300,9 @@ export function Component() {
     searchQuery ||
     filters.tags ||
     filters.note_type ||
-    archiveFilter !== 'active'
+    archiveFilter !== 'active' ||
+    filters.order_by !== 'updated_at' ||
+    filters.order_desc !== true
   )
 
   if (isLoading) {
@@ -363,6 +405,18 @@ export function Component() {
             onChange={handleTagFilter}
           />
         )}
+        <FilterSelect
+          label="排序"
+          options={ORDER_BY_OPTIONS}
+          value={getCurrentOrderValue()}
+          onChange={handleOrderByChange}
+        />
+        <FilterSelect
+          label="每页"
+          options={PAGE_SIZE_OPTIONS}
+          value={String(filters.page_size || 20)}
+          onChange={handlePageSizeChange}
+        />
       </FilterToolbar>
 
       {/* Notes List */}

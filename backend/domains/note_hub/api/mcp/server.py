@@ -5,7 +5,7 @@ MCP Server - 笔记知识库 MCP 服务器
 使用 Streamable HTTP 传输协议（MCP 2025-03-26 规范推荐）。
 
 Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
-- 基础 CRUD（create_note, get_note, list_notes, search_notes）
+- 基础 CRUD（create_note, update_note, get_note, list_notes, search_notes）
 - 研究记录（record_observation, record_hypothesis, record_finding）
 - 研究轨迹（get_research_trail）
 - 归档管理（archive_note, unarchive_note）
@@ -27,6 +27,7 @@ from domains.mcp_core.server.server import run_server as mcp_run_server
 from .tools.note_tools import (
     # 基础 CRUD
     CreateNoteTool,
+    UpdateNoteTool,
     SearchNotesTool,
     GetNoteTool,
     ListNotesTool,
@@ -64,8 +65,9 @@ class NoteHubMCPServer(BaseMCPServer):
         self.register_tool(GetNoteTool(), "query")
         self.register_tool(SearchNotesTool(), "query")
 
-        # 基础创建工具
+        # 基础创建和更新工具
         self.register_tool(CreateNoteTool(), "mutation")
+        self.register_tool(UpdateNoteTool(), "mutation")
 
         # 研究记录工具
         self.register_tool(RecordObservationTool(), "mutation")

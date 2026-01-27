@@ -11,6 +11,7 @@ from .note_sync import NoteSyncService
 from .strategy_sync import StrategySyncService
 from .experience_sync import ExperienceSyncService
 from .manager import SyncManager
+from .trigger import SyncTrigger, get_sync_trigger
 
 __all__ = [
     "BaseSyncService",
@@ -19,4 +20,6 @@ __all__ = [
     "StrategySyncService",
     "ExperienceSyncService",
     "SyncManager",
+    "SyncTrigger",
+    "get_sync_trigger",
 ]

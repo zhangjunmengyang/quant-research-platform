@@ -6,6 +6,7 @@ Note Hub 定位为"研究草稿/临时记录"层（Knowledge Layer），
 笔记可以被提炼为正式经验（Experience）。
 """
 
+import uuid as uuid_lib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -44,8 +45,6 @@ class Note:
         title: 笔记标题
         content: 笔记内容（Markdown 格式）
         tags: 标签（逗号分隔的字符串）
-        source: 来源（如 factor, strategy, backtest, manual）
-        source_ref: 来源引用（如因子名、策略ID等）
 
         note_type: 笔记类型（observation/hypothesis/finding/trail/general）
         research_session_id: 研究会话 ID，用于追踪研究轨迹
@@ -56,13 +55,11 @@ class Note:
         updated_at: 更新时间
     """
     id: Optional[int] = None
+    uuid: str = field(default_factory=lambda: str(uuid_lib.uuid4()))
     title: str = ""
     content: str = ""
     tags: str = ""
-    source: str = ""
-    source_ref: str = ""
 
-    # 新增字段
     note_type: str = field(default=NoteType.GENERAL.value)
     research_session_id: Optional[str] = None
     promoted_to_experience_id: Optional[int] = None
@@ -75,11 +72,10 @@ class Note:
         """转换为字典"""
         return {
             'id': self.id,
+            'uuid': self.uuid,
             'title': self.title,
             'content': self.content,
             'tags': self.tags,
-            'source': self.source,
-            'source_ref': self.source_ref,
             'note_type': self.note_type,
             'research_session_id': self.research_session_id,
             'promoted_to_experience_id': self.promoted_to_experience_id,

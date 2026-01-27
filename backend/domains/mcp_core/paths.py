@@ -4,6 +4,7 @@
 提供统一的项目路径获取接口，避免各模块重复实现。
 """
 
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -116,6 +117,30 @@ def get_private_data_dir() -> Path:
     return private_data_dir
 
 
+def setup_factor_paths() -> None:
+    """
+    设置因子导入和引擎依赖路径
+
+    需要添加以下路径到 sys.path:
+    1. private 目录 - 用于导入 factors 和 sections 包
+    2. project_root - 用于导入 config 模块（engine/core 依赖）
+    3. backend 目录 - 用于导入 domains 模块
+
+    FactorHub 使用 importlib.import_module("factors.{name}") 来加载因子，
+    engine/core 使用 `from config import ...` 加载配置。
+
+    此函数是幂等的，可以多次调用。
+    """
+    paths_to_add = [
+        str(get_private_data_dir()),  # factors, sections
+        str(get_project_root()),       # config
+        str(get_backend_dir()),        # domains
+    ]
+    for path in paths_to_add:
+        if path not in sys.path:
+            sys.path.insert(0, path)
+
+
 __all__ = [
     "get_project_root",
     "get_data_dir",
@@ -126,4 +151,5 @@ __all__ = [
     "get_backend_dir",
     "get_domain_dir",
     "get_private_data_dir",
+    "setup_factor_paths",
 ]

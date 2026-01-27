@@ -394,11 +394,10 @@ async def get_backtest_config():
     """
     try:
         import config
-        from pathlib import Path
+        from domains.mcp_core.paths import get_factors_dir
 
-        # 获取可用因子列表 - 从 factors 目录读取
-        project_root = Path(__file__).parent.parent.parent.parent.parent
-        factors_dir = project_root / "factors"
+        # 获取可用因子列表 - 从 private/factors 目录读取
+        factors_dir = get_factors_dir()
 
         available_factors = []
         if factors_dir.exists():

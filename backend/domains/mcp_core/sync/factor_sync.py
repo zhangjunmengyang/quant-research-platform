@@ -51,11 +51,11 @@ class FactorSyncService(BaseSyncService):
         初始化因子同步服务
 
         Args:
-            data_dir: 私有数据目录 (private-data/)
+            data_dir: 私有数据目录 (private/)
             store: FactorStore 实例
         """
         super().__init__(data_dir, store)
-        self.metadata_dir = data_dir / "factors" / "metadata"
+        self.metadata_dir = data_dir / "metadata"
 
     def export_all(self, overwrite: bool = False) -> Dict[str, int]:
         """

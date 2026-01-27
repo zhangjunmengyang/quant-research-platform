@@ -6,6 +6,7 @@
 """
 
 import logging
+import math
 from typing import Any, Dict, List, Optional, Set
 from datetime import datetime
 
@@ -229,6 +230,15 @@ class StrategyStore(BaseStore[Strategy]):
         def get_col(name, default=None):
             return row.get(name) if row.get(name) is not None else default
 
+        def safe_float(val, default=0.0):
+            """将可能为 None/nan/inf 的值转换为安全的 float"""
+            if val is None:
+                return default
+            f = float(val)
+            if math.isnan(f) or math.isinf(f):
+                return default
+            return f
+
         return Strategy(
             id=row["id"],
             name=row["name"],
@@ -270,24 +280,24 @@ class StrategyStore(BaseStore[Strategy]):
             black_list=get_col("black_list"),
             white_list=get_col("white_list"),
             # 绩效指标
-            cumulative_return=row.get("cumulative_return") or 0.0,
-            annual_return=row.get("annual_return") or 0.0,
-            max_drawdown=row.get("max_drawdown") or 0.0,
+            cumulative_return=safe_float(row.get("cumulative_return")),
+            annual_return=safe_float(row.get("annual_return")),
+            max_drawdown=safe_float(row.get("max_drawdown")),
             max_drawdown_start=row.get("max_drawdown_start"),
             max_drawdown_end=row.get("max_drawdown_end"),
-            sharpe_ratio=row.get("sharpe_ratio") or 0.0,
-            recovery_rate=row.get("recovery_rate") or 0.0,
+            sharpe_ratio=safe_float(row.get("sharpe_ratio")),
+            recovery_rate=safe_float(row.get("recovery_rate")),
             recovery_time=row.get("recovery_time"),
             win_periods=row.get("win_periods") or 0,
             loss_periods=row.get("loss_periods") or 0,
-            win_rate=row.get("win_rate") or 0.0,
-            avg_return_per_period=row.get("avg_return_per_period") or 0.0,
-            profit_loss_ratio=row.get("profit_loss_ratio") or 0.0,
-            max_single_profit=row.get("max_single_profit") or 0.0,
-            max_single_loss=row.get("max_single_loss") or 0.0,
+            win_rate=safe_float(row.get("win_rate")),
+            avg_return_per_period=safe_float(row.get("avg_return_per_period")),
+            profit_loss_ratio=safe_float(row.get("profit_loss_ratio")),
+            max_single_profit=safe_float(row.get("max_single_profit")),
+            max_single_loss=safe_float(row.get("max_single_loss")),
             max_consecutive_wins=row.get("max_consecutive_wins") or 0,
             max_consecutive_losses=row.get("max_consecutive_losses") or 0,
-            return_std=row.get("return_std") or 0.0,
+            return_std=safe_float(row.get("return_std")),
             year_return=row.get("year_return"),
             quarter_return=row.get("quarter_return"),
             month_return=row.get("month_return"),
@@ -365,6 +375,9 @@ class StrategyStore(BaseStore[Strategy]):
                 strategy.task_id, strategy.task_status, strategy.error_message,
             ))
             logger.info(f"创建策略: {strategy.id} - {strategy.name}")
+
+        # 触发实时同步
+        self._trigger_sync(strategy.id)
 
         return strategy
 
@@ -450,7 +463,19 @@ class StrategyStore(BaseStore[Strategy]):
             ))
             logger.debug(f"更新策略: {strategy.id}")
 
+        # 触发实时同步
+        self._trigger_sync(strategy.id)
+
         return strategy
+
+    def _trigger_sync(self, strategy_id: str) -> None:
+        """触发策略同步到文件（不阻塞主流程）"""
+        try:
+            from domains.mcp_core.sync.trigger import get_sync_trigger
+            get_sync_trigger().sync_strategy(strategy_id)
+        except Exception as e:
+            # 同步失败只记录日志，不影响主业务
+            logger.debug(f"strategy_sync_trigger_skipped: {strategy_id}, {e}")
 
     def delete(self, strategy_id: str) -> bool:
         """删除策略"""
@@ -594,16 +619,25 @@ class StrategyStore(BaseStore[Strategy]):
             """)
             row = cursor.fetchone()
 
+            def safe_float(val, default=0.0):
+                """将可能为 None/nan/inf 的值转换为安全的 float"""
+                if val is None:
+                    return default
+                f = float(val)
+                if math.isnan(f) or math.isinf(f):
+                    return default
+                return f
+
             return {
                 "total": total,
                 "verified": verified,
                 "completed": completed,
                 "failed": failed,
                 "running": running,
-                "avg_annual_return": float(row['avg_annual_return'] or 0),
-                "avg_max_drawdown": float(row['avg_max_drawdown'] or 0),
-                "avg_sharpe_ratio": float(row['avg_sharpe_ratio'] or 0),
-                "avg_win_rate": float(row['avg_win_rate'] or 0),
+                "avg_annual_return": safe_float(row['avg_annual_return']),
+                "avg_max_drawdown": safe_float(row['avg_max_drawdown']),
+                "avg_sharpe_ratio": safe_float(row['avg_sharpe_ratio']),
+                "avg_win_rate": safe_float(row['avg_win_rate']),
             }
 
     def get_top_performers(

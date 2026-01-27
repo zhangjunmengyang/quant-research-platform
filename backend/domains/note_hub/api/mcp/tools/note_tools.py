@@ -34,7 +34,6 @@ class CreateNoteTool(BaseTool):
 笔记支持:
 - Markdown 格式的内容
 - 标签分类
-- 来源关联（如关联到某个因子）
 - 笔记类型（observation/hypothesis/finding/trail/general）
 - 研究会话关联
 
@@ -60,15 +59,6 @@ class CreateNoteTool(BaseTool):
                     "type": "string",
                     "description": "标签（英文逗号分隔，如: 动量,反转,经验）"
                 },
-                "source": {
-                    "type": "string",
-                    "description": "来源类型（如: factor, strategy, backtest, manual）",
-                    "enum": ["factor", "strategy", "backtest", "manual"]
-                },
-                "source_ref": {
-                    "type": "string",
-                    "description": "来源引用（如因子名: Momentum_5d）"
-                },
                 "note_type": {
                     "type": "string",
                     "description": "笔记类型",
@@ -88,8 +78,6 @@ class CreateNoteTool(BaseTool):
             title = params.get("title", "")
             content = params.get("content", "")
             tags = params.get("tags", "")
-            source = params.get("source", "")
-            source_ref = params.get("source_ref", "")
             note_type = params.get("note_type", "general")
             research_session_id = params.get("research_session_id")
 
@@ -97,8 +85,6 @@ class CreateNoteTool(BaseTool):
                 title=title,
                 content=content,
                 tags=tags,
-                source=source,
-                source_ref=source_ref,
                 note_type=note_type,
                 research_session_id=research_session_id,
             )
@@ -115,6 +101,99 @@ class CreateNoteTool(BaseTool):
                 )
             else:
                 return ToolResult(success=False, error=message)
+
+        except Exception as e:
+            return ToolResult(success=False, error=str(e))
+
+
+class UpdateNoteTool(BaseTool):
+    """更新笔记工具"""
+
+    @property
+    def name(self) -> str:
+        return "update_note"
+
+    @property
+    def description(self) -> str:
+        return """更新笔记字段。
+
+支持更新标题、内容、标签等字段。
+只需提供需要更新的字段，未提供的字段保持不变。
+
+使用场景:
+- 修改笔记标题
+- 更新笔记内容
+- 调整标签分类
+- 变更笔记类型"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "note_id": {
+                    "type": "integer",
+                    "description": "笔记 ID"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "新标题"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "新内容（支持 Markdown 格式）"
+                },
+                "tags": {
+                    "type": "string",
+                    "description": "新标签（英文逗号分隔）"
+                },
+                "note_type": {
+                    "type": "string",
+                    "description": "新笔记类型",
+                    "enum": ["observation", "hypothesis", "finding", "trail", "general"]
+                },
+                "research_session_id": {
+                    "type": "string",
+                    "description": "新研究会话 ID"
+                }
+            },
+            "required": ["note_id"]
+        }
+
+    async def execute(self, **params) -> ToolResult:
+        try:
+            note_id = params.get("note_id")
+
+            # 构建更新字段
+            update_fields = {}
+            for field in ["title", "content", "tags", "note_type", "research_session_id"]:
+                if field in params and params[field] is not None:
+                    update_fields[field] = params[field]
+
+            if not update_fields:
+                return ToolResult(success=False, error="没有需要更新的字段")
+
+            # 验证笔记存在
+            note = self.note_service.get_note(note_id)
+            if note is None:
+                return ToolResult(success=False, error=f"笔记不存在: {note_id}")
+
+            success = self.note_service.update_note(note_id, **update_fields)
+
+            if success:
+                # 获取更新后的笔记
+                updated_note = self.note_service.get_note(note_id)
+                return ToolResult(
+                    success=True,
+                    data={
+                        "id": note_id,
+                        "title": updated_note.title,
+                        "updated_fields": list(update_fields.keys()),
+                        "message": "更新成功"
+                    }
+                )
+            else:
+                return ToolResult(success=False, error="更新失败")
 
         except Exception as e:
             return ToolResult(success=False, error=str(e))
@@ -171,7 +250,6 @@ class SearchNotesTool(BaseTool):
                     "title": note.title,
                     "summary": note.summary,
                     "tags": note.tags,
-                    "source": note.source,
                     "note_type": note.note_type,
                     "is_archived": note.is_archived,
                     "updated_at": str(note.updated_at) if note.updated_at else None,
@@ -234,8 +312,6 @@ class GetNoteTool(BaseTool):
                     "title": note.title,
                     "content": note.content,
                     "tags": note.tags,
-                    "source": note.source,
-                    "source_ref": note.source_ref,
                     "note_type": note.note_type,
                     "research_session_id": note.research_session_id,
                     "promoted_to_experience_id": note.promoted_to_experience_id,
@@ -260,7 +336,7 @@ class ListNotesTool(BaseTool):
     def description(self) -> str:
         return """获取笔记列表。
 
-支持按标签和来源筛选，返回笔记摘要列表。"""
+支持按标签筛选，返回笔记摘要列表。"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -270,10 +346,6 @@ class ListNotesTool(BaseTool):
                 "tags": {
                     "type": "string",
                     "description": "按标签筛选（英文逗号分隔）"
-                },
-                "source": {
-                    "type": "string",
-                    "description": "按来源筛选"
                 },
                 "note_type": {
                     "type": "string",
@@ -302,7 +374,6 @@ class ListNotesTool(BaseTool):
     async def execute(self, **params) -> ToolResult:
         try:
             tags_str = params.get("tags", "")
-            source = params.get("source", "")
             note_type = params.get("note_type", "")
             is_archived = params.get("is_archived")
             page = params.get("page", 1)
@@ -314,7 +385,6 @@ class ListNotesTool(BaseTool):
 
             notes, total = self.note_service.list_notes(
                 tags=tags_list,
-                source=source,
                 note_type=note_type,
                 is_archived=is_archived,
                 page=page,
@@ -328,7 +398,6 @@ class ListNotesTool(BaseTool):
                     "title": note.title,
                     "summary": note.summary,
                     "tags": note.tags,
-                    "source": note.source,
                     "note_type": note.note_type,
                     "is_archived": note.is_archived,
                     "updated_at": str(note.updated_at) if note.updated_at else None,
@@ -387,15 +456,6 @@ class RecordObservationTool(BaseTool):
                     "type": "string",
                     "description": "标签（英文逗号分隔）"
                 },
-                "source": {
-                    "type": "string",
-                    "description": "来源类型",
-                    "enum": ["factor", "strategy", "backtest", "manual"]
-                },
-                "source_ref": {
-                    "type": "string",
-                    "description": "来源引用"
-                },
                 "research_session_id": {
                     "type": "string",
                     "description": "研究会话 ID（用于追踪研究轨迹）"
@@ -410,8 +470,6 @@ class RecordObservationTool(BaseTool):
                 title=params.get("title", ""),
                 content=params.get("content", ""),
                 tags=params.get("tags", ""),
-                source=params.get("source", ""),
-                source_ref=params.get("source_ref", ""),
                 research_session_id=params.get("research_session_id"),
             )
 
@@ -468,15 +526,6 @@ class RecordHypothesisTool(BaseTool):
                     "type": "string",
                     "description": "标签（英文逗号分隔）"
                 },
-                "source": {
-                    "type": "string",
-                    "description": "来源类型",
-                    "enum": ["factor", "strategy", "backtest", "manual"]
-                },
-                "source_ref": {
-                    "type": "string",
-                    "description": "来源引用"
-                },
                 "research_session_id": {
                     "type": "string",
                     "description": "研究会话 ID（用于追踪研究轨迹）"
@@ -491,8 +540,6 @@ class RecordHypothesisTool(BaseTool):
                 title=params.get("title", ""),
                 content=params.get("content", ""),
                 tags=params.get("tags", ""),
-                source=params.get("source", ""),
-                source_ref=params.get("source_ref", ""),
                 research_session_id=params.get("research_session_id"),
             )
 
@@ -549,15 +596,6 @@ class RecordFindingTool(BaseTool):
                     "type": "string",
                     "description": "标签（英文逗号分隔）"
                 },
-                "source": {
-                    "type": "string",
-                    "description": "来源类型",
-                    "enum": ["factor", "strategy", "backtest", "manual"]
-                },
-                "source_ref": {
-                    "type": "string",
-                    "description": "来源引用"
-                },
                 "research_session_id": {
                     "type": "string",
                     "description": "研究会话 ID（用于追踪研究轨迹）"
@@ -572,8 +610,6 @@ class RecordFindingTool(BaseTool):
                 title=params.get("title", ""),
                 content=params.get("content", ""),
                 tags=params.get("tags", ""),
-                source=params.get("source", ""),
-                source_ref=params.get("source_ref", ""),
                 research_session_id=params.get("research_session_id"),
             )
 
@@ -653,7 +689,6 @@ class GetResearchTrailTool(BaseTool):
                     "note_type": note.note_type,
                     "type_label": note.type_label,
                     "tags": note.tags,
-                    "source": note.source,
                     "is_archived": note.is_archived,
                     "is_promoted": note.is_promoted,
                     "created_at": str(note.created_at) if note.created_at else None,

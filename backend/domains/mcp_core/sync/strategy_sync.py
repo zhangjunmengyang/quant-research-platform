@@ -108,8 +108,9 @@ class StrategySyncService(BaseSyncService):
 
         for strategy in strategies:
             try:
-                name = self._get_safe_filename(strategy.name or strategy.id)
-                config_path = self.configs_dir / f"{name}.yaml"
+                # 使用 UUID (strategy.id) 作为文件名，保证唯一性
+                filename = strategy.id
+                config_path = self.configs_dir / f"{filename}.yaml"
 
                 # 检查是否需要更新
                 if config_path.exists() and not overwrite:
@@ -120,12 +121,12 @@ class StrategySyncService(BaseSyncService):
                         continue
 
                 # 导出配置
-                config_data = self._strategy_to_yaml(strategy, name)
+                config_data = self._strategy_to_yaml(strategy, filename)
                 self.write_yaml(config_path, config_data)
 
                 # 导出资金曲线（如果有）
                 if strategy.equity_curve:
-                    equity_path = self.equity_dir / f"{name}.json"
+                    equity_path = self.equity_dir / f"{filename}.json"
                     equity_data = self.parse_json_field(strategy.equity_curve)
                     if equity_data:
                         self.write_json(equity_path, equity_data)
@@ -264,6 +265,71 @@ class StrategySyncService(BaseSyncService):
         strategy = Strategy.from_dict(data)
         self.store.add(strategy)
         return "created"
+
+    def export_single(self, strategy_id: str) -> bool:
+        """
+        导出单个策略
+
+        Args:
+            strategy_id: 策略 UUID
+
+        Returns:
+            是否成功
+        """
+        if self.store is None:
+            return False
+
+        try:
+            strategy = self.store.get(strategy_id)
+            if strategy is None:
+                return False
+
+            self.ensure_dir(self.configs_dir)
+            self.ensure_dir(self.equity_dir)
+
+            filename = strategy.id
+            config_path = self.configs_dir / f"{filename}.yaml"
+
+            # 导出配置
+            config_data = self._strategy_to_yaml(strategy, filename)
+            self.write_yaml_atomic(config_path, config_data)
+
+            # 导出资金曲线（如果有）
+            if strategy.equity_curve:
+                equity_path = self.equity_dir / f"{filename}.json"
+                equity_data = self.parse_json_field(strategy.equity_curve)
+                if equity_data:
+                    self.write_json_atomic(equity_path, equity_data)
+
+            return True
+
+        except Exception as e:
+            logger.error(f"strategy_export_single_error: {strategy_id}, {e}")
+            return False
+
+    def import_single(self, strategy_id: str) -> bool:
+        """
+        导入单个策略
+
+        Args:
+            strategy_id: 策略 UUID
+
+        Returns:
+            是否成功
+        """
+        if self.store is None:
+            return False
+
+        filepath = self.configs_dir / f"{strategy_id}.yaml"
+        if not filepath.exists():
+            return False
+
+        try:
+            result = self._import_strategy_file(filepath)
+            return result in ("created", "updated", "unchanged")
+        except Exception as e:
+            logger.error(f"strategy_import_single_error: {strategy_id}, {e}")
+            return False
 
     def get_status(self) -> Dict[str, Any]:
         """获取同步状态"""

@@ -7,6 +7,7 @@
 
 import uuid as uuid_lib
 import logging
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
@@ -194,7 +195,22 @@ class FactorStore(BaseStore[Factor]):
                 f'UPDATE factors SET {set_clause} WHERE filename = %s',
                 values
             )
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+
+        # 触发元数据实时同步
+        if updated:
+            self._trigger_metadata_sync(filename)
+
+        return updated
+
+    def _trigger_metadata_sync(self, filename: str) -> None:
+        """触发因子元数据同步到文件（不阻塞主流程）"""
+        try:
+            from domains.mcp_core.sync.trigger import get_sync_trigger
+            get_sync_trigger().sync_factor_metadata(filename)
+        except Exception as e:
+            # 同步失败只记录日志，不影响主业务
+            logger.debug(f"factor_metadata_sync_trigger_skipped: {filename}, {e}")
 
     def delete(self, filename: str) -> bool:
         """删除因子"""
@@ -320,12 +336,21 @@ class FactorStore(BaseStore[Factor]):
             verified = stats_row['verified'] or 0
             excluded_count = stats_row['excluded_count'] or 0
 
+            def safe_float(val, default=0.0, decimals=None):
+                """将可能为 None/nan/inf 的值转换为安全的 float"""
+                if val is None:
+                    return default
+                f = float(val)
+                if math.isnan(f) or math.isinf(f):
+                    return default
+                return round(f, decimals) if decimals is not None else f
+
             score_stats = {}
             if stats_row['avg_score'] is not None:
                 score_stats = {
-                    'avg': round(float(stats_row['avg_score']), 2),
-                    'min': float(stats_row['min_score']),
-                    'max': float(stats_row['max_score'])
+                    'avg': safe_float(stats_row['avg_score'], decimals=2),
+                    'min': safe_float(stats_row['min_score']),
+                    'max': safe_float(stats_row['max_score'])
                 }
 
             # 评分分布 - 单次查询
@@ -383,18 +408,18 @@ class FactorStore(BaseStore[Factor]):
             ic_stats = {}
             if ic_row['avg_ic'] is not None:
                 ic_stats = {
-                    'avg': round(float(ic_row['avg_ic']), 4),
-                    'min': round(float(ic_row['min_ic']), 4),
-                    'max': round(float(ic_row['max_ic']), 4),
+                    'avg': safe_float(ic_row['avg_ic'], decimals=4),
+                    'min': safe_float(ic_row['min_ic'], decimals=4),
+                    'max': safe_float(ic_row['max_ic'], decimals=4),
                     'count': ic_row['count_ic']
                 }
 
             rank_ic_stats = {}
             if ic_row['avg_rank_ic'] is not None:
                 rank_ic_stats = {
-                    'avg': round(float(ic_row['avg_rank_ic']), 4),
-                    'min': round(float(ic_row['min_rank_ic']), 4),
-                    'max': round(float(ic_row['max_rank_ic']), 4),
+                    'avg': safe_float(ic_row['avg_rank_ic'], decimals=4),
+                    'min': safe_float(ic_row['min_rank_ic'], decimals=4),
+                    'max': safe_float(ic_row['max_rank_ic'], decimals=4),
                     'count': ic_row['count_rank_ic']
                 }
 
@@ -461,8 +486,8 @@ class FactorStore(BaseStore[Factor]):
                 stats=stats
             )
 
-        # 同步截面因子（sections/ 目录）
-        sections_dir = config.project_root / "sections"
+        # 同步截面因子（private/sections/ 目录）
+        sections_dir = config.sections_dir
         if sections_dir.exists():
             self._sync_directory(
                 directory=sections_dir,

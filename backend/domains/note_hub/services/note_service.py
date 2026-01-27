@@ -54,8 +54,6 @@ class NoteService:
         title: str,
         content: str,
         tags: str = "",
-        source: str = "",
-        source_ref: str = "",
         note_type: str = NoteType.GENERAL.value,
         research_session_id: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[int]]:
@@ -66,8 +64,6 @@ class NoteService:
             title: 标题
             content: 内容
             tags: 标签（逗号分隔）
-            source: 来源
-            source_ref: 来源引用
             note_type: 笔记类型
             research_session_id: 研究会话 ID
 
@@ -81,8 +77,6 @@ class NoteService:
             title=title.strip(),
             content=content,
             tags=tags,
-            source=source,
-            source_ref=source_ref,
             note_type=note_type,
             research_session_id=research_session_id,
         )
@@ -113,7 +107,6 @@ class NoteService:
         self,
         search: str = "",
         tags: Optional[List[str]] = None,
-        source: str = "",
         note_type: str = "",
         is_archived: Optional[bool] = None,
         order_by: str = "updated_at",
@@ -127,7 +120,6 @@ class NoteService:
         Args:
             search: 搜索关键词
             tags: 标签筛选
-            source: 来源筛选
             note_type: 笔记类型筛选
             is_archived: 归档状态筛选
             order_by: 排序字段
@@ -146,7 +138,6 @@ class NoteService:
         return self.store.query(
             search=search if search else None,
             tags=tags,
-            source=source if source else None,
             note_type=note_type if note_type else None,
             is_archived=is_archived,
             order_by=order_by_str,
@@ -157,10 +148,6 @@ class NoteService:
     def search_notes(self, keyword: str, limit: int = 20) -> List[Note]:
         """搜索笔记"""
         return self.store.search(keyword, limit)
-
-    def get_notes_by_source(self, source: str, source_ref: str) -> List[Note]:
-        """根据来源获取笔记"""
-        return self.store.get_by_source(source, source_ref)
 
     def get_tags(self) -> List[str]:
         """获取所有标签"""
@@ -184,8 +171,6 @@ class NoteService:
         title: str,
         content: str,
         tags: str = "",
-        source: str = "",
-        source_ref: str = "",
         research_session_id: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[int]]:
         """
@@ -197,8 +182,6 @@ class NoteService:
             title: 观察标题
             content: 观察内容
             tags: 标签
-            source: 来源
-            source_ref: 来源引用
             research_session_id: 研究会话 ID
 
         Returns:
@@ -208,8 +191,6 @@ class NoteService:
             title=title,
             content=content,
             tags=tags,
-            source=source,
-            source_ref=source_ref,
             note_type=NoteType.OBSERVATION.value,
             research_session_id=research_session_id,
         )
@@ -219,8 +200,6 @@ class NoteService:
         title: str,
         content: str,
         tags: str = "",
-        source: str = "",
-        source_ref: str = "",
         research_session_id: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[int]]:
         """
@@ -232,8 +211,6 @@ class NoteService:
             title: 假设标题
             content: 假设内容
             tags: 标签
-            source: 来源
-            source_ref: 来源引用
             research_session_id: 研究会话 ID
 
         Returns:
@@ -243,8 +220,6 @@ class NoteService:
             title=title,
             content=content,
             tags=tags,
-            source=source,
-            source_ref=source_ref,
             note_type=NoteType.HYPOTHESIS.value,
             research_session_id=research_session_id,
         )
@@ -254,8 +229,6 @@ class NoteService:
         title: str,
         content: str,
         tags: str = "",
-        source: str = "",
-        source_ref: str = "",
         research_session_id: Optional[str] = None,
     ) -> Tuple[bool, str, Optional[int]]:
         """
@@ -267,8 +240,6 @@ class NoteService:
             title: 发现标题
             content: 发现内容
             tags: 标签
-            source: 来源
-            source_ref: 来源引用
             research_session_id: 研究会话 ID
 
         Returns:
@@ -278,8 +249,6 @@ class NoteService:
             title=title,
             content=content,
             tags=tags,
-            source=source,
-            source_ref=source_ref,
             note_type=NoteType.FINDING.value,
             research_session_id=research_session_id,
         )
@@ -289,8 +258,6 @@ class NoteService:
         title: str,
         content: str,
         research_session_id: str,
-        source: str = "",
-        source_ref: str = "",
     ) -> Tuple[bool, str, Optional[int]]:
         """
         记录研究轨迹
@@ -301,8 +268,6 @@ class NoteService:
             title: 轨迹标题
             content: 轨迹内容
             research_session_id: 研究会话 ID（必填）
-            source: 来源
-            source_ref: 来源引用
 
         Returns:
             (成功, 消息, 笔记ID)
@@ -311,8 +276,6 @@ class NoteService:
             title=title,
             content=content,
             tags="研究轨迹",
-            source=source,
-            source_ref=source_ref,
             note_type=NoteType.TRAIL.value,
             research_session_id=research_session_id,
         )

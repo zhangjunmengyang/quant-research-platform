@@ -44,7 +44,6 @@ async def list_notes(
     page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     tags: Optional[str] = None,
-    source: Optional[str] = None,
     note_type: Optional[NoteType] = None,
     is_archived: Optional[bool] = None,
     order_by: str = "updated_at",
@@ -65,7 +64,6 @@ async def list_notes(
         service.list_notes,
         search=search or "",
         tags=tags_list,
-        source=source or "",
         note_type=note_type.value if note_type else "",
         is_archived=is_archived,
         order_by=order_by,
@@ -165,8 +163,6 @@ async def create_note(
         title=request.title,
         content=request.content,
         tags=request.tags,
-        source=request.source,
-        source_ref=request.source_ref,
         note_type=request.note_type.value if request.note_type else NoteType.GENERAL.value,
         research_session_id=request.research_session_id,
     )
@@ -193,8 +189,6 @@ async def record_observation(
         title=request.title,
         content=request.content,
         tags=request.tags,
-        source=request.source,
-        source_ref=request.source_ref,
         research_session_id=request.research_session_id,
     )
 
@@ -220,8 +214,6 @@ async def record_hypothesis(
         title=request.title,
         content=request.content,
         tags=request.tags,
-        source=request.source,
-        source_ref=request.source_ref,
         research_session_id=request.research_session_id,
     )
 
@@ -247,8 +239,6 @@ async def record_finding(
         title=request.title,
         content=request.content,
         tags=request.tags,
-        source=request.source,
-        source_ref=request.source_ref,
         research_session_id=request.research_session_id,
     )
 

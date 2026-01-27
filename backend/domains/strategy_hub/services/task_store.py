@@ -5,6 +5,7 @@
 """
 
 import logging
+import math
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 
@@ -464,16 +465,25 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
             )
             row = cursor.fetchone()
 
+            def safe_float(val):
+                """将可能为 None/nan/inf 的值转换为安全的 float 或 None"""
+                if val is None:
+                    return None
+                f = float(val)
+                if math.isnan(f) or math.isinf(f):
+                    return None
+                return f
+
             return {
                 "total": row["total"] or 0,
                 "completed": row["completed"] or 0,
                 "failed": row["failed"] or 0,
                 "running": row["running"] or 0,
                 "pending": row["pending"] or 0,
-                "avg_annual_return": float(row["avg_annual_return"]) if row["avg_annual_return"] else None,
-                "avg_sharpe_ratio": float(row["avg_sharpe_ratio"]) if row["avg_sharpe_ratio"] else None,
-                "best_annual_return": float(row["best_annual_return"]) if row["best_annual_return"] else None,
-                "worst_annual_return": float(row["worst_annual_return"]) if row["worst_annual_return"] else None,
+                "avg_annual_return": safe_float(row["avg_annual_return"]),
+                "avg_sharpe_ratio": safe_float(row["avg_sharpe_ratio"]),
+                "best_annual_return": safe_float(row["best_annual_return"]),
+                "worst_annual_return": safe_float(row["worst_annual_return"]),
             }
 
 

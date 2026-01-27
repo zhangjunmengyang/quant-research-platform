@@ -9,7 +9,6 @@
 """
 
 import os
-import sys
 import uuid
 import json
 import logging
@@ -25,7 +24,7 @@ from .models import Strategy, TaskStatus, TaskInfo
 from .strategy_store import StrategyStore, get_strategy_store
 from .cache_isolation import isolated_cache, cleanup_task_cache
 from .task_store import BacktestTaskStore, get_task_store
-from domains.mcp_core.paths import get_project_root, get_backend_dir, get_data_dir
+from domains.mcp_core.paths import get_data_dir, setup_factor_paths
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +49,11 @@ def _setup_backtest_engine_paths():
     设置回测引擎需要的 Python 路径。
 
     engine/core 是回测引擎核心，需要特定的路径设置:
-    1. 项目根目录 - 用于 `from config import ...`
-    2. backend 目录 - 用于 `from domains.engine.core...`
+    1. private 目录 - 用于导入 factors 和 sections 包
+    2. 项目根目录 - 用于 `from config import ...`
+    3. backend 目录 - 用于 `from domains.engine.core...`
     """
-    project_root = get_project_root()
-    backend_path = get_backend_dir()
-
-    paths_to_add = [str(project_root), str(backend_path)]
-    for path in paths_to_add:
-        if path not in sys.path:
-            sys.path.insert(0, path)
+    setup_factor_paths()
 
 
 @dataclass
@@ -520,6 +514,8 @@ class BacktestRunner:
         except Exception as e:
             logger.exception(f"回测失败: {task_id}")
             self._update_task_error(task_id, str(e))
+            # 重新抛出异常，让 run_and_wait 能够捕获
+            raise
 
         finally:
             # 清理运行状态

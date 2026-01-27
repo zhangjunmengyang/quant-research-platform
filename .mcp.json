@@ -15,6 +15,14 @@
     "note-hub": {
       "type": "http",
       "url": "http://localhost:6792/mcp"
+    },
+    "research-hub": {
+      "type": "http",
+      "url": "http://localhost:6793/mcp"
+    },
+    "experience-hub": {
+      "type": "http",
+      "url": "http://localhost:6794/mcp"
     }
   }
 }

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Set, List, Optional
 from dataclasses import dataclass, field
 
+from domains.mcp_core.paths import get_factors_dir, get_sections_dir
 from ..core.config import get_config_loader
 from ..core.store import get_factor_store, FactorStore
 from ..core.models import FactorType
@@ -41,11 +42,8 @@ def discover_factors(
     config = get_config_loader()
     store = store or get_factor_store()
 
-    # 项目根目录
-    base_path = Path(__file__).parent.parent.parent.parent.parent
-
-    # 扫描 factors/ 目录（时序因子）
-    factors_dir = base_path / "factors"
+    # 扫描 private/factors/ 目录（时序因子）
+    factors_dir = get_factors_dir()
     time_series_factors = set()
     if factors_dir.exists():
         for f in factors_dir.glob("*.py"):
@@ -53,8 +51,8 @@ def discover_factors(
                 # 使用不带 .py 后缀的文件名
                 time_series_factors.add(f.stem)
 
-    # 扫描 sections/ 目录（截面因子）
-    sections_dir = base_path / "sections"
+    # 扫描 private/sections/ 目录（截面因子）
+    sections_dir = get_sections_dir()
     cross_section_factors = set()
     if sections_dir.exists():
         for f in sections_dir.glob("*.py"):

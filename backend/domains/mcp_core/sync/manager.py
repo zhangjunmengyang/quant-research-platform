@@ -73,8 +73,13 @@ class SyncManager:
 
         try:
             # 策略同步
-            from domains.strategy_hub.services.strategy_store import get_strategy_store
-            strategy_store = get_strategy_store()
+            # 注意：不能使用 get_strategy_store()，因为它位于 strategy_hub.services.strategy_store
+            # 该模块的 __init__.py 会导入 param_search.py，后者依赖 engine.core.backtest
+            # 而 backtest.py 依赖 config 模块，在独立脚本环境下不可用
+            # 因此直接导入 StrategyStore 类并使用通用单例管理
+            from domains.strategy_hub.services.strategy_store import StrategyStore
+            from domains.mcp_core.base import get_store_instance
+            strategy_store = get_store_instance(StrategyStore)
             self._services["strategies"] = StrategySyncService(self.data_dir, strategy_store)
         except Exception as e:
             logger.warning(f"strategy_sync_service_init_error: {e}")

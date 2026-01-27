@@ -11,6 +11,10 @@
 - MCP Server: Model Context Protocol 服务
 """
 
+from domains.mcp_core.paths import setup_factor_paths
+
+setup_factor_paths()
+
 from .core.config import DataHubConfig, get_data_hub_config
 from .core.models import DataConfig, KlineData, FactorResult
 from domains.core.exceptions import DataHubError, DataNotFoundError, FactorNotFoundError

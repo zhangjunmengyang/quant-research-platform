@@ -6,8 +6,11 @@
 
 import json
 import logging
+import os
+import shutil
+import tempfile
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -93,20 +96,27 @@ class BaseSyncService(ABC):
         path.mkdir(parents=True, exist_ok=True)
 
     def get_file_mtime(self, filepath: Path) -> Optional[datetime]:
-        """获取文件修改时间"""
+        """获取文件修改时间（UTC）"""
         if not filepath.exists():
             return None
-        return datetime.fromtimestamp(filepath.stat().st_mtime)
+        # 转换为 UTC 时区，确保时间比较一致性
+        ts = filepath.stat().st_mtime
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
 
     def get_db_mtime(self, entity: Any) -> Optional[datetime]:
-        """获取数据库记录更新时间"""
+        """获取数据库记录更新时间（UTC）"""
         if hasattr(entity, 'updated_at'):
             mtime = entity.updated_at
             if isinstance(mtime, datetime):
-                return mtime
+                # 如果没有时区信息，假设是本地时间，转换为 UTC
+                if mtime.tzinfo is None:
+                    # 数据库存储的时间通常是本地时间
+                    return mtime.replace(tzinfo=timezone.utc)
+                return mtime.astimezone(timezone.utc)
             if isinstance(mtime, str):
                 try:
-                    return datetime.fromisoformat(mtime.replace('Z', '+00:00'))
+                    dt = datetime.fromisoformat(mtime.replace('Z', '+00:00'))
+                    return dt.astimezone(timezone.utc)
                 except (ValueError, AttributeError):
                     pass
         return None
@@ -116,24 +126,28 @@ class BaseSyncService(ABC):
         判断是否应该更新数据库
 
         文件更新时间 > 数据库更新时间 时，更新数据库
+        添加 1 秒容差，避免时间精度问题导致的误判
         """
         if file_mtime is None:
             return False
         if db_mtime is None:
             return True
-        return file_mtime > db_mtime
+        # 添加 1 秒容差
+        return file_mtime > db_mtime + timedelta(seconds=1)
 
     def should_update_file(self, file_mtime: Optional[datetime], db_mtime: Optional[datetime]) -> bool:
         """
         判断是否应该更新文件
 
         数据库更新时间 > 文件更新时间 时，更新文件
+        添加 1 秒容差，避免时间精度问题导致的误判
         """
         if db_mtime is None:
             return False
         if file_mtime is None:
             return True
-        return db_mtime > file_mtime
+        # 添加 1 秒容差
+        return db_mtime > file_mtime + timedelta(seconds=1)
 
     # ===== YAML 工具 =====
 
@@ -261,3 +275,94 @@ class BaseSyncService(ABC):
             except json.JSONDecodeError:
                 return json.dumps(value, ensure_ascii=False)
         return json.dumps(value, ensure_ascii=False)
+
+    # ===== 原子写入工具 =====
+
+    def write_yaml_atomic(self, filepath: Path, data: Dict[str, Any]) -> None:
+        """
+        原子写入 YAML 文件
+
+        使用临时文件 + 原子重命名，确保写入过程中断不会损坏文件。
+        """
+        self.ensure_dir(filepath.parent)
+
+        # 写入临时文件
+        fd, tmp_path = tempfile.mkstemp(
+            suffix='.yaml',
+            prefix='.tmp_',
+            dir=filepath.parent
+        )
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                yaml.dump(
+                    data,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                )
+            # 原子重命名
+            shutil.move(tmp_path, filepath)
+        except Exception:
+            # 清理临时文件
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
+    def write_markdown_with_frontmatter_atomic(
+        self,
+        filepath: Path,
+        metadata: Dict[str, Any],
+        content: str
+    ) -> None:
+        """
+        原子写入 Markdown 文件
+
+        使用临时文件 + 原子重命名，确保写入过程中断不会损坏文件。
+        """
+        self.ensure_dir(filepath.parent)
+
+        fd, tmp_path = tempfile.mkstemp(
+            suffix='.md',
+            prefix='.tmp_',
+            dir=filepath.parent
+        )
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write('---\n')
+                yaml.dump(
+                    metadata,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                )
+                f.write('---\n\n')
+                f.write(content)
+            shutil.move(tmp_path, filepath)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise
+
+    def write_json_atomic(self, filepath: Path, data: Any) -> None:
+        """
+        原子写入 JSON 文件
+
+        使用临时文件 + 原子重命名，确保写入过程中断不会损坏文件。
+        """
+        self.ensure_dir(filepath.parent)
+
+        fd, tmp_path = tempfile.mkstemp(
+            suffix='.json',
+            prefix='.tmp_',
+            dir=filepath.parent
+        )
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            shutil.move(tmp_path, filepath)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            raise

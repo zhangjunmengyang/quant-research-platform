@@ -15,6 +15,10 @@ Strategy Hub - 策略知识库模块
 import sys
 from pathlib import Path
 
+from domains.mcp_core.paths import setup_factor_paths
+
+setup_factor_paths()
+
 # 向后兼容: core 子目录仍然存在，但应使用 engine 模块
 # 保留 sys.path 修改以支持旧代码的渐进式迁移
 _engine_path = Path(__file__).parent

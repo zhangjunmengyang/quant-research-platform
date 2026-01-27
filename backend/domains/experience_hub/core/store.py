@@ -144,10 +144,25 @@ class ExperienceStore(BaseStore[Experience]):
                     experience.created_at, experience.updated_at
                 ))
                 result = cursor.fetchone()
-                return result['id'] if result else None
+                experience_id = result['id'] if result else None
         except psycopg2.IntegrityError as e:
             logger.error(f"添加经验失败: {e}")
             return None
+
+        # 触发实时同步
+        if experience_id:
+            self._trigger_sync(experience_id)
+
+        return experience_id
+
+    def _trigger_sync(self, experience_id: int) -> None:
+        """触发经验同步到文件（不阻塞主流程）"""
+        try:
+            from domains.mcp_core.sync.trigger import get_sync_trigger
+            get_sync_trigger().sync_experience(experience_id)
+        except Exception as e:
+            # 同步失败只记录日志，不影响主业务
+            logger.debug(f"experience_sync_trigger_skipped: {experience_id}, {e}")
 
     def update(self, experience_id: int, **fields) -> bool:
         """更新经验字段"""
@@ -174,7 +189,13 @@ class ExperienceStore(BaseStore[Experience]):
                 f'UPDATE experiences SET {set_clause} WHERE id = %s',
                 values
             )
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+
+        # 触发实时同步
+        if updated:
+            self._trigger_sync(experience_id)
+
+        return updated
 
     def delete(self, experience_id: int) -> bool:
         """删除经验"""
@@ -362,6 +383,40 @@ class ExperienceStore(BaseStore[Experience]):
                 (link_id,)
             )
             return cursor.rowcount > 0
+
+    def get_all_links(self) -> List[ExperienceLink]:
+        """获取所有经验关联"""
+        with self._cursor() as cursor:
+            cursor.execute('SELECT * FROM experience_links ORDER BY experience_id')
+            return [ExperienceLink.from_dict(dict(row)) for row in cursor.fetchall()]
+
+    def link_exists(
+        self,
+        experience_id: int,
+        entity_type: str,
+        entity_id: str,
+        relation: str = "related"
+    ) -> bool:
+        """
+        检查关联是否已存在
+
+        Args:
+            experience_id: 经验 ID
+            entity_type: 实体类型
+            entity_id: 实体 ID
+            relation: 关系类型
+
+        Returns:
+            是否存在
+        """
+        with self._cursor() as cursor:
+            cursor.execute('''
+                SELECT 1 FROM experience_links
+                WHERE experience_id = %s AND entity_type = %s
+                AND entity_id = %s AND relation = %s
+                LIMIT 1
+            ''', (experience_id, entity_type, entity_id, relation))
+            return cursor.fetchone() is not None
 
 
 # ==================== 单例管理 ====================

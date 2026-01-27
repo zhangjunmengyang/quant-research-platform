@@ -23,6 +23,7 @@ from app.schemas.common import ApiResponse
 from app.core.deps import get_factor_store, get_field_filler
 from app.core.async_utils import run_sync
 from domains.mcp_core.server.sse import get_task_manager, TaskStatus
+from domains.mcp_core.paths import get_factors_dir, get_sections_dir
 
 router = APIRouter()
 
@@ -355,10 +356,9 @@ async def ingest_factors(
         skipped = []
         failed = []
 
-        # Get factor directories
-        base_path = Path(__file__).parent.parent.parent.parent.parent
-        factors_dir = base_path / "factors"
-        sections_dir = base_path / "sections"
+        # Get factor directories (private/factors, private/sections)
+        factors_dir = get_factors_dir()
+        sections_dir = get_sections_dir()
 
         for filename in factors_to_ingest:
             try:

@@ -29,9 +29,10 @@ class Settings(BaseSettings):
     ]
 
     # Paths (relative to project root)
+    # NOTE: 因子路径请使用 domains.mcp_core.paths.get_factors_dir()
     PROJECT_ROOT: Path = Path(__file__).parent.parent.parent.parent.parent
     DATA_DIR: Path = PROJECT_ROOT / "data"
-    FACTORS_DIR: Path = PROJECT_ROOT / "factors"
+    FACTORS_DIR: Path = PROJECT_ROOT / "private" / "factors"
     CONFIG_DIR: Path = PROJECT_ROOT / "config"
 
     # MCP settings
