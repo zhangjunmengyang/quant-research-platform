@@ -17,4 +17,11 @@ export {
   useKline,
   useAvailableFactors,
   useFactorCalculation,
+  // 标签相关
+  useAllTags,
+  useAllSymbolTags,
+  useSymbolTags,
+  useSymbolsByTag,
+  useAddSymbolTag,
+  useRemoveSymbolTag,
 } from './hooks'

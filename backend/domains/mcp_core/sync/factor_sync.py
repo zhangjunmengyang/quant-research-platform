@@ -19,7 +19,7 @@ class FactorSyncService(BaseSyncService):
     因子元数据同步服务
 
     文件结构：
-        private-data/factors/metadata/{filename}.yaml
+        private/metadata/{filename}.yaml
 
     同步字段（不含 code_content）：
         - 基础：filename, factor_type, uuid

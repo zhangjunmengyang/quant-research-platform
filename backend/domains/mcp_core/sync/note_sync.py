@@ -23,6 +23,11 @@ class NoteSyncService(BaseSyncService):
     文件结构：
         private-data/notes/{note_type}/{uuid}.md
 
+    笔记类型（研究流程）：
+        - observation: 观察 - 对数据或现象的客观记录
+        - hypothesis: 假设 - 基于观察提出的待验证假说
+        - verification: 检验 - 对假设的验证过程和结论
+
     Markdown 格式：
         ---
         uuid: "550e8400-e29b-41d4-a716-446655440000"
@@ -32,7 +37,6 @@ class NoteSyncService(BaseSyncService):
         tags: tag1,tag2
         source: factor
         source_ref: Momentum_5d
-        research_session_id: "session_001"
         is_archived: false
         promoted_to_experience_id: null
         created_at: "2024-01-15T10:00:00"
@@ -41,16 +45,17 @@ class NoteSyncService(BaseSyncService):
 
         笔记内容...
 
+    注意：实体关联（如检验关联假设）通过 Edge 系统管理，不在文件元数据中存储。
+
     注意：使用 UUID 作为文件名，保证文件名稳定（标题变更不影响文件名）
     """
 
     # 笔记类型到目录的映射
+    # 研究流程: 观察 -> 假设 -> 检验
     TYPE_DIRS = {
         'observation': 'observations',
         'hypothesis': 'hypotheses',
-        'finding': 'findings',
-        'trail': 'trails',
-        'general': 'general',
+        'verification': 'verifications',
     }
 
     def __init__(self, data_dir: Path, store: Any = None):
@@ -164,8 +169,8 @@ class NoteSyncService(BaseSyncService):
 
     def _get_note_filepath(self, note: Any) -> Path:
         """获取笔记的文件路径（基于 UUID）"""
-        note_type = getattr(note, 'note_type', 'general')
-        type_dir = self.TYPE_DIRS.get(note_type, 'general')
+        note_type = getattr(note, 'note_type', 'observation')
+        type_dir = self.TYPE_DIRS.get(note_type, 'observations')
 
         # 使用 UUID 作为文件名，保证稳定性
         note_uuid = getattr(note, 'uuid', None)
@@ -199,8 +204,8 @@ class NoteSyncService(BaseSyncService):
         if not note.uuid:
             return
 
-        note_type = getattr(note, 'note_type', 'general')
-        type_dir = self.TYPE_DIRS.get(note_type, 'general')
+        note_type = getattr(note, 'note_type', 'observation')
+        type_dir = self.TYPE_DIRS.get(note_type, 'observations')
         dir_path = self.notes_dir / type_dir
 
         if not dir_path.exists():
@@ -228,7 +233,6 @@ class NoteSyncService(BaseSyncService):
             'tags': note.tags,
             'source': note.source,
             'source_ref': note.source_ref,
-            'research_session_id': note.research_session_id,
             'is_archived': note.is_archived,
             'promoted_to_experience_id': note.promoted_to_experience_id,
             'created_at': self.datetime_to_iso(note.created_at),
@@ -266,8 +270,7 @@ class NoteSyncService(BaseSyncService):
             'tags': metadata.get('tags', ''),
             'source': metadata.get('source', ''),
             'source_ref': metadata.get('source_ref', ''),
-            'note_type': metadata.get('note_type', 'general'),
-            'research_session_id': metadata.get('research_session_id'),
+            'note_type': metadata.get('note_type', 'observation'),
             'is_archived': metadata.get('is_archived', False),
             'promoted_to_experience_id': metadata.get('promoted_to_experience_id'),
         }
@@ -356,8 +359,8 @@ class NoteSyncService(BaseSyncService):
                     logger.warning(f"failed_to_persist_uuid: {note.id}, {e}")
 
             # 确保目录存在
-            note_type = getattr(note, 'note_type', 'general')
-            type_dir = self.TYPE_DIRS.get(note_type, 'general')
+            note_type = getattr(note, 'note_type', 'observation')
+            type_dir = self.TYPE_DIRS.get(note_type, 'observations')
             self.ensure_dir(self.notes_dir / type_dir)
 
             filepath = self._get_note_filepath(note)
@@ -392,8 +395,8 @@ class NoteSyncService(BaseSyncService):
                 return False
 
             # 查找对应的文件
-            note_type = getattr(note, 'note_type', 'general')
-            type_dir = self.TYPE_DIRS.get(note_type, 'general')
+            note_type = getattr(note, 'note_type', 'observation')
+            type_dir = self.TYPE_DIRS.get(note_type, 'observations')
             filepath = self.notes_dir / type_dir / f"{note.uuid}.md"
 
             if not filepath.exists():

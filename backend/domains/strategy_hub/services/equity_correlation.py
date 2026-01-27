@@ -13,6 +13,7 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 
+from domains.mcp_core.paths import get_data_dir
 from ..utils.plot_functions import draw_params_heatmap_plotly, merge_html_flexible
 from ..utils.data_functions import curve_difference_all_pairs
 
@@ -42,7 +43,7 @@ class EquityCorrelationService:
         Args:
             data_path: 数据根路径
         """
-        self.data_path = data_path or Path("data")
+        self.data_path = data_path or get_data_dir()
         self.output_path = self.data_path / "analysis_results" / "equity_correlation"
         self.output_path.mkdir(parents=True, exist_ok=True)
 

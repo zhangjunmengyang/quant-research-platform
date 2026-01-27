@@ -134,3 +134,11 @@ export interface CrossSectionData {
     rank: number
   }>
 }
+
+/**
+ * Tag info with count
+ */
+export interface TagInfo {
+  tag: string
+  count: number
+}

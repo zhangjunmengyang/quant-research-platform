@@ -8,13 +8,15 @@ from pydantic import BaseModel, Field
 
 
 class NoteType(str, Enum):
-    """笔记类型枚举"""
+    """
+    笔记类型枚举
 
-    OBSERVATION = "observation"  # 观察 - 对数据或现象的客观记录
-    HYPOTHESIS = "hypothesis"    # 假设 - 基于观察提出的假设
-    FINDING = "finding"          # 发现 - 验证后的发现
-    TRAIL = "trail"              # 轨迹 - 研究过程记录（自动生成）
-    GENERAL = "general"          # 通用 - 一般性笔记（向后兼容）
+    研究流程：观察 -> 假设 -> 检验
+    """
+
+    OBSERVATION = "observation"    # 观察 - 对数据或现象的客观记录
+    HYPOTHESIS = "hypothesis"      # 假设 - 基于观察提出的待验证假说
+    VERIFICATION = "verification"  # 检验 - 对假设的验证过程和结论
 
 
 class NoteBase(BaseModel):
@@ -28,8 +30,7 @@ class NoteBase(BaseModel):
 class NoteCreate(NoteBase):
     """Note create request."""
 
-    note_type: NoteType = Field(NoteType.GENERAL, description="笔记类型")
-    research_session_id: Optional[str] = Field(None, description="研究会话 ID")
+    note_type: NoteType = Field(NoteType.OBSERVATION, description="笔记类型")
 
 
 class NoteUpdate(BaseModel):
@@ -39,15 +40,13 @@ class NoteUpdate(BaseModel):
     content: Optional[str] = None
     tags: Optional[str] = None
     note_type: Optional[NoteType] = None
-    research_session_id: Optional[str] = None
 
 
 class Note(NoteBase):
     """Complete note model for API responses."""
 
     id: int = Field(..., description="笔记 ID")
-    note_type: NoteType = Field(NoteType.GENERAL, description="笔记类型")
-    research_session_id: Optional[str] = Field(None, description="研究会话 ID")
+    note_type: NoteType = Field(NoteType.OBSERVATION, description="笔记类型")
     promoted_to_experience_id: Optional[int] = Field(None, description="已提炼为经验的 ID")
     is_archived: bool = Field(False, description="是否已归档")
     created_at: Optional[datetime] = None
@@ -79,7 +78,6 @@ class NoteStats(BaseModel):
     active_count: int = Field(0, description="活跃笔记数")
     archived_count: int = Field(0, description="已归档笔记数")
     promoted_count: int = Field(0, description="已提炼为经验的笔记数")
-    session_count: int = Field(0, description="研究会话数")
     by_type: Dict[str, int] = Field(default_factory=dict, description="按类型统计")
 
 
@@ -92,7 +90,6 @@ class ObservationCreate(BaseModel):
     title: str = Field(..., description="观察标题", min_length=1, max_length=500)
     content: str = Field(..., description="观察内容（Markdown 格式）")
     tags: str = Field("", description="标签（逗号分隔）")
-    research_session_id: Optional[str] = Field(None, description="研究会话 ID")
 
 
 class HypothesisCreate(BaseModel):
@@ -101,28 +98,18 @@ class HypothesisCreate(BaseModel):
     title: str = Field(..., description="假设标题", min_length=1, max_length=500)
     content: str = Field(..., description="假设内容（Markdown 格式）")
     tags: str = Field("", description="标签（逗号分隔）")
-    research_session_id: Optional[str] = Field(None, description="研究会话 ID")
 
 
-class FindingCreate(BaseModel):
-    """记录发现请求"""
+class VerificationCreate(BaseModel):
+    """记录检验请求"""
 
-    title: str = Field(..., description="发现标题", min_length=1, max_length=500)
-    content: str = Field(..., description="发现内容（Markdown 格式）")
+    title: str = Field(..., description="检验标题", min_length=1, max_length=500)
+    content: str = Field(..., description="检验内容（Markdown 格式）")
     tags: str = Field("", description="标签（逗号分隔）")
-    research_session_id: Optional[str] = Field(None, description="研究会话 ID")
+    hypothesis_id: Optional[int] = Field(None, description="关联的假设笔记 ID（通过 Edge 系统关联）")
 
 
 class PromoteRequest(BaseModel):
     """提炼为经验请求"""
 
     experience_id: int = Field(..., description="经验 ID")
-
-
-class ResearchTrail(BaseModel):
-    """研究轨迹响应"""
-
-    session_id: str = Field(..., description="研究会话 ID")
-    notes: List[Note] = Field(default_factory=list, description="笔记列表")
-    total: int = Field(0, description="笔记总数")
-    by_type: Dict[str, int] = Field(default_factory=dict, description="按类型统计")

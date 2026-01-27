@@ -72,6 +72,11 @@ class SyncTrigger:
                 from domains.experience_hub.core.store import get_experience_store
                 self._services["experience"] = ExperienceSyncService(self.data_dir, get_experience_store())
 
+            elif service_type == "edge":
+                from .edge_sync import EdgeSyncService
+                from domains.mcp_core.edge.store import get_edge_store
+                self._services["edge"] = EdgeSyncService(self.data_dir, get_edge_store())
+
         except Exception as e:
             logger.debug(f"sync_service_init_skipped: {service_type}, {e}")
             return None
@@ -160,6 +165,49 @@ class SyncTrigger:
                 return result
         except Exception as e:
             logger.warning(f"sync_experience_failed: {experience_id}, {e}")
+        return False
+
+    def sync_tag(self, entity_type: str, entity_id: str) -> bool:
+        """
+        同步标签到文件
+
+        Args:
+            entity_type: 实体类型（data, factor, strategy 等）
+            entity_id: 实体 ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            service = self._get_service("edge")
+            if service and hasattr(service, 'export_single'):
+                result = service.export_single(entity_type, entity_id)
+                if result:
+                    logger.debug(f"tag_synced: {entity_type}:{entity_id}")
+                return result
+        except Exception as e:
+            logger.warning(f"sync_tag_failed: {entity_type}:{entity_id}, {e}")
+        return False
+
+    def sync_edge(self, edge: Any) -> bool:
+        """
+        同步知识边到文件
+
+        Args:
+            edge: KnowledgeEdge 对象
+
+        Returns:
+            是否成功
+        """
+        try:
+            service = self._get_service("edge")
+            if service and hasattr(service, 'export_edge'):
+                result = service.export_edge(edge)
+                if result:
+                    logger.debug(f"edge_synced: {edge.source_id} -> {edge.target_id}")
+                return result
+        except Exception as e:
+            logger.warning(f"sync_edge_failed: {edge.source_id} -> {edge.target_id}, {e}")
         return False
 
 

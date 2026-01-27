@@ -10,7 +10,7 @@ import type {
   NoteListParams,
   ObservationCreate,
   HypothesisCreate,
-  FindingCreate,
+  VerificationCreate,
   PromoteRequest,
   NoteType,
 } from './types'
@@ -27,6 +27,8 @@ export const noteKeys = {
   trails: () => [...noteKeys.all, 'trail'] as const,
   trail: (sessionId: string, includeArchived: boolean) =>
     [...noteKeys.trails(), sessionId, includeArchived] as const,
+  verifications: (hypothesisId: number, includeArchived?: boolean) =>
+    [...noteKeys.all, 'verifications', hypothesisId, includeArchived] as const,
 }
 
 // 默认缓存时间: 5 分钟
@@ -138,7 +140,7 @@ export function useNoteDetail(id: number | null) {
 // ==================== 研究记录相关 Hooks ====================
 
 /**
- * Hook for recording notes (observation, hypothesis, finding)
+ * Hook for recording notes (observation, hypothesis, verification)
  */
 export function useRecordNote() {
   const queryClient = useQueryClient()
@@ -161,8 +163,8 @@ export function useRecordNote() {
     },
   })
 
-  const recordFinding = useMutation({
-    mutationFn: (request: FindingCreate) => noteApi.recordFinding(request),
+  const recordVerification = useMutation({
+    mutationFn: (request: VerificationCreate) => noteApi.recordVerification(request),
     onSuccess: () => {
       invalidateNotes()
     },
@@ -171,7 +173,7 @@ export function useRecordNote() {
   return {
     recordObservation,
     recordHypothesis,
-    recordFinding,
+    recordVerification,
   }
 }
 
@@ -179,15 +181,15 @@ export function useRecordNote() {
  * Hook to record a specific type of note
  */
 export function useRecordNoteByType(noteType: NoteType) {
-  const { recordObservation, recordHypothesis, recordFinding } = useRecordNote()
+  const { recordObservation, recordHypothesis, recordVerification } = useRecordNote()
 
   switch (noteType) {
     case 'observation':
       return recordObservation
     case 'hypothesis':
       return recordHypothesis
-    case 'finding':
-      return recordFinding
+    case 'verification':
+      return recordVerification
     default:
       return recordObservation
   }
@@ -203,6 +205,36 @@ export function useResearchTrail(sessionId: string | null, includeArchived = fal
     enabled: sessionId !== null && sessionId.length > 0,
     staleTime: DEFAULT_STALE_TIME,
   })
+}
+
+/**
+ * Hook to fetch verifications for a hypothesis
+ *
+ * 通过 Edge 系统获取关联到某个假设的所有验证笔记
+ */
+export function useVerifications(
+  hypothesisId: number | null,
+  includeArchived = false
+) {
+  return useQuery({
+    queryKey: noteKeys.verifications(hypothesisId ?? 0, includeArchived),
+    queryFn: () => noteApi.getVerifications(hypothesisId!, includeArchived),
+    enabled: hypothesisId !== null && hypothesisId > 0,
+    staleTime: DEFAULT_STALE_TIME,
+  })
+}
+
+/**
+ * @deprecated Use useVerifications instead
+ * Hook to fetch notes linked to a specific note (legacy)
+ */
+export function useLinkedNotes(
+  noteId: number | null,
+  noteType?: string,
+  includeArchived = false
+) {
+  // Redirect to verifications endpoint for hypothesis
+  return useVerifications(noteId, includeArchived)
 }
 
 /**

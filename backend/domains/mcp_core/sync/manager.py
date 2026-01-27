@@ -12,6 +12,7 @@ from .factor_sync import FactorSyncService
 from .note_sync import NoteSyncService
 from .strategy_sync import StrategySyncService
 from .experience_sync import ExperienceSyncService
+from .edge_sync import EdgeSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -20,25 +21,27 @@ class SyncManager:
     """
     数据同步管理器
 
-    统一管理因子、笔记、策略、经验的同步操作。
+    统一管理因子、笔记、策略、经验、标签的同步操作。
+    标签数据主要包括币种标签（如蓝筹、妖币等）。
 
     使用方式：
         manager = SyncManager()
         manager.export_all()       # 导出所有数据
         manager.import_all()       # 导入所有数据
         manager.export("factors")  # 导出指定类型
+        manager.export("tags")     # 导出标签数据
         manager.get_status()       # 获取同步状态
     """
 
     # 支持的数据类型
-    DATA_TYPES = ["factors", "notes", "strategies", "experiences"]
+    DATA_TYPES = ["factors", "notes", "strategies", "experiences", "tags"]
 
     def __init__(self, private_data_dir: Optional[Path] = None):
         """
         初始化同步管理器
 
         Args:
-            private_data_dir: 私有数据目录，默认为项目根目录下的 private-data/
+            private_data_dir: 私有数据目录，默认为项目根目录下的 private/
         """
         if private_data_dir is None:
             from domains.mcp_core.paths import get_private_data_dir
@@ -93,6 +96,15 @@ class SyncManager:
         except Exception as e:
             logger.warning(f"experience_sync_service_init_error: {e}")
             self._services["experiences"] = ExperienceSyncService(self.data_dir, None)
+
+        try:
+            # 标签同步（币种标签等）
+            from domains.mcp_core.edge.store import get_edge_store
+            edge_store = get_edge_store()
+            self._services["tags"] = EdgeSyncService(self.data_dir, edge_store)
+        except Exception as e:
+            logger.warning(f"edge_sync_service_init_error: {e}")
+            self._services["tags"] = EdgeSyncService(self.data_dir, None)
 
         self._initialized = True
 
@@ -219,7 +231,7 @@ class SyncManager:
 
         Returns:
             {
-                "data_dir": "/path/to/private-data",
+                "data_dir": "/path/to/private",
                 "exists": True,
                 "factors": {"db_count": N, "file_count": M, ...},
                 "notes": {...},
@@ -243,6 +255,84 @@ class SyncManager:
                 status[data_type] = {"error": "service not available"}
 
         return status
+
+    def verify(self, *data_types: str) -> Dict[str, Any]:
+        """
+        验证数据库和文件的同步状态
+
+        Args:
+            data_types: 要验证的数据类型，默认验证所有支持验证的类型
+
+        Returns:
+            {
+                "is_synced": bool,
+                "tags": {"is_synced": bool, ...},
+                ...
+            }
+        """
+        types_to_verify = data_types if data_types else ["tags"]
+        results = {"is_synced": True}
+
+        for data_type in types_to_verify:
+            service = self._get_service(data_type)
+            if service and hasattr(service, 'verify_sync'):
+                try:
+                    result = service.verify_sync()
+                    results[data_type] = result
+                    if not result.get("is_synced", True):
+                        results["is_synced"] = False
+                except Exception as e:
+                    logger.error(f"verify_{data_type}_error: {e}")
+                    results[data_type] = {"error": str(e)}
+                    results["is_synced"] = False
+            else:
+                results[data_type] = {"error": "verify not supported"}
+
+        return results
+
+    def restore(self, *data_types: str, full_sync: bool = True) -> Dict[str, Dict[str, int]]:
+        """
+        从文件恢复数据到数据库
+
+        Args:
+            data_types: 要恢复的数据类型，默认恢复所有
+            full_sync: 是否完全同步（删除文件中不存在的数据）
+
+        Returns:
+            {
+                "factors": {"created": N, "updated": M, "deleted": D, "unchanged": K, "errors": L},
+                ...
+            }
+        """
+        types_to_restore = data_types if data_types else self.DATA_TYPES
+        results = {}
+
+        for data_type in types_to_restore:
+            if data_type not in self.DATA_TYPES:
+                logger.warning(f"unknown_data_type: {data_type}")
+                results[data_type] = {"errors": 1}
+                continue
+
+            service = self._get_service(data_type)
+            if service:
+                try:
+                    # 如果服务支持 full_sync 参数
+                    if hasattr(service, 'import_all'):
+                        import inspect
+                        sig = inspect.signature(service.import_all)
+                        if 'full_sync' in sig.parameters:
+                            results[data_type] = service.import_all(full_sync=full_sync)
+                        else:
+                            results[data_type] = service.import_all()
+                    else:
+                        results[data_type] = {"errors": 1}
+                except Exception as e:
+                    logger.error(f"restore_{data_type}_error: {e}")
+                    results[data_type] = {"errors": 1}
+            else:
+                results[data_type] = {"errors": 1}
+
+        return results
 
 
 # 便捷函数

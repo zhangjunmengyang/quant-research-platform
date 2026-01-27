@@ -10,6 +10,7 @@ import type {
   FactorCalcRequest,
   FactorCalcResult,
   AvailableFactor,
+  TagInfo,
 } from './types'
 
 const BASE_URL = '/data'
@@ -93,5 +94,71 @@ export const dataApi = {
       throw new Error(data.error || 'Failed to calculate factor')
     }
     return data.data
+  },
+
+  // ==================== 标签 API ====================
+
+  /**
+   * Get all tags with counts
+   */
+  getAllTags: async (): Promise<TagInfo[]> => {
+    const { data } = await apiClient.get<ApiResponse<TagInfo[]>>(`${BASE_URL}/tags`)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to fetch tags')
+    }
+    return data.data
+  },
+
+  /**
+   * Get all symbols' tags mapping
+   */
+  getAllSymbolTags: async (): Promise<Record<string, string[]>> => {
+    const { data } = await apiClient.get<ApiResponse<Record<string, string[]>>>(`${BASE_URL}/tags/all-symbols`)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to fetch all symbol tags')
+    }
+    return data.data
+  },
+
+  /**
+   * Get symbols by tag
+   */
+  getSymbolsByTag: async (tag: string): Promise<string[]> => {
+    const { data } = await apiClient.get<ApiResponse<string[]>>(`${BASE_URL}/tags/${encodeURIComponent(tag)}/symbols`)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to fetch symbols by tag')
+    }
+    return data.data
+  },
+
+  /**
+   * Get tags for a symbol
+   */
+  getSymbolTags: async (symbol: string): Promise<string[]> => {
+    const { data } = await apiClient.get<ApiResponse<string[]>>(`${BASE_URL}/symbol/${symbol}/tags`)
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to fetch symbol tags')
+    }
+    return data.data
+  },
+
+  /**
+   * Add tag to a symbol
+   */
+  addSymbolTag: async (symbol: string, tag: string): Promise<void> => {
+    const { data } = await apiClient.post<ApiResponse<unknown>>(`${BASE_URL}/symbol/${symbol}/tags`, { symbol, tag })
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to add tag')
+    }
+  },
+
+  /**
+   * Remove tag from a symbol
+   */
+  removeSymbolTag: async (symbol: string, tag: string): Promise<void> => {
+    const { data } = await apiClient.delete<ApiResponse<unknown>>(`${BASE_URL}/symbol/${symbol}/tags/${encodeURIComponent(tag)}`)
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to remove tag')
+    }
   },
 }

@@ -8,7 +8,7 @@
 # 默认配置
 default:
   pipeline: default
-  upload_dir: data/research
+  upload_dir: private/research
   max_file_size_mb: 100
 
 # 流水线配置

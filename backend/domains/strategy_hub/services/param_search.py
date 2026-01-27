@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
+from domains.mcp_core.paths import get_data_dir
 from domains.engine.core.backtest import find_best_params
 from domains.engine.core.model.backtest_config import BacktestConfigFactory
 
@@ -44,7 +45,7 @@ class ParamSearchService:
         Args:
             data_path: 数据根路径
         """
-        self.data_path = data_path or Path("data")
+        self.data_path = data_path or get_data_dir()
         self.output_path = self.data_path / "traversal_results"
         self.output_path.mkdir(parents=True, exist_ok=True)
 

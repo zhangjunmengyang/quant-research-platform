@@ -108,10 +108,10 @@ const QUICK_RECORD_TYPES = [
     description: '基于观察提出的待验证假设',
   },
   {
-    type: NoteType.FINDING,
-    label: '记录发现',
+    type: NoteType.VERIFICATION,
+    label: '记录检验',
     icon: FlaskConical,
-    description: '验证后的结论或发现',
+    description: '对假设的验证过程和结论',
   },
 ]
 
@@ -136,12 +136,12 @@ export function Component() {
   const { data, isLoading, isError, error } = useNotes(queryParams)
   const { data: tags = [] } = useNoteTags()
   const { createNote, deleteNote } = useNoteMutations()
-  const { recordObservation, recordHypothesis, recordFinding } = useRecordNote()
+  const { recordObservation, recordHypothesis, recordVerification } = useRecordNote()
   const { archive, unarchive } = useNoteArchive()
 
   // Dialog state for creating new note
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [dialogType, setDialogType] = useState<NoteType>(NoteType.GENERAL)
+  const [dialogType, setDialogType] = useState<NoteType>(NoteType.OBSERVATION)
   const [newTitle, setNewTitle] = useState('')
   const [newTags, setNewTags] = useState('')
   const [newContent, setNewContent] = useState('')
@@ -155,7 +155,7 @@ export function Component() {
     [tags]
   )
 
-  const handleOpenDialog = (type: NoteType = NoteType.GENERAL) => {
+  const handleOpenDialog = (type: NoteType = NoteType.OBSERVATION) => {
     setDialogType(type)
     setNewTitle('')
     setNewTags('')
@@ -191,8 +191,8 @@ export function Component() {
         case NoteType.HYPOTHESIS:
           await recordHypothesis.mutateAsync(noteData)
           break
-        case NoteType.FINDING:
-          await recordFinding.mutateAsync(noteData)
+        case NoteType.VERIFICATION:
+          await recordVerification.mutateAsync(noteData)
           break
         default:
           await createNote.mutateAsync({
@@ -294,7 +294,7 @@ export function Component() {
     createNote.isPending ||
     recordObservation.isPending ||
     recordHypothesis.isPending ||
-    recordFinding.isPending
+    recordVerification.isPending
 
   const hasActiveFilters = !!(
     searchQuery ||
@@ -367,7 +367,7 @@ export function Component() {
           </DropdownMenu>
 
           <button
-            onClick={() => handleOpenDialog(NoteType.GENERAL)}
+            onClick={() => handleOpenDialog(NoteType.OBSERVATION)}
             className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
@@ -428,7 +428,7 @@ export function Component() {
               {hasActiveFilters ? '没有匹配的笔记' : '还没有笔记'}
             </p>
             <button
-              onClick={() => handleOpenDialog(NoteType.GENERAL)}
+              onClick={() => handleOpenDialog(NoteType.OBSERVATION)}
               className="mt-4 flex items-center gap-2 text-sm text-primary hover:underline"
             >
               <Plus className="h-4 w-4" />
@@ -437,7 +437,7 @@ export function Component() {
           </div>
         ) : (
           data?.items.map((note) => {
-            const typeColors = NOTE_TYPE_COLORS[note.note_type] || NOTE_TYPE_COLORS[NoteType.GENERAL]
+            const typeColors = NOTE_TYPE_COLORS[note.note_type] || NOTE_TYPE_COLORS[NoteType.OBSERVATION]
             return (
               <div
                 key={note.id}
@@ -459,7 +459,7 @@ export function Component() {
                           typeColors.border
                         )}
                       >
-                        {NOTE_TYPE_LABELS[note.note_type] || NOTE_TYPE_LABELS[NoteType.GENERAL]}
+                        {NOTE_TYPE_LABELS[note.note_type] || NOTE_TYPE_LABELS[NoteType.OBSERVATION]}
                       </span>
                       {/* 已提炼为经验标记 */}
                       {note.promoted_to_experience_id && (
@@ -539,19 +539,17 @@ export function Component() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {dialogType !== NoteType.GENERAL && (
-                <span
-                  className={cn(
-                    'inline-flex items-center rounded px-2 py-0.5 text-sm border',
-                    NOTE_TYPE_COLORS[dialogType].bg,
-                    NOTE_TYPE_COLORS[dialogType].text,
-                    NOTE_TYPE_COLORS[dialogType].border
-                  )}
-                >
-                  {NOTE_TYPE_LABELS[dialogType]}
-                </span>
-              )}
-              {dialogType === NoteType.GENERAL ? '新建笔记' : `记录${NOTE_TYPE_LABELS[dialogType]}`}
+              <span
+                className={cn(
+                  'inline-flex items-center rounded px-2 py-0.5 text-sm border',
+                  NOTE_TYPE_COLORS[dialogType].bg,
+                  NOTE_TYPE_COLORS[dialogType].text,
+                  NOTE_TYPE_COLORS[dialogType].border
+                )}
+              >
+                {NOTE_TYPE_LABELS[dialogType]}
+              </span>
+              记录{NOTE_TYPE_LABELS[dialogType]}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">

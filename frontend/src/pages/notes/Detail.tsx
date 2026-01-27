@@ -15,7 +15,9 @@ import {
   Edit2,
   X,
 } from 'lucide-react'
-import { useNoteDetail, useNoteMutations } from '@/features/note'
+import { useNoteDetail, useNoteMutations, useVerifications, useNote } from '@/features/note'
+import { NoteType, NOTE_TYPE_LABELS, NOTE_TYPE_COLORS } from '@/features/note/types'
+import { Link } from 'react-router-dom'
 
 export function Component() {
   const { id } = useParams<{ id: string }>()
@@ -244,6 +246,81 @@ export function Component() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* 假设类型笔记显示相关验证（通过 Edge 系统查询） */}
+      {note?.note_type === NoteType.HYPOTHESIS && (
+        <LinkedVerificationsSection hypothesisId={note.id} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * 相关验证区块组件
+ * 通过 Edge 系统查询关联到假设的验证笔记
+ */
+function LinkedVerificationsSection({ hypothesisId }: { hypothesisId: number }) {
+  const { data: linkedNotes, isLoading } = useVerifications(hypothesisId)
+
+  if (isLoading) {
+    return (
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="text-lg font-semibold">相关验证</h2>
+        <div className="mt-4 flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!linkedNotes || linkedNotes.length === 0) {
+    return (
+      <div className="rounded-lg border bg-card p-6">
+        <h2 className="text-lg font-semibold">相关验证</h2>
+        <p className="mt-4 text-sm text-muted-foreground">暂无相关验证笔记</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border bg-card p-6">
+      <h2 className="text-lg font-semibold">相关验证 ({linkedNotes.length})</h2>
+      <div className="mt-4 space-y-3">
+        {linkedNotes.map((note) => {
+          const colors = NOTE_TYPE_COLORS[note.note_type as NoteType]
+          return (
+            <Link
+              key={note.id}
+              to={`/notes/${note.id}`}
+              className="block rounded-md border p-4 transition-colors hover:bg-muted/50"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colors?.bg || 'bg-gray-100'} ${colors?.text || 'text-gray-700'}`}
+                    >
+                      {NOTE_TYPE_LABELS[note.note_type as NoteType] || note.note_type}
+                    </span>
+                    <h3 className="font-medium truncate">{note.title}</h3>
+                  </div>
+                  {note.content && (
+                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                      {note.content.slice(0, 200)}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3 mr-1" />
+                  {note.created_at
+                    ? new Date(note.created_at).toLocaleDateString('zh-CN')
+                    : '-'}
+                </div>
+              </div>
+            </Link>
+          )
+        })}
       </div>
     </div>
   )

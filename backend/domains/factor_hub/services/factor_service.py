@@ -169,8 +169,9 @@ class FactorService:
         return self.store.update(filename, **fields)
 
     def delete_factor(self, filename: str) -> bool:
-        """删除因子（同时删除数据库记录和代码文件）"""
+        """删除因子（同时删除数据库记录、代码文件和元数据文件）"""
         from pathlib import Path
+        import os
 
         # 先获取因子信息，以便知道文件路径
         factor = self.store.get(filename, include_excluded=True)
@@ -190,6 +191,15 @@ class FactorService:
                 except Exception:
                     # 文件删除失败不影响整体结果，数据库记录已删除
                     pass
+
+        # 删除元数据文件
+        private_dir = Path(os.environ.get('PRIVATE_DATA_DIR', 'private'))
+        metadata_path = private_dir / "metadata" / f"{filename}.yaml"
+        if metadata_path.exists():
+            try:
+                metadata_path.unlink()
+            except Exception:
+                pass
 
         return True
 
@@ -218,10 +228,10 @@ class FactorService:
         return success
 
     def batch_delete(self, filenames: List[str]) -> int:
-        """批量删除"""
+        """批量删除（同时删除数据库记录、代码文件和元数据文件）"""
         success = 0
         for filename in filenames:
-            if self.store.delete(filename):
+            if self.delete_factor(filename):
                 success += 1
         return success
 

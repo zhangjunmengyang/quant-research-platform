@@ -6,8 +6,11 @@ MCP Server - 笔记知识库 MCP 服务器
 
 Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
 - 基础 CRUD（create_note, update_note, get_note, list_notes, search_notes）
-- 研究记录（record_observation, record_hypothesis, record_finding）
-- 研究轨迹（get_research_trail）
+- 研究流程：通过 create_note 的 note_type 参数区分
+  - observation: 观察 - 对数据或现象的客观记录
+  - hypothesis: 假设 - 基于观察提出的待验证假说
+  - verification: 检验 - 对假设的验证
+- 实体关联：通过 link_note 建立与任意实体的关系（Edge 系统）
 - 归档管理（archive_note, unarchive_note）
 - 提炼为经验（promote_to_experience）
 """
@@ -31,17 +34,15 @@ from .tools.note_tools import (
     SearchNotesTool,
     GetNoteTool,
     ListNotesTool,
-    # 研究记录
-    RecordObservationTool,
-    RecordHypothesisTool,
-    RecordFindingTool,
-    # 研究轨迹
-    GetResearchTrailTool,
     # 归档管理
     ArchiveNoteTool,
     UnarchiveNoteTool,
     # 提炼为经验
     PromoteToExperienceTool,
+    # 知识边关联
+    LinkNoteTool,
+    GetNoteEdgesTool,
+    TraceNoteLineageTool,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,20 +70,17 @@ class NoteHubMCPServer(BaseMCPServer):
         self.register_tool(CreateNoteTool(), "mutation")
         self.register_tool(UpdateNoteTool(), "mutation")
 
-        # 研究记录工具
-        self.register_tool(RecordObservationTool(), "mutation")
-        self.register_tool(RecordHypothesisTool(), "mutation")
-        self.register_tool(RecordFindingTool(), "mutation")
-
-        # 研究轨迹工具
-        self.register_tool(GetResearchTrailTool(), "query")
-
         # 归档管理工具
         self.register_tool(ArchiveNoteTool(), "mutation")
         self.register_tool(UnarchiveNoteTool(), "mutation")
 
         # 提炼为经验工具
         self.register_tool(PromoteToExperienceTool(), "mutation")
+
+        # 知识边关联工具
+        self.register_tool(LinkNoteTool(), "mutation")
+        self.register_tool(GetNoteEdgesTool(), "query")
+        self.register_tool(TraceNoteLineageTool(), "query")
 
         logger.info(f"注册了 {len(self.tool_registry)} 个笔记知识库工具")
 

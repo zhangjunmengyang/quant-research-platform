@@ -11,7 +11,7 @@ import type {
   NoteStats,
   ObservationCreate,
   HypothesisCreate,
-  FindingCreate,
+  VerificationCreate,
   PromoteRequest,
   ResearchTrail,
 } from './types'
@@ -122,14 +122,38 @@ export const noteApi = {
   },
 
   /**
-   * 记录发现
+   * 记录检验
    */
-  recordFinding: async (request: FindingCreate): Promise<Note> => {
-    const { data } = await apiClient.post<ApiResponse<Note>>(`${BASE_URL}/finding`, request)
+  recordVerification: async (request: VerificationCreate): Promise<Note> => {
+    const { data } = await apiClient.post<ApiResponse<Note>>(`${BASE_URL}/verification`, request)
     if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to record finding')
+      throw new Error(data.error || 'Failed to record verification')
     }
     return data.data
+  },
+
+  /**
+   * 获取假设的所有验证笔记
+   * 通过 Edge 系统查找关联关系
+   */
+  getVerifications: async (hypothesisId: number, includeArchived = false): Promise<Note[]> => {
+    const { data } = await apiClient.get<ApiResponse<Note[]>>(
+      `${BASE_URL}/${hypothesisId}/verifications`,
+      { params: { include_archived: includeArchived } }
+    )
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to fetch verifications')
+    }
+    return data.data
+  },
+
+  /**
+   * @deprecated Use getVerifications instead
+   * 获取关联到指定笔记的所有笔记 (legacy)
+   */
+  getLinkedNotes: async (noteId: number, noteType?: string, includeArchived = false): Promise<Note[]> => {
+    // Redirect to verifications endpoint
+    return noteApi.getVerifications(noteId, includeArchived)
   },
 
   /**

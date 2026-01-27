@@ -2,7 +2,7 @@
  * Data React Query Hooks
  */
 
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { dataApi } from './api'
 import type { FactorCalcRequest } from './types'
 
@@ -18,6 +18,11 @@ export const dataKeys = {
   kline: (symbol: string, dataType: 'spot' | 'swap', params?: { start_date?: string; end_date?: string }) =>
     [...dataKeys.all, 'kline', symbol, dataType, params] as const,
   factors: () => [...dataKeys.all, 'factors'] as const,
+  // 标签相关
+  tags: () => [...dataKeys.all, 'tags'] as const,
+  allSymbolTags: () => [...dataKeys.all, 'allSymbolTags'] as const,
+  symbolTags: (symbol: string) => [...dataKeys.all, 'symbolTags', symbol] as const,
+  symbolsByTag: (tag: string) => [...dataKeys.all, 'symbolsByTag', tag] as const,
 }
 
 /**
@@ -95,5 +100,85 @@ export function useAvailableFactors() {
 export function useFactorCalculation() {
   return useMutation({
     mutationFn: (request: FactorCalcRequest) => dataApi.calculateFactor(request),
+  })
+}
+
+// ==================== 标签 Hooks ====================
+
+/**
+ * Hook to fetch all tags
+ */
+export function useAllTags() {
+  return useQuery({
+    queryKey: dataKeys.tags(),
+    queryFn: dataApi.getAllTags,
+    staleTime: DEFAULT_STALE_TIME,
+  })
+}
+
+/**
+ * Hook to fetch all symbols' tags mapping
+ */
+export function useAllSymbolTags() {
+  return useQuery({
+    queryKey: dataKeys.allSymbolTags(),
+    queryFn: dataApi.getAllSymbolTags,
+    staleTime: DEFAULT_STALE_TIME,
+  })
+}
+
+/**
+ * Hook to fetch tags for a symbol
+ */
+export function useSymbolTags(symbol: string) {
+  return useQuery({
+    queryKey: dataKeys.symbolTags(symbol),
+    queryFn: () => dataApi.getSymbolTags(symbol),
+    enabled: !!symbol,
+    staleTime: DEFAULT_STALE_TIME,
+  })
+}
+
+/**
+ * Hook to fetch symbols by tag
+ */
+export function useSymbolsByTag(tag: string) {
+  return useQuery({
+    queryKey: dataKeys.symbolsByTag(tag),
+    queryFn: () => dataApi.getSymbolsByTag(tag),
+    enabled: !!tag,
+    staleTime: DEFAULT_STALE_TIME,
+  })
+}
+
+/**
+ * Hook for adding tag to a symbol
+ */
+export function useAddSymbolTag() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ symbol, tag }: { symbol: string; tag: string }) =>
+      dataApi.addSymbolTag(symbol, tag),
+    onSuccess: (_, { symbol }) => {
+      // Invalidate symbol tags and all tags
+      queryClient.invalidateQueries({ queryKey: dataKeys.symbolTags(symbol) })
+      queryClient.invalidateQueries({ queryKey: dataKeys.tags() })
+    },
+  })
+}
+
+/**
+ * Hook for removing tag from a symbol
+ */
+export function useRemoveSymbolTag() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ symbol, tag }: { symbol: string; tag: string }) =>
+      dataApi.removeSymbolTag(symbol, tag),
+    onSuccess: (_, { symbol }) => {
+      // Invalidate symbol tags and all tags
+      queryClient.invalidateQueries({ queryKey: dataKeys.symbolTags(symbol) })
+      queryClient.invalidateQueries({ queryKey: dataKeys.tags() })
+    },
   })
 }

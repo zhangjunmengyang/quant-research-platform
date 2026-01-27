@@ -36,11 +36,11 @@ def get_project_root() -> Path:
 
 def get_data_dir() -> Path:
     """
-    获取数据目录（项目根目录/data）
+    获取数据目录（项目根目录/private）
 
     自动创建目录（如果不存在）。
     """
-    data_dir = get_project_root() / "data"
+    data_dir = get_project_root() / "private"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 

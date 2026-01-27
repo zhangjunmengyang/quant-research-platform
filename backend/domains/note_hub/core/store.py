@@ -5,9 +5,9 @@
 继承 mcp_core.BaseStore，复用连接管理和通用 CRUD。
 
 Note Hub 定位为"研究草稿/临时记录"层，支持：
-- 笔记类型分类（observation/hypothesis/finding/trail）
-- 研究会话追踪
+- 笔记类型分类（observation/hypothesis/verification）
 - 归档管理
+- 实体关联通过 Edge 系统 (mcp_core/edge) 管理
 """
 
 import logging
@@ -40,7 +40,9 @@ class NoteStore(BaseStore[Note]):
 
     allowed_columns = {
         'id', 'uuid', 'title', 'content', 'tags',
-        'note_type', 'research_session_id', 'promoted_to_experience_id', 'is_archived',
+        'source', 'source_ref',
+        'note_type',
+        'promoted_to_experience_id', 'is_archived',
         'created_at', 'updated_at'
     }
 
@@ -112,14 +114,16 @@ class NoteStore(BaseStore[Note]):
             with self._cursor() as cursor:
                 cursor.execute('''
                     INSERT INTO notes (
-                        uuid, title, content, tags,
-                        note_type, research_session_id, promoted_to_experience_id, is_archived,
+                        uuid, title, content, tags, source, source_ref,
+                        note_type,
+                        promoted_to_experience_id, is_archived,
                         created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 ''', (
                     note.uuid, note.title, note.content, note.tags,
-                    note.note_type, note.research_session_id,
+                    note.source, note.source_ref,
+                    note.note_type,
                     note.promoted_to_experience_id, note.is_archived,
                     note.created_at, note.updated_at
                 ))
@@ -174,10 +178,41 @@ class NoteStore(BaseStore[Note]):
         return updated
 
     def delete(self, note_id: int) -> bool:
-        """删除笔记"""
+        """删除笔记（同时删除数据库记录和对应的文件）"""
+        # 先获取笔记信息，用于后续删除文件
+        note = self.get(note_id)
+        if note is None:
+            return False
+
+        # 删除数据库记录
         with self._cursor() as cursor:
             cursor.execute('DELETE FROM notes WHERE id = %s', (note_id,))
-            return cursor.rowcount > 0
+            deleted = cursor.rowcount > 0
+
+        # 如果删除成功且笔记有 UUID，删除对应的文件
+        if deleted and note.uuid:
+            self._delete_note_file(note)
+
+        return deleted
+
+    def _delete_note_file(self, note: Note) -> None:
+        """删除笔记对应的文件"""
+        try:
+            from domains.mcp_core.sync.note_sync import NoteSyncService
+            from pathlib import Path
+            import os
+
+            # 获取私有数据目录
+            private_dir = Path(os.environ.get('PRIVATE_DATA_DIR', 'private'))
+            type_dir = NoteSyncService.TYPE_DIRS.get(note.note_type, 'observations')
+            filepath = private_dir / "notes" / type_dir / f"{note.uuid}.md"
+
+            if filepath.exists():
+                filepath.unlink()
+                logger.info(f"deleted_note_file: {filepath}")
+        except Exception as e:
+            # 文件删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_note_file: {note.id}, {e}")
 
     # ==================== 查询操作 ====================
 
@@ -186,7 +221,6 @@ class NoteStore(BaseStore[Note]):
         search: Optional[str] = None,
         tags: Optional[List[str]] = None,
         note_type: Optional[str] = None,
-        research_session_id: Optional[str] = None,
         is_archived: Optional[bool] = None,
         is_promoted: Optional[bool] = None,
         order_by: str = "updated_at DESC",
@@ -200,7 +234,6 @@ class NoteStore(BaseStore[Note]):
             search: 搜索关键词（标题和内容）
             tags: 标签筛选
             note_type: 笔记类型筛选
-            research_session_id: 研究会话 ID 筛选
             is_archived: 归档状态筛选
             is_promoted: 是否已提炼为经验
             order_by: 排序
@@ -224,9 +257,6 @@ class NoteStore(BaseStore[Note]):
 
         if note_type:
             builder.where("note_type", note_type)
-
-        if research_session_id:
-            builder.where("research_session_id", research_session_id)
 
         if is_archived is not None:
             builder.where("is_archived", is_archived)
@@ -261,10 +291,19 @@ class NoteStore(BaseStore[Note]):
         notes, _ = self.query(search=keyword, limit=limit)
         return notes
 
-    def get_tags(self) -> List[str]:
-        """获取所有标签（去重）"""
+    def get_tags(self, include_archived: bool = False) -> List[str]:
+        """获取所有标签（去重）
+
+        Args:
+            include_archived: 是否包含已归档笔记的标签，默认 False
+        """
         with self._cursor() as cursor:
-            cursor.execute("SELECT DISTINCT tags FROM notes WHERE tags != ''")
+            if include_archived:
+                cursor.execute("SELECT DISTINCT tags FROM notes WHERE tags != ''")
+            else:
+                cursor.execute(
+                    "SELECT DISTINCT tags FROM notes WHERE tags != '' AND is_archived = FALSE"
+                )
             tags = set()
             for row in cursor.fetchall():
                 for tag in row['tags'].split(','):
@@ -279,41 +318,7 @@ class NoteStore(BaseStore[Note]):
             cursor.execute('SELECT COUNT(*) as count FROM notes')
             return cursor.fetchone()['count']
 
-    # ==================== 研究轨迹操作 ====================
-
-    def get_research_trail(
-        self,
-        research_session_id: str,
-        include_archived: bool = False
-    ) -> List[Note]:
-        """
-        获取研究轨迹
-
-        根据研究会话 ID 获取该会话中的所有笔记，按时间排序。
-
-        Args:
-            research_session_id: 研究会话 ID
-            include_archived: 是否包含已归档的笔记
-
-        Returns:
-            按创建时间排序的笔记列表
-        """
-        with self._cursor() as cursor:
-            if include_archived:
-                cursor.execute(
-                    '''SELECT * FROM notes
-                    WHERE research_session_id = %s
-                    ORDER BY created_at ASC''',
-                    (research_session_id,)
-                )
-            else:
-                cursor.execute(
-                    '''SELECT * FROM notes
-                    WHERE research_session_id = %s AND is_archived = FALSE
-                    ORDER BY created_at ASC''',
-                    (research_session_id,)
-                )
-            return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
+    # ==================== 类型操作 ====================
 
     def get_by_type(
         self,
@@ -406,20 +411,11 @@ class NoteStore(BaseStore[Note]):
             ''')
             promoted_count = cursor.fetchone()['count']
 
-            # 研究会话数
-            cursor.execute('''
-                SELECT COUNT(DISTINCT research_session_id) as count
-                FROM notes
-                WHERE research_session_id IS NOT NULL
-            ''')
-            session_count = cursor.fetchone()['count']
-
         return {
             "total": total,
             "active_count": active_count,
             "archived_count": archived_count,
             "promoted_count": promoted_count,
-            "session_count": session_count,
             "by_type": type_counts,
         }
 

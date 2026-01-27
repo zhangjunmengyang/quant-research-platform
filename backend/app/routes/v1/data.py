@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from app.schemas.common import ApiResponse
 from app.core.deps import get_data_loader, get_factor_calculator
 from app.core.async_utils import run_sync
+from domains.mcp_core.edge import get_edge_store, EdgeEntityType
 
 router = APIRouter()
 
@@ -142,6 +143,32 @@ class FactorCalculateResult(BaseModel):
     symbol: str
     data_type: str
     results: List[FactorParamResult]
+
+
+# ==================== 标签相关模型 ====================
+
+class TagAddRequest(BaseModel):
+    """添加标签请求"""
+    symbol: str
+    tag: str
+
+
+class TagRemoveRequest(BaseModel):
+    """移除标签请求"""
+    symbol: str
+    tag: str
+
+
+class TagInfo(BaseModel):
+    """标签信息"""
+    tag: str
+    count: int
+
+
+class EntityByTag(BaseModel):
+    """按标签查询的实体"""
+    type: str
+    id: str
 
 
 @router.get("/symbols", response_model=ApiResponse[List[SymbolListItem]])
@@ -425,6 +452,90 @@ async def calculate_factor(
                 results=param_results,
             )
         )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== 标签 API ====================
+
+@router.get("/tags", response_model=ApiResponse[List[TagInfo]])
+async def list_all_tags():
+    """获取所有标签及统计"""
+    try:
+        edge_store = get_edge_store()
+        tags = edge_store.list_all_tags()
+        return ApiResponse(data=[TagInfo(**t) for t in tags])
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tags/all-symbols", response_model=ApiResponse[Dict[str, List[str]]])
+async def get_all_symbol_tags():
+    """获取所有币种的标签映射"""
+    try:
+        edge_store = get_edge_store()
+        tags_map = edge_store.get_all_entity_tags_by_type(EdgeEntityType.DATA)
+        return ApiResponse(data=tags_map)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tags/{tag}/symbols", response_model=ApiResponse[List[str]])
+async def get_symbols_by_tag(tag: str):
+    """获取指定标签的所有币种"""
+    try:
+        edge_store = get_edge_store()
+        entities = edge_store.get_entities_by_tag(tag, EdgeEntityType.DATA)
+        symbols = [e["id"] for e in entities]
+        return ApiResponse(data=symbols)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/symbol/{symbol}/tags", response_model=ApiResponse[List[str]])
+async def get_symbol_tags(symbol: str):
+    """获取币种的所有标签"""
+    try:
+        edge_store = get_edge_store()
+        tags = edge_store.get_entity_tags(EdgeEntityType.DATA, symbol)
+        return ApiResponse(data=tags)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/symbol/{symbol}/tags", response_model=ApiResponse[Dict[str, Any]])
+async def add_symbol_tag(symbol: str, request: TagAddRequest):
+    """给币种添加标签"""
+    try:
+        edge_store = get_edge_store()
+
+        # 检查是否已存在
+        if edge_store.has_tag(EdgeEntityType.DATA, symbol, request.tag):
+            return ApiResponse(data={"symbol": symbol, "tag": request.tag, "message": "标签已存在"})
+
+        edge_id = edge_store.add_tag(EdgeEntityType.DATA, symbol, request.tag)
+        if edge_id:
+            return ApiResponse(data={"symbol": symbol, "tag": request.tag, "edge_id": edge_id})
+        else:
+            raise HTTPException(status_code=500, detail="添加标签失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/symbol/{symbol}/tags/{tag}", response_model=ApiResponse[Dict[str, Any]])
+async def remove_symbol_tag(symbol: str, tag: str):
+    """移除币种的标签"""
+    try:
+        edge_store = get_edge_store()
+        success = edge_store.remove_tag(EdgeEntityType.DATA, symbol, tag)
+        if success:
+            return ApiResponse(data={"symbol": symbol, "tag": tag, "removed": True})
+        else:
+            raise HTTPException(status_code=404, detail="标签不存在")
     except HTTPException:
         raise
     except Exception as e:

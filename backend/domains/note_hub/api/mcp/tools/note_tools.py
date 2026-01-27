@@ -1,13 +1,17 @@
 """
 笔记 MCP 工具
 
-提供笔记的创建、搜索和研究记录功能。
+提供笔记的创建、搜索和管理功能。
 
 Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
-- 基础 CRUD（create_note, get_note, list_notes, search_notes）
-- 研究记录（record_observation, record_hypothesis, record_finding）
-- 研究轨迹（get_research_trail）
-- 归档管理（archive_note）
+- 基础 CRUD（create_note, update_note, get_note, list_notes, search_notes）
+- 研究流程：通过 create_note 的 note_type 参数区分
+  - observation: 观察 - 对数据或现象的客观记录
+  - hypothesis: 假设 - 基于观察提出的待验证假说
+  - verification: 检验 - 对假设的验证
+- 实体关联：通过 link_note 建立与任意实体的关系（Edge 系统）
+- 归档管理（archive_note, unarchive_note）
+- 提炼为经验（promote_to_experience）
 """
 
 from typing import Any, Dict
@@ -27,20 +31,23 @@ class CreateNoteTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return """创建一条经验概览。
+        return """创建一条研究笔记。
 
-用于记录量化研究过程中的洞察、经验和发现。
+用于记录量化研究过程中的观察、假设和检验。
 
-笔记支持:
-- Markdown 格式的内容
-- 标签分类
-- 笔记类型（observation/hypothesis/finding/trail/general）
-- 研究会话关联
+笔记类型（通过 note_type 参数指定）:
+- observation: 观察 - 对数据或现象的客观记录（默认）
+- hypothesis: 假设 - 基于观察提出的待验证假说
+- verification: 检验 - 对假设的验证过程和结论
+
+创建笔记后，可使用 link_note 工具建立与其他实体的关联:
+- 关联数据源: link_note(note_id, "data", "BTC-USDT", "derived_from")
+- 检验关联假设: link_note(verification_id, "note", str(hypothesis_id), "verifies")
 
 使用场景:
-- 记录因子分析的发现
-- 保存策略优化的经验
-- 积累交易逻辑的洞察"""
+- 记录因子在特定条件下的表现（observation）
+- 提出因子构造或策略改进假设（hypothesis）
+- 记录假设验证的过程和结论（verification）"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -62,12 +69,8 @@ class CreateNoteTool(BaseTool):
                 "note_type": {
                     "type": "string",
                     "description": "笔记类型",
-                    "enum": ["observation", "hypothesis", "finding", "trail", "general"],
-                    "default": "general"
-                },
-                "research_session_id": {
-                    "type": "string",
-                    "description": "研究会话 ID（用于追踪研究轨迹）"
+                    "enum": ["observation", "hypothesis", "verification"],
+                    "default": "observation"
                 }
             },
             "required": ["title", "content"]
@@ -78,15 +81,13 @@ class CreateNoteTool(BaseTool):
             title = params.get("title", "")
             content = params.get("content", "")
             tags = params.get("tags", "")
-            note_type = params.get("note_type", "general")
-            research_session_id = params.get("research_session_id")
+            note_type = params.get("note_type", "observation")
 
             success, message, note_id = self.note_service.create_note(
                 title=title,
                 content=content,
                 tags=tags,
                 note_type=note_type,
-                research_session_id=research_session_id,
             )
 
             if success:
@@ -150,11 +151,7 @@ class UpdateNoteTool(BaseTool):
                 "note_type": {
                     "type": "string",
                     "description": "新笔记类型",
-                    "enum": ["observation", "hypothesis", "finding", "trail", "general"]
-                },
-                "research_session_id": {
-                    "type": "string",
-                    "description": "新研究会话 ID"
+                    "enum": ["observation", "hypothesis", "verification"]
                 }
             },
             "required": ["note_id"]
@@ -166,7 +163,7 @@ class UpdateNoteTool(BaseTool):
 
             # 构建更新字段
             update_fields = {}
-            for field in ["title", "content", "tags", "note_type", "research_session_id"]:
+            for field in ["title", "content", "tags", "note_type"]:
                 if field in params and params[field] is not None:
                     update_fields[field] = params[field]
 
@@ -313,7 +310,6 @@ class GetNoteTool(BaseTool):
                     "content": note.content,
                     "tags": note.tags,
                     "note_type": note.note_type,
-                    "research_session_id": note.research_session_id,
                     "promoted_to_experience_id": note.promoted_to_experience_id,
                     "is_archived": note.is_archived,
                     "created_at": str(note.created_at) if note.created_at else None,
@@ -350,7 +346,7 @@ class ListNotesTool(BaseTool):
                 "note_type": {
                     "type": "string",
                     "description": "按笔记类型筛选",
-                    "enum": ["observation", "hypothesis", "finding", "trail", "general"]
+                    "enum": ["observation", "hypothesis", "verification"]
                 },
                 "is_archived": {
                     "type": "boolean",
@@ -410,296 +406,6 @@ class ListNotesTool(BaseTool):
                     "total": total,
                     "page": page,
                     "page_size": page_size,
-                }
-            )
-
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
-
-
-# ==================== 研究记录工具 ====================
-
-
-class RecordObservationTool(BaseTool):
-    """记录观察工具"""
-
-    @property
-    def name(self) -> str:
-        return "record_observation"
-
-    @property
-    def description(self) -> str:
-        return """记录研究观察。
-
-观察是对数据或现象的客观记录，是研究的起点。
-用于记录在分析过程中发现的有趣现象或数据特征。
-
-使用场景:
-- 记录因子在特定市场条件下的表现
-- 记录异常数据点或模式
-- 记录策略行为的观察结果"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "观察标题"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "观察内容（支持 Markdown 格式）"
-                },
-                "tags": {
-                    "type": "string",
-                    "description": "标签（英文逗号分隔）"
-                },
-                "research_session_id": {
-                    "type": "string",
-                    "description": "研究会话 ID（用于追踪研究轨迹）"
-                }
-            },
-            "required": ["title", "content"]
-        }
-
-    async def execute(self, **params) -> ToolResult:
-        try:
-            success, message, note_id = self.note_service.record_observation(
-                title=params.get("title", ""),
-                content=params.get("content", ""),
-                tags=params.get("tags", ""),
-                research_session_id=params.get("research_session_id"),
-            )
-
-            if success:
-                return ToolResult(
-                    success=True,
-                    data={
-                        "id": note_id,
-                        "title": params.get("title"),
-                        "note_type": "observation",
-                        "message": "观察记录成功"
-                    }
-                )
-            else:
-                return ToolResult(success=False, error=message)
-
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
-
-
-class RecordHypothesisTool(BaseTool):
-    """记录假设工具"""
-
-    @property
-    def name(self) -> str:
-        return "record_hypothesis"
-
-    @property
-    def description(self) -> str:
-        return """记录研究假设。
-
-假设是基于观察提出的待验证假说。
-用于记录需要通过实验或回测验证的猜想。
-
-使用场景:
-- 提出新的因子构造假设
-- 提出策略改进假设
-- 提出市场行为解释假设"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "假设标题"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "假设内容（支持 Markdown 格式）"
-                },
-                "tags": {
-                    "type": "string",
-                    "description": "标签（英文逗号分隔）"
-                },
-                "research_session_id": {
-                    "type": "string",
-                    "description": "研究会话 ID（用于追踪研究轨迹）"
-                }
-            },
-            "required": ["title", "content"]
-        }
-
-    async def execute(self, **params) -> ToolResult:
-        try:
-            success, message, note_id = self.note_service.record_hypothesis(
-                title=params.get("title", ""),
-                content=params.get("content", ""),
-                tags=params.get("tags", ""),
-                research_session_id=params.get("research_session_id"),
-            )
-
-            if success:
-                return ToolResult(
-                    success=True,
-                    data={
-                        "id": note_id,
-                        "title": params.get("title"),
-                        "note_type": "hypothesis",
-                        "message": "假设记录成功"
-                    }
-                )
-            else:
-                return ToolResult(success=False, error=message)
-
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
-
-
-class RecordFindingTool(BaseTool):
-    """记录发现工具"""
-
-    @property
-    def name(self) -> str:
-        return "record_finding"
-
-    @property
-    def description(self) -> str:
-        return """记录研究发现。
-
-发现是验证后的结论，是研究的成果。
-用于记录经过验证的有价值的研究结论。
-
-使用场景:
-- 记录回测验证的因子效果
-- 记录策略优化的有效改进
-- 记录市场规律的发现"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "发现标题"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "发现内容（支持 Markdown 格式）"
-                },
-                "tags": {
-                    "type": "string",
-                    "description": "标签（英文逗号分隔）"
-                },
-                "research_session_id": {
-                    "type": "string",
-                    "description": "研究会话 ID（用于追踪研究轨迹）"
-                }
-            },
-            "required": ["title", "content"]
-        }
-
-    async def execute(self, **params) -> ToolResult:
-        try:
-            success, message, note_id = self.note_service.record_finding(
-                title=params.get("title", ""),
-                content=params.get("content", ""),
-                tags=params.get("tags", ""),
-                research_session_id=params.get("research_session_id"),
-            )
-
-            if success:
-                return ToolResult(
-                    success=True,
-                    data={
-                        "id": note_id,
-                        "title": params.get("title"),
-                        "note_type": "finding",
-                        "message": "发现记录成功"
-                    }
-                )
-            else:
-                return ToolResult(success=False, error=message)
-
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
-
-
-# ==================== 研究轨迹工具 ====================
-
-
-class GetResearchTrailTool(BaseTool):
-    """获取研究轨迹工具"""
-
-    @property
-    def name(self) -> str:
-        return "get_research_trail"
-
-    @property
-    def description(self) -> str:
-        return """获取研究轨迹。
-
-根据研究会话 ID 获取该会话中的所有笔记，按时间顺序排列。
-用于回顾和追溯研究过程。
-
-使用场景:
-- 回顾研究过程
-- 追溯决策依据
-- 总结研究成果"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "research_session_id": {
-                    "type": "string",
-                    "description": "研究会话 ID"
-                },
-                "include_archived": {
-                    "type": "boolean",
-                    "description": "是否包含已归档的笔记",
-                    "default": False
-                }
-            },
-            "required": ["research_session_id"]
-        }
-
-    async def execute(self, **params) -> ToolResult:
-        try:
-            research_session_id = params.get("research_session_id", "")
-            include_archived = params.get("include_archived", False)
-
-            notes = self.note_service.get_research_trail(
-                research_session_id=research_session_id,
-                include_archived=include_archived,
-            )
-
-            note_list = []
-            for note in notes:
-                note_list.append({
-                    "id": note.id,
-                    "title": note.title,
-                    "summary": note.summary,
-                    "note_type": note.note_type,
-                    "type_label": note.type_label,
-                    "tags": note.tags,
-                    "is_archived": note.is_archived,
-                    "is_promoted": note.is_promoted,
-                    "created_at": str(note.created_at) if note.created_at else None,
-                })
-
-            return ToolResult(
-                success=True,
-                data={
-                    "research_session_id": research_session_id,
-                    "count": len(note_list),
-                    "trail": note_list,
                 }
             )
 
@@ -869,6 +575,244 @@ class PromoteToExperienceTool(BaseTool):
                 )
             else:
                 return ToolResult(success=False, error=message)
+
+        except Exception as e:
+            return ToolResult(success=False, error=str(e))
+
+
+# ==================== 知识边关联工具 ====================
+
+
+class LinkNoteTool(BaseTool):
+    """关联笔记工具"""
+
+    @property
+    def name(self) -> str:
+        return "link_note"
+
+    @property
+    def description(self) -> str:
+        return """创建笔记与其他实体的关联。
+
+建立笔记与数据、因子、策略、研报、经验等实体的关联关系。
+用于构建知识图谱，实现数据-信息-知识-经验的链路追溯。
+
+实体类型:
+- data: 数据层（币种、K线等）
+- factor: 因子
+- strategy: 策略
+- note: 其他笔记
+- research: 外部研报
+- experience: 经验记录
+
+关系类型:
+- derived_from: 派生自（如：笔记 derived_from 数据）
+- references: 引用（如：笔记 references 研报）
+- verifies: 验证（如：检验笔记 verifies 假设笔记）
+- summarizes: 总结为（如：笔记 summarizes 多个观察）
+- related: 一般关联（默认）
+
+使用场景:
+- 记录笔记引用的数据源
+- 关联笔记与相关因子/策略
+- 建立研究知识网络"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "note_id": {
+                    "type": "integer",
+                    "description": "笔记 ID"
+                },
+                "target_type": {
+                    "type": "string",
+                    "description": "目标实体类型",
+                    "enum": ["data", "factor", "strategy", "note", "research", "experience"]
+                },
+                "target_id": {
+                    "type": "string",
+                    "description": "目标实体 ID（如：BTC-USDT、Momentum_5d、123）"
+                },
+                "relation": {
+                    "type": "string",
+                    "description": "关系类型",
+                    "enum": ["derived_from", "applied_to", "verifies", "references", "summarizes", "related"],
+                    "default": "related"
+                },
+                "is_bidirectional": {
+                    "type": "boolean",
+                    "description": "是否双向关联",
+                    "default": False
+                }
+            },
+            "required": ["note_id", "target_type", "target_id"]
+        }
+
+    async def execute(self, **params) -> ToolResult:
+        try:
+            note_id = params.get("note_id")
+            target_type = params.get("target_type")
+            target_id = params.get("target_id")
+            relation = params.get("relation", "related")
+            is_bidirectional = params.get("is_bidirectional", False)
+
+            success, message, edge_id = self.note_service.link_note(
+                note_id=note_id,
+                target_type=target_type,
+                target_id=target_id,
+                relation=relation,
+                is_bidirectional=is_bidirectional,
+            )
+
+            if success:
+                return ToolResult(
+                    success=True,
+                    data={
+                        "edge_id": edge_id,
+                        "note_id": note_id,
+                        "target_type": target_type,
+                        "target_id": target_id,
+                        "relation": relation,
+                        "message": message
+                    }
+                )
+            else:
+                return ToolResult(success=False, error=message)
+
+        except Exception as e:
+            return ToolResult(success=False, error=str(e))
+
+
+class GetNoteEdgesTool(BaseTool):
+    """获取笔记关联工具"""
+
+    @property
+    def name(self) -> str:
+        return "get_note_edges"
+
+    @property
+    def description(self) -> str:
+        return """获取笔记的所有关联。
+
+返回笔记与其他实体的关联列表，用于查看笔记的知识网络。
+
+使用场景:
+- 查看笔记引用了哪些数据源
+- 了解笔记与其他实体的关系
+- 探索知识图谱"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "note_id": {
+                    "type": "integer",
+                    "description": "笔记 ID"
+                },
+                "include_bidirectional": {
+                    "type": "boolean",
+                    "description": "是否包含双向关联",
+                    "default": True
+                }
+            },
+            "required": ["note_id"]
+        }
+
+    async def execute(self, **params) -> ToolResult:
+        try:
+            note_id = params.get("note_id")
+            include_bidirectional = params.get("include_bidirectional", True)
+
+            edges = self.note_service.get_note_edges(
+                note_id=note_id,
+                include_bidirectional=include_bidirectional,
+            )
+
+            return ToolResult(
+                success=True,
+                data={
+                    "note_id": note_id,
+                    "count": len(edges),
+                    "edges": edges,
+                }
+            )
+
+        except Exception as e:
+            return ToolResult(success=False, error=str(e))
+
+
+class TraceNoteLineageTool(BaseTool):
+    """追溯笔记链路工具"""
+
+    @property
+    def name(self) -> str:
+        return "trace_note_lineage"
+
+    @property
+    def description(self) -> str:
+        return """追溯笔记的知识链路。
+
+沿着知识图谱追溯笔记的来源或应用，实现数据-信息-知识-经验的链路追溯。
+
+方向:
+- backward: 向上追溯源头（笔记引用了什么）
+- forward: 向下追溯应用（笔记被什么引用）
+
+使用场景:
+- 追溯笔记的数据来源
+- 查看笔记被哪些经验引用
+- 理解知识的演化路径"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "note_id": {
+                    "type": "integer",
+                    "description": "笔记 ID"
+                },
+                "direction": {
+                    "type": "string",
+                    "description": "追溯方向",
+                    "enum": ["backward", "forward"],
+                    "default": "backward"
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "description": "最大追溯深度",
+                    "default": 5,
+                    "maximum": 10
+                }
+            },
+            "required": ["note_id"]
+        }
+
+    async def execute(self, **params) -> ToolResult:
+        try:
+            note_id = params.get("note_id")
+            direction = params.get("direction", "backward")
+            max_depth = params.get("max_depth", 5)
+
+            lineage = self.note_service.trace_note_lineage(
+                note_id=note_id,
+                direction=direction,
+                max_depth=max_depth,
+            )
+
+            return ToolResult(
+                success=True,
+                data={
+                    "note_id": note_id,
+                    "direction": direction,
+                    "max_depth": max_depth,
+                    "count": len(lineage),
+                    "lineage": lineage,
+                }
+            )
 
         except Exception as e:
             return ToolResult(success=False, error=str(e))

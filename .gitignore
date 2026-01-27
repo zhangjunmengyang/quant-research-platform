@@ -74,10 +74,6 @@ backend/domains/engine/
 # Python 依赖锁文件（使用 pyproject.toml 管理）
 uv.lock
 
-# 本地数据目录
-/data/
-backend/data/
-
 # 数据库备份（保留目录结构）
 backups/*
 !backups/.gitkeep

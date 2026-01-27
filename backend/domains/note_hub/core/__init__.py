@@ -2,8 +2,8 @@
 核心层：数据模型和存储
 
 Note Hub 定位为"研究草稿/临时记录"层，支持：
-- 笔记类型分类（observation/hypothesis/finding/trail/general）
-- 研究会话追踪
+- 笔记类型分类（observation/hypothesis/verification）
+- 实体关联通过 Edge 系统 (mcp_core/edge) 管理
 - 归档管理
 - 提炼为经验
 """

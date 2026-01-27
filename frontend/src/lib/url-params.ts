@@ -27,7 +27,7 @@ const FACTOR_ORDER_BY_VALUES = ['filename', 'verified', 'created_at'] as const
 const FACTOR_EXCLUDED_VALUES: readonly ExcludedFilter[] = ['all', 'active', 'excluded']
 const FACTOR_TYPE_VALUES: readonly FactorType[] = ['time_series', 'cross_section']
 const STRATEGY_ORDER_BY_VALUES = ['created_at', 'updated_at', 'name'] as const
-const NOTE_TYPE_VALUES: readonly NoteType[] = [NoteType.OBSERVATION, NoteType.HYPOTHESIS, NoteType.FINDING, NoteType.TRAIL, NoteType.GENERAL]
+const NOTE_TYPE_VALUES: readonly NoteType[] = [NoteType.OBSERVATION, NoteType.HYPOTHESIS, NoteType.VERIFICATION]
 
 // =============================================================================
 // Factor 相关
@@ -123,9 +123,8 @@ export function paramsToNoteFilters(searchParams: URLSearchParams): NoteListPara
     page_size: Number(searchParams.get('page_size')) || 20,
     search: searchParams.get('search') || undefined,
     tags: searchParams.get('tags') || undefined,
-    source: searchParams.get('source') || undefined,
     note_type: noteType
-      ? validateEnum(noteType, NOTE_TYPE_VALUES, NoteType.GENERAL)
+      ? validateEnum(noteType, NOTE_TYPE_VALUES, NoteType.OBSERVATION)
       : undefined,
     is_archived: searchParams.get('is_archived') === 'true' ? true : searchParams.get('is_archived') === 'false' ? false : false,
     order_by: searchParams.get('order_by') || 'updated_at',
@@ -140,7 +139,6 @@ export function noteFiltersToParams(filters: Partial<NoteListParams>): Record<st
   if (filters.page_size) params.page_size = String(filters.page_size)
   if (filters.search) params.search = filters.search
   if (filters.tags) params.tags = filters.tags
-  if (filters.source) params.source = filters.source
   if (filters.note_type) params.note_type = filters.note_type
   if (filters.is_archived !== undefined) params.is_archived = String(filters.is_archived)
   if (filters.order_by) params.order_by = filters.order_by

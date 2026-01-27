@@ -20,8 +20,37 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  X,
+  Plus,
 } from 'lucide-react'
-import { useDataOverview, useSymbols, useKline } from '@/features/data'
+
+// 标签颜色配置 - 柔和的颜色方案
+const TAG_COLORS = [
+  { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
+  { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
+  { bg: 'bg-pink-100 dark:bg-pink-900/30', text: 'text-pink-700 dark:text-pink-300', dot: 'bg-pink-500' },
+  { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
+  { bg: 'bg-teal-100 dark:bg-teal-900/30', text: 'text-teal-700 dark:text-teal-300', dot: 'bg-teal-500' },
+  { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-300', dot: 'bg-cyan-500' },
+  { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
+  { bg: 'bg-rose-100 dark:bg-rose-900/30', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
+]
+
+// 根据标签名生成稳定的颜色索引
+function getTagColorIndex(tag: string): number {
+  let hash = 0
+  for (let i = 0; i < tag.length; i++) {
+    hash = ((hash << 5) - hash) + tag.charCodeAt(i)
+    hash = hash & hash
+  }
+  return Math.abs(hash) % TAG_COLORS.length
+}
+
+// 获取标签颜色
+function getTagColor(tag: string) {
+  return TAG_COLORS[getTagColorIndex(tag)]
+}
+import { useDataOverview, useSymbols, useKline, useSymbolTags, useAddSymbolTag, useRemoveSymbolTag, useAllTags, useAllSymbolTags } from '@/features/data'
 import type { Symbol } from '@/features/data'
 import { StatsCard } from '@/features/factor/components/StatsCard'
 import { KlineChart } from '@/components/charts'
@@ -72,6 +101,7 @@ export function Component() {
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     symbol: 180,
     type: 120,
+    tags: 200,
     first_candle_time: 150,
     last_candle_time: 150,
     kline_count: 120,
@@ -95,6 +125,17 @@ export function Component() {
       end_date: '',
     }
   })
+
+  // 标签相关状态
+  const [newTagInput, setNewTagInput] = useState('')
+  const [showTagInput, setShowTagInput] = useState(false)
+
+  // 标签 hooks
+  const { data: symbolTags = [], isLoading: tagsLoading } = useSymbolTags(selectedSymbolName || '')
+  const { data: allTags = [] } = useAllTags()
+  const { data: allSymbolTags = {} } = useAllSymbolTags()
+  const addTagMutation = useAddSymbolTag()
+  const removeTagMutation = useRemoveSymbolTag()
 
   // 详情页分页状态
   const [detailPage, setDetailPage] = useState(1)
@@ -352,6 +393,134 @@ export function Component() {
                 >
                   合约
                 </button>
+              )}
+            </div>
+
+            {/* 分隔线 */}
+            <div className="h-5 w-px bg-border" />
+
+            {/* 标签区域 */}
+            <div className="flex items-center gap-2">
+              {tagsLoading ? (
+                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  {/* 现有标签 */}
+                  {symbolTags.map((tag) => {
+                    const color = getTagColor(tag)
+                    return (
+                      <span
+                        key={tag}
+                        className={`group inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${color.bg} ${color.text}`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${color.dot}`} />
+                        {tag}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeTagMutation.mutate({ symbol: selectedSymbol.symbol, tag })
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
+                          disabled={removeTagMutation.isPending}
+                        >
+                          <X className="h-3 w-3 hover:text-destructive" />
+                        </button>
+                      </span>
+                    )
+                  })}
+
+                  {/* 添加标签输入框 */}
+                  {showTagInput ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={newTagInput}
+                        onChange={(e) => setNewTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newTagInput.trim()) {
+                            addTagMutation.mutate(
+                              { symbol: selectedSymbol.symbol, tag: newTagInput.trim() },
+                              {
+                                onSuccess: () => {
+                                  setNewTagInput('')
+                                  setShowTagInput(false)
+                                },
+                              }
+                            )
+                          } else if (e.key === 'Escape') {
+                            setNewTagInput('')
+                            setShowTagInput(false)
+                          }
+                        }}
+                        onBlur={() => {
+                          // 失焦时如果有输入内容则保存
+                          if (newTagInput.trim()) {
+                            addTagMutation.mutate(
+                              { symbol: selectedSymbol.symbol, tag: newTagInput.trim() },
+                              {
+                                onSuccess: () => {
+                                  setNewTagInput('')
+                                  setShowTagInput(false)
+                                },
+                              }
+                            )
+                          } else {
+                            // 没有内容则关闭输入框
+                            setShowTagInput(false)
+                          }
+                        }}
+                        placeholder="输入标签"
+                        className="w-20 rounded-md border border-input bg-background px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                        autoFocus
+                      />
+                      {/* 推荐标签下拉 */}
+                      {allTags.length > 0 && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              addTagMutation.mutate(
+                                { symbol: selectedSymbol.symbol, tag: e.target.value },
+                                {
+                                  onSuccess: () => {
+                                    setShowTagInput(false)
+                                  },
+                                }
+                              )
+                            }
+                          }}
+                          className="rounded-md border border-input bg-background px-1 py-0.5 text-xs"
+                        >
+                          <option value="">选择</option>
+                          {allTags
+                            .filter((t) => !symbolTags.includes(t.tag))
+                            .map((t) => (
+                              <option key={t.tag} value={t.tag}>
+                                {t.tag} ({t.count})
+                              </option>
+                            ))}
+                        </select>
+                      )}
+                      <button
+                        onClick={() => {
+                          setNewTagInput('')
+                          setShowTagInput(false)
+                        }}
+                        className="rounded p-0.5 hover:bg-accent"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowTagInput(true)}
+                      className="flex items-center gap-1 rounded-full border border-dashed border-muted-foreground/50 px-2 py-0.5 text-xs text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+                    >
+                      <Plus className="h-3 w-3" />
+                      添加标签
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -747,6 +916,7 @@ export function Component() {
         ) : (
           <SymbolTable
             symbols={paginatedSymbols}
+            symbolTags={allSymbolTags}
             columnWidths={columnWidths}
             onColumnWidthChange={handleColumnWidthChange}
             sortState={sortState}
@@ -819,6 +989,7 @@ export function Component() {
  */
 interface SymbolTableProps {
   symbols: Symbol[]
+  symbolTags: Record<string, string[]>
   columnWidths: Record<string, number>
   onColumnWidthChange: (key: string, width: number) => void
   sortState: SortState
@@ -828,6 +999,7 @@ interface SymbolTableProps {
 
 function SymbolTable({
   symbols,
+  symbolTags,
   columnWidths,
   onColumnWidthChange,
   sortState,
@@ -871,6 +1043,35 @@ function SymbolTable({
         ),
       },
       {
+        key: 'tags',
+        label: '标签',
+        width: columnWidths.tags ?? 200,
+        minWidth: 100,
+        maxWidth: 400,
+        render: (_, row) => {
+          const tags = symbolTags[row.symbol] || []
+          if (tags.length === 0) {
+            return <span className="text-muted-foreground text-xs">-</span>
+          }
+          return (
+            <div className="flex flex-wrap gap-1">
+              {tags.map((tag) => {
+                const color = getTagColor(tag)
+                return (
+                  <span
+                    key={tag}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${color.bg} ${color.text}`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${color.dot}`} />
+                    {tag}
+                  </span>
+                )
+              })}
+            </div>
+          )
+        },
+      },
+      {
         key: 'first_candle_time',
         label: '上线时间',
         width: columnWidths.first_candle_time ?? 150,
@@ -911,7 +1112,7 @@ function SymbolTable({
         ),
       },
     ],
-    [columnWidths]
+    [columnWidths, symbolTags]
   )
 
   if (symbols.length === 0) {

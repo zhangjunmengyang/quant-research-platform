@@ -70,7 +70,7 @@ class ResearchHubSettings(BaseSettings):
     )
 
     default_pipeline: str = "default"
-    upload_dir: str = "data/research"
+    upload_dir: str = "private/research"
     max_file_size_mb: int = 100
     pipelines: Dict[str, PipelineConfig] = Field(default_factory=dict)
 
@@ -109,7 +109,7 @@ class ResearchHubSettings(BaseSettings):
 
         return cls(
             default_pipeline=default.get("pipeline", "default"),
-            upload_dir=default.get("upload_dir", "data/research"),
+            upload_dir=default.get("upload_dir", "private/research"),
             max_file_size_mb=default.get("max_file_size_mb", 100),
             pipelines=pipelines,
         )

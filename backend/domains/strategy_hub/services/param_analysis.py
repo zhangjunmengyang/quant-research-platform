@@ -14,6 +14,7 @@ from typing import Dict, List, Any, Optional, Literal
 
 import pandas as pd
 
+from domains.mcp_core.paths import get_data_dir
 from ..utils.plot_functions import (
     draw_params_bar_plotly,
     draw_params_heatmap_plotly,
@@ -65,7 +66,7 @@ class ParamAnalysisService:
         Args:
             data_path: 数据根路径
         """
-        self.data_path = data_path or Path("data")
+        self.data_path = data_path or get_data_dir()
         self.traversal_path = self.data_path / "traversal_results"
         self.output_path = self.data_path / "analysis_results" / "param_analysis"
         self.output_path.mkdir(parents=True, exist_ok=True)

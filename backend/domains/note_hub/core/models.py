@@ -2,8 +2,13 @@
 研究笔记数据模型定义
 
 Note Hub 定位为"研究草稿/临时记录"层（Knowledge Layer），
-用于存储研究过程中的观察、假设、发现和研究轨迹。
+用于存储研究过程中的观察、假设和检验。
 笔记可以被提炼为正式经验（Experience）。
+
+研究流程：观察 -> 假设 -> 检验
+- 观察：对数据或现象的客观记录
+- 假设：基于观察提出的待验证假说
+- 检验：对假设的验证过程和结论，关联到具体假设
 """
 
 import uuid as uuid_lib
@@ -17,17 +22,14 @@ class NoteType(str, Enum):
     """
     笔记类型枚举
 
+    研究流程：观察 -> 假设 -> 检验
     - observation: 观察 - 对数据或现象的客观记录
-    - hypothesis: 假设 - 基于观察提出的假设
-    - finding: 发现 - 验证后的发现
-    - trail: 轨迹 - 研究过程记录（自动生成）
-    - general: 通用 - 一般性笔记（向后兼容）
+    - hypothesis: 假设 - 基于观察提出的待验证假说
+    - verification: 检验 - 对假设的验证过程和结论
     """
     OBSERVATION = "observation"
     HYPOTHESIS = "hypothesis"
-    FINDING = "finding"
-    TRAIL = "trail"
-    GENERAL = "general"
+    VERIFICATION = "verification"
 
 
 @dataclass
@@ -36,8 +38,8 @@ class Note:
     研究笔记数据类
 
     作为研究过程中的临时记录，支持：
-    - 分类管理：observation/hypothesis/finding/trail
-    - 研究会话关联：追踪研究轨迹
+    - 分类管理：observation/hypothesis/verification
+    - 关联关系：通过 Edge 系统 (mcp_core/edge) 管理实体间关系
     - 提炼为经验：从笔记中提取正式经验
 
     Attributes:
@@ -46,22 +48,28 @@ class Note:
         content: 笔记内容（Markdown 格式）
         tags: 标签（逗号分隔的字符串）
 
-        note_type: 笔记类型（observation/hypothesis/finding/trail/general）
-        research_session_id: 研究会话 ID，用于追踪研究轨迹
+        note_type: 笔记类型（observation/hypothesis/verification）
         promoted_to_experience_id: 已提炼为经验的 ID（如果有）
         is_archived: 是否已归档
 
         created_at: 创建时间
         updated_at: 更新时间
+
+    Note:
+        实体间关联（如检验关联假设）通过 Edge 系统管理，使用:
+        - link_note(note_id, target_type="note", target_id, relation="verifies")
+        - get_note_edges(note_id)
+        - trace_note_lineage(note_id)
     """
     id: Optional[int] = None
     uuid: str = field(default_factory=lambda: str(uuid_lib.uuid4()))
     title: str = ""
     content: str = ""
     tags: str = ""
+    source: Optional[str] = None  # 来源类型（如 factor, strategy）
+    source_ref: Optional[str] = None  # 来源引用（如因子名、策略ID）
 
-    note_type: str = field(default=NoteType.GENERAL.value)
-    research_session_id: Optional[str] = None
+    note_type: str = field(default=NoteType.OBSERVATION.value)
     promoted_to_experience_id: Optional[int] = None
     is_archived: bool = False
 
@@ -76,8 +84,9 @@ class Note:
             'title': self.title,
             'content': self.content,
             'tags': self.tags,
+            'source': self.source,
+            'source_ref': self.source_ref,
             'note_type': self.note_type,
-            'research_session_id': self.research_session_id,
             'promoted_to_experience_id': self.promoted_to_experience_id,
             'is_archived': self.is_archived,
             'created_at': self.created_at,
@@ -136,8 +145,6 @@ class Note:
         labels = {
             NoteType.OBSERVATION.value: "观察",
             NoteType.HYPOTHESIS.value: "假设",
-            NoteType.FINDING.value: "发现",
-            NoteType.TRAIL.value: "轨迹",
-            NoteType.GENERAL.value: "笔记",
+            NoteType.VERIFICATION.value: "检验",
         }
         return labels.get(self.note_type, "笔记")

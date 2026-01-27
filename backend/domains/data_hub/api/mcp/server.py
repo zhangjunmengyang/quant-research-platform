@@ -30,6 +30,13 @@ from .tools.factor_tools import (
 from .tools.market_tools import (
     GetMarketOverviewTool,
 )
+from .tools.tag_tools import (
+    AddTagTool,
+    RemoveTagTool,
+    GetEntityTagsTool,
+    GetEntitiesByTagTool,
+    ListAllTagsTool,
+)
 from .resources.data_resources import DataResourceProvider
 
 logger = logging.getLogger(__name__)
@@ -61,6 +68,13 @@ class DataHubMCPServer(BaseMCPServer):
 
         # 市场分析工具
         self.register_tool(GetMarketOverviewTool(), "market")
+
+        # 标签管理工具
+        self.register_tool(AddTagTool(), "tag")
+        self.register_tool(RemoveTagTool(), "tag")
+        self.register_tool(GetEntityTagsTool(), "tag")
+        self.register_tool(GetEntitiesByTagTool(), "tag")
+        self.register_tool(ListAllTagsTool(), "tag")
 
         logger.info(f"注册了 {len(self.tool_registry)} 个数据模块工具")
 

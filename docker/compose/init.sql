@@ -146,18 +146,18 @@ CREATE TRIGGER update_factors_updated_at
     EXECUTE FUNCTION update_updated_at_column();
 
 -- 经验概览表（研究草稿/临时记录层）
+-- 注意：实体关联（如检验关联假设）通过 knowledge_edges 表管理
 CREATE TABLE IF NOT EXISTS notes (
     id SERIAL PRIMARY KEY,
+    uuid VARCHAR(36) UNIQUE,
     title VARCHAR(500) NOT NULL,
     content TEXT DEFAULT '',
     tags VARCHAR(500) DEFAULT '',
     source VARCHAR(50) DEFAULT '',
     source_ref VARCHAR(255) DEFAULT '',
 
-    -- 笔记类型：observation(观察), hypothesis(假设), finding(发现), trail(轨迹), general(通用)
-    note_type VARCHAR(20) DEFAULT 'general',
-    -- 研究会话 ID，用于追踪同一研究过程中的多条笔记
-    research_session_id VARCHAR(36),
+    -- 笔记类型：observation(观察), hypothesis(假设), verification(检验)
+    note_type VARCHAR(20) DEFAULT 'observation',
     -- 已提炼为经验的 ID
     promoted_to_experience_id INTEGER,
     -- 是否已归档
@@ -168,15 +168,14 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 
 -- 笔记索引
+CREATE INDEX IF NOT EXISTS idx_notes_uuid ON notes(uuid) WHERE uuid IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_notes_tags ON notes(tags);
 CREATE INDEX IF NOT EXISTS idx_notes_source ON notes(source);
 CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_note_type ON notes(note_type);
-CREATE INDEX IF NOT EXISTS idx_notes_research_session_id ON notes(research_session_id);
 CREATE INDEX IF NOT EXISTS idx_notes_is_archived ON notes(is_archived);
 CREATE INDEX IF NOT EXISTS idx_notes_promoted ON notes(promoted_to_experience_id) WHERE promoted_to_experience_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_notes_type_archived ON notes(note_type, is_archived);
-CREATE INDEX IF NOT EXISTS idx_notes_session_created ON notes(research_session_id, created_at) WHERE research_session_id IS NOT NULL;
 
 -- 笔记全文搜索索引
 CREATE INDEX IF NOT EXISTS idx_notes_search ON notes
@@ -530,3 +529,49 @@ CREATE TABLE IF NOT EXISTS rag_evaluations (
 CREATE INDEX IF NOT EXISTS idx_rag_evaluations_pipeline ON rag_evaluations(pipeline_config_id);
 CREATE INDEX IF NOT EXISTS idx_rag_evaluations_name ON rag_evaluations(pipeline_name);
 CREATE INDEX IF NOT EXISTS idx_rag_evaluations_created_at ON rag_evaluations(created_at DESC);
+
+
+-- ============================================
+-- 知识边表（通用实体关联）
+-- 用于数据-信息-知识-经验的链路追溯
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS knowledge_edges (
+    id SERIAL PRIMARY KEY,
+
+    -- 源实体
+    source_type VARCHAR(20) NOT NULL,
+    source_id VARCHAR(500) NOT NULL,
+
+    -- 目标实体
+    target_type VARCHAR(20) NOT NULL,
+    target_id VARCHAR(500) NOT NULL,
+
+    -- 关系类型
+    relation VARCHAR(50) NOT NULL DEFAULT 'related',
+
+    -- 双向标记
+    is_bidirectional BOOLEAN DEFAULT FALSE,
+
+    -- 扩展元数据
+    metadata JSONB DEFAULT '{}',
+
+    -- 时间戳
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- 约束
+    CONSTRAINT knowledge_edges_source_type_check CHECK (
+        source_type IN ('data', 'factor', 'strategy', 'note', 'research', 'experience', 'tag')
+    ),
+    CONSTRAINT knowledge_edges_target_type_check CHECK (
+        target_type IN ('data', 'factor', 'strategy', 'note', 'research', 'experience', 'tag')
+    ),
+    CONSTRAINT knowledge_edges_unique UNIQUE (source_type, source_id, target_type, target_id, relation)
+);
+
+-- 知识边索引
+CREATE INDEX IF NOT EXISTS idx_knowledge_edges_source ON knowledge_edges(source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_edges_target ON knowledge_edges(target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_edges_relation ON knowledge_edges(relation);
+CREATE INDEX IF NOT EXISTS idx_knowledge_edges_bidirectional ON knowledge_edges(is_bidirectional) WHERE is_bidirectional = TRUE;
+CREATE INDEX IF NOT EXISTS idx_knowledge_edges_metadata ON knowledge_edges USING GIN(metadata);

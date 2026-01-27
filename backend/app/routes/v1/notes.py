@@ -4,8 +4,7 @@
 
 支持:
 - 基本 CRUD 操作
-- 记录观察/假设/发现
-- 研究轨迹追踪
+- 记录观察/假设/检验
 - 归档管理
 - 提炼为经验
 
@@ -26,9 +25,8 @@ from app.schemas.note import (
     NoteType,
     ObservationCreate,
     HypothesisCreate,
-    FindingCreate,
+    VerificationCreate,
     PromoteRequest,
-    ResearchTrail,
 )
 from app.core.deps import get_note_or_404, get_note_service
 from app.core.async_utils import run_sync
@@ -97,7 +95,6 @@ async def get_stats(service=Depends(get_note_service)):
             active_count=stats.get("active_count", 0),
             archived_count=stats.get("archived_count", 0),
             promoted_count=stats.get("promoted_count", 0),
-            session_count=stats.get("session_count", 0),
             by_type=stats.get("by_type", {}),
         )
     )
@@ -110,46 +107,31 @@ async def get_tags(service=Depends(get_note_service)):
     return ApiResponse(data=tags)
 
 
-@router.get("/trail/{session_id}", response_model=ApiResponse[ResearchTrail])
-async def get_research_trail(
-    session_id: str = Path(..., description="研究会话 ID"),
-    include_archived: bool = Query(False, description="是否包含已归档的笔记"),
-    service=Depends(get_note_service),
-):
-    """
-    获取研究轨迹
-
-    根据研究会话 ID 获取该会话中的所有笔记，按时间排序。
-    返回研究过程中的观察、假设、发现等记录。
-    """
-    notes = await run_sync(
-        service.get_research_trail,
-        research_session_id=session_id,
-        include_archived=include_archived,
-    )
-
-    # 按类型统计
-    by_type = {}
-    for n in notes:
-        note_type = n.note_type or NoteType.GENERAL.value
-        by_type[note_type] = by_type.get(note_type, 0) + 1
-
-    items = [Note(**model_to_dict(n)) for n in notes]
-
-    return ApiResponse(
-        data=ResearchTrail(
-            session_id=session_id,
-            notes=items,
-            total=len(items),
-            by_type=by_type,
-        )
-    )
-
-
 @router.get("/{note_id}", response_model=ApiResponse[Note])
 async def get_note(note=Depends(get_note_or_404)):
     """获取笔记详情"""
     return ApiResponse(data=Note(**model_to_dict(note)))
+
+
+@router.get("/{note_id}/verifications", response_model=ApiResponse[List[Note]])
+async def get_verifications(
+    note_id: int = Path(..., description="假设笔记 ID"),
+    include_archived: bool = Query(False, description="是否包含已归档的笔记"),
+    service=Depends(get_note_service),
+):
+    """
+    获取假设的所有验证笔记
+
+    通过 Edge 系统查找关联到指定假设的验证笔记。
+    """
+    notes = await run_sync(
+        service.get_verifications_for_hypothesis,
+        hypothesis_id=note_id,
+        include_archived=include_archived,
+    )
+
+    items = [Note(**model_to_dict(n)) for n in notes]
+    return ApiResponse(data=items)
 
 
 @router.post("/", response_model=ApiResponse[Note])
@@ -163,8 +145,7 @@ async def create_note(
         title=request.title,
         content=request.content,
         tags=request.tags,
-        note_type=request.note_type.value if request.note_type else NoteType.GENERAL.value,
-        research_session_id=request.research_session_id,
+        note_type=request.note_type.value if request.note_type else NoteType.OBSERVATION.value,
     )
 
     if not success or note_id is None:
@@ -189,7 +170,6 @@ async def record_observation(
         title=request.title,
         content=request.content,
         tags=request.tags,
-        research_session_id=request.research_session_id,
     )
 
     if not success or note_id is None:
@@ -214,7 +194,6 @@ async def record_hypothesis(
         title=request.title,
         content=request.content,
         tags=request.tags,
-        research_session_id=request.research_session_id,
     )
 
     if not success or note_id is None:
@@ -224,29 +203,30 @@ async def record_hypothesis(
     return ApiResponse(data=Note(**model_to_dict(note)), message="假设记录成功")
 
 
-@router.post("/finding", response_model=ApiResponse[Note])
-async def record_finding(
-    request: FindingCreate,
+@router.post("/verification", response_model=ApiResponse[Note])
+async def record_verification(
+    request: VerificationCreate,
     service=Depends(get_note_service),
 ):
     """
-    记录发现
+    记录检验
 
-    发现是验证后的结论，是研究的成果。
+    检验是对假设的验证过程和结论。
+    通过 Edge 系统关联到假设笔记。
     """
     success, message, note_id = await run_sync(
-        service.record_finding,
+        service.record_verification,
         title=request.title,
         content=request.content,
         tags=request.tags,
-        research_session_id=request.research_session_id,
+        hypothesis_id=request.hypothesis_id,
     )
 
     if not success or note_id is None:
         raise HTTPException(status_code=400, detail=message)
 
     note = await run_sync(service.get_note, note_id)
-    return ApiResponse(data=Note(**model_to_dict(note)), message="发现记录成功")
+    return ApiResponse(data=Note(**model_to_dict(note)), message="检验记录成功")
 
 
 @router.patch("/{note_id}", response_model=ApiResponse[Note])

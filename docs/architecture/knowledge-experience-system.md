@@ -899,14 +899,22 @@ experience-hub
 - 关联管理: `backend/domains/experience_hub/core/store.py` (`add_link`, `get_links`, `get_experiences_by_entity` 方法)
 - 提炼任务: `backend/domains/experience_hub/tasks/curate.py`
 
-### Phase 5: 集成优化 (进行中)
+### Phase 5: 集成优化 (已完成)
 
 **目标**：与现有系统深度集成
 
 **已实现**：
 1. 优化 note-hub，明确其作为"草稿"的定位
-   - 数据库迁移: `scripts/migrations/note_hub_enhance.sql`
-   - 新增字段: note_type, research_session_id, promoted_to_experience_id, is_archived
+   - 新增字段: note_type, promoted_to_experience_id, is_archived
+2. 实现 Edge 系统管理实体关系
+   - 核心实现: `backend/domains/mcp_core/edge/`
+   - 支持任意实体间的关系建立（note-note, note-factor, note-coin 等）
+   - 关系类型: derived_from, verifies, references, summarizes, has_tag, related
+
+**Edge 系统替代 linked_note_id**：
+- 旧方案: 使用 `linked_note_id` 字段关联验证笔记与假设笔记
+- 新方案: 使用 `link_note(note_id, "note", hypothesis_id, "verifies")` 建立关系
+- 优势: 支持任意实体间的多对多关系，可追溯完整知识谱系
 
 **待完成**：
 - 在研究流程中自动触发经验查询
