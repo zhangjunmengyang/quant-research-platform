@@ -93,3 +93,7 @@ update_min_qty.py
 # 私有数据目录（通过独立 Git 仓库管理）
 /private/*
 !/private/.gitkeep
+
+# 临时研究脚本（个人探索性代码）
+scripts/research/
+scripts/research2/

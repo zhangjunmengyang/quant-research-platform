@@ -4,10 +4,21 @@
 提供因子管理的业务逻辑，包括查询、更新、验证等操作。
 """
 
+import logging
 from typing import List, Optional, Dict, Any, Tuple
 
 from ..core.store import get_factor_store, FactorStore
 from ..core.models import Factor
+
+from domains.mcp_core.edge import (
+    KnowledgeEdge,
+    EdgeEntityType,
+    EdgeRelationType,
+    EdgeStore,
+    get_edge_store,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class FactorService:
@@ -17,14 +28,27 @@ class FactorService:
     封装存储层操作，提供业务逻辑处理。
     """
 
-    def __init__(self, store: Optional[FactorStore] = None):
+    def __init__(
+        self,
+        store: Optional[FactorStore] = None,
+        edge_store: Optional[EdgeStore] = None,
+    ):
         """
         初始化服务
 
         Args:
             store: 因子存储实例，默认使用单例
+            edge_store: 知识边存储层实例
         """
         self.store = store or get_factor_store()
+        self._edge_store = edge_store
+
+    @property
+    def edge_store(self) -> EdgeStore:
+        """延迟获取知识边存储层"""
+        if self._edge_store is None:
+            self._edge_store = get_edge_store()
+        return self._edge_store
 
     def list_factors(
         self,
@@ -72,10 +96,13 @@ class FactorService:
             filter_condition['llm_score'] = 'empty'
 
         # 验证状态筛选
-        if verify_filter == "已验证":
-            filter_condition['verified'] = True
+        from ..core.models import VerificationStatus
+        if verify_filter == "通过":
+            filter_condition['verification_status'] = VerificationStatus.PASSED
         elif verify_filter == "未验证":
-            filter_condition['verified'] = False
+            filter_condition['verification_status'] = VerificationStatus.UNVERIFIED
+        elif verify_filter == "废弃":
+            filter_condition['verification_status'] = VerificationStatus.FAILED
 
         # 排序
         order = f"{order_by} DESC" if order_desc else order_by
@@ -203,27 +230,43 @@ class FactorService:
 
         return True
 
-    def verify_factor(self, filename: str, note: str = "") -> bool:
-        """验证因子"""
-        return self.store.verify(filename, note)
+    def set_verification_status(self, filename: str, status: int, note: str = "") -> bool:
+        """设置因子验证状态"""
+        return self.store.set_verification_status(filename, status, note)
 
-    def unverify_factor(self, filename: str) -> bool:
-        """取消验证"""
-        return self.store.unverify(filename)
+    def mark_factor_as_passed(self, filename: str, note: str = "") -> bool:
+        """标记因子为验证通过"""
+        return self.store.mark_as_passed(filename, note)
 
-    def batch_verify(self, filenames: List[str], note: str = "") -> int:
-        """批量验证"""
+    def mark_factor_as_failed(self, filename: str, note: str = "") -> bool:
+        """标记因子为废弃（失败研究）"""
+        return self.store.mark_as_failed(filename, note)
+
+    def reset_factor_verification(self, filename: str) -> bool:
+        """重置因子验证状态为未验证"""
+        return self.store.reset_verification(filename)
+
+    def batch_mark_as_passed(self, filenames: List[str], note: str = "") -> int:
+        """批量标记为验证通过"""
         success = 0
         for filename in filenames:
-            if self.store.verify(filename, note):
+            if self.store.mark_as_passed(filename, note):
                 success += 1
         return success
 
-    def batch_unverify(self, filenames: List[str]) -> int:
-        """批量取消验证"""
+    def batch_mark_as_failed(self, filenames: List[str], note: str = "") -> int:
+        """批量标记为废弃"""
         success = 0
         for filename in filenames:
-            if self.store.unverify(filename):
+            if self.store.mark_as_failed(filename, note):
+                success += 1
+        return success
+
+    def batch_reset_verification(self, filenames: List[str]) -> int:
+        """批量重置验证状态"""
+        success = 0
+        for filename in filenames:
+            if self.store.reset_verification(filename):
                 success += 1
         return success
 
@@ -380,6 +423,184 @@ class FactorService:
         else:
             return False, "更新数据库失败"
 
+    def check_consistency(self) -> Dict[str, Any]:
+        """
+        检测因子一致性
+
+        对比文件系统、数据库、元数据YAML三者的一致性。
+
+        Returns:
+            {
+                "is_consistent": bool,
+                "summary": {
+                    "code_files": int,      # 代码文件数量
+                    "db_records": int,      # 数据库记录数量
+                    "metadata_files": int,  # 元数据文件数量
+                },
+                "orphan_db_records": [...],      # 数据库中存在但代码文件不存在
+                "orphan_metadata": [...],        # 元数据存在但代码文件不存在
+                "missing_metadata": [...],       # 代码文件存在但元数据不存在
+                "missing_db_records": [...],     # 代码文件存在但数据库记录不存在
+            }
+        """
+        from pathlib import Path
+        import os
+        from ..core.config import get_config_loader
+
+        config = get_config_loader()
+        factors_dir = config.factors_dir
+        private_dir = Path(os.environ.get('PRIVATE_DATA_DIR', 'private'))
+        metadata_dir = private_dir / "metadata"
+
+        # 1. 获取代码文件列表
+        code_files = set()
+        if factors_dir.exists():
+            for f in factors_dir.glob("*.py"):
+                if f.name != "__init__.py":
+                    code_files.add(f.stem)
+
+        # 2. 获取数据库记录列表
+        all_factors = self.store.query(include_excluded=True)
+        db_records = {f.filename for f in all_factors}
+
+        # 3. 获取元数据文件列表
+        metadata_files = set()
+        if metadata_dir.exists():
+            for f in metadata_dir.glob("*.yaml"):
+                metadata_files.add(f.stem)
+
+        # 4. 计算差异
+        orphan_db_records = sorted(db_records - code_files)
+        orphan_metadata = sorted(metadata_files - code_files)
+        missing_metadata = sorted(code_files - metadata_files)
+        missing_db_records = sorted(code_files - db_records)
+
+        is_consistent = (
+            len(orphan_db_records) == 0 and
+            len(orphan_metadata) == 0 and
+            len(missing_db_records) == 0
+        )
+
+        return {
+            "is_consistent": is_consistent,
+            "summary": {
+                "code_files": len(code_files),
+                "db_records": len(db_records),
+                "metadata_files": len(metadata_files),
+            },
+            "orphan_db_records": orphan_db_records,
+            "orphan_metadata": orphan_metadata,
+            "missing_metadata": missing_metadata,
+            "missing_db_records": missing_db_records,
+        }
+
+    def cleanup_orphans(self, dry_run: bool = True) -> Dict[str, Any]:
+        """
+        清理孤立数据
+
+        删除代码文件不存在但数据库/元数据仍存在的记录。
+
+        Args:
+            dry_run: 是否仅预览（不实际删除）
+
+        Returns:
+            {
+                "dry_run": bool,
+                "deleted_db_records": [...],
+                "deleted_metadata": [...],
+                "errors": [...],
+            }
+        """
+        from pathlib import Path
+        import os
+
+        consistency = self.check_consistency()
+        private_dir = Path(os.environ.get('PRIVATE_DATA_DIR', 'private'))
+        metadata_dir = private_dir / "metadata"
+
+        deleted_db_records = []
+        deleted_metadata = []
+        errors = []
+
+        # 删除孤立的数据库记录
+        for filename in consistency["orphan_db_records"]:
+            if dry_run:
+                deleted_db_records.append(filename)
+            else:
+                try:
+                    if self.store.delete(filename):
+                        deleted_db_records.append(filename)
+                    else:
+                        errors.append(f"删除数据库记录失败: {filename}")
+                except Exception as e:
+                    errors.append(f"删除数据库记录异常: {filename} - {e}")
+
+        # 删除孤立的元数据文件
+        for filename in consistency["orphan_metadata"]:
+            metadata_path = metadata_dir / f"{filename}.yaml"
+            if dry_run:
+                deleted_metadata.append(filename)
+            else:
+                try:
+                    if metadata_path.exists():
+                        metadata_path.unlink()
+                        deleted_metadata.append(filename)
+                except Exception as e:
+                    errors.append(f"删除元数据文件异常: {filename} - {e}")
+
+        return {
+            "dry_run": dry_run,
+            "deleted_db_records": deleted_db_records,
+            "deleted_metadata": deleted_metadata,
+            "errors": errors,
+        }
+
+    def sync_missing(self) -> Dict[str, Any]:
+        """
+        同步缺失的数据
+
+        为存在代码文件但缺少数据库记录的因子创建记录。
+
+        Returns:
+            {
+                "created_db_records": [...],
+                "exported_metadata": [...],
+                "errors": [...],
+            }
+        """
+        consistency = self.check_consistency()
+
+        created_db_records = []
+        exported_metadata = []
+        errors = []
+
+        # 为缺失的数据库记录创建因子
+        for filename in consistency["missing_db_records"]:
+            try:
+                # 触发代码同步会自动创建记录
+                result = self.store.sync_code_from_files()
+                if result.get("created", 0) > 0:
+                    created_db_records.append(filename)
+                break  # sync_code_from_files 会处理所有缺失的
+            except Exception as e:
+                errors.append(f"同步因子代码失败: {filename} - {e}")
+
+        # 导出缺失的元数据
+        if consistency["missing_metadata"]:
+            try:
+                from domains.mcp_core.sync import get_sync_manager
+                manager = get_sync_manager()
+                result = manager.export("factors")
+                exported_metadata = consistency["missing_metadata"]
+            except Exception as e:
+                errors.append(f"导出元数据失败: {e}")
+
+        return {
+            "created_db_records": created_db_records,
+            "exported_metadata": exported_metadata,
+            "errors": errors,
+        }
+
     def ingest_factor_from_code(
         self,
         code_content: str,
@@ -432,6 +653,148 @@ class FactorService:
         )
 
         return success, message, factor_name if success else None
+
+
+    # ==================== 知识边关联 ====================
+
+    def link_factor(
+        self,
+        factor_name: str,
+        target_type: str,
+        target_id: str,
+        relation: str = "related",
+        is_bidirectional: bool = False,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[bool, str, Optional[int]]:
+        """
+        创建因子与其他实体的关联
+
+        Args:
+            factor_name: 因子名称
+            target_type: 目标实体类型（data/factor/strategy/note/research/experience）
+            target_id: 目标实体 ID
+            relation: 关系类型（derived_from/applied_to/verifies/references/summarizes/related）
+            is_bidirectional: 是否双向关联
+            metadata: 扩展元数据
+
+        Returns:
+            (成功, 消息, 边ID)
+        """
+        # 验证因子存在
+        factor = self.store.get(factor_name)
+        if factor is None:
+            return False, f"因子不存在: {factor_name}", None
+
+        # 验证实体类型
+        try:
+            target_entity_type = EdgeEntityType(target_type)
+        except ValueError:
+            return False, f"无效的实体类型: {target_type}", None
+
+        # 验证关系类型
+        try:
+            relation_type = EdgeRelationType(relation)
+        except ValueError:
+            return False, f"无效的关系类型: {relation}", None
+
+        # 创建知识边
+        edge = KnowledgeEdge(
+            source_type=EdgeEntityType.FACTOR,
+            source_id=factor_name,
+            target_type=target_entity_type,
+            target_id=target_id,
+            relation=relation_type,
+            is_bidirectional=is_bidirectional,
+            metadata=metadata or {},
+        )
+
+        edge_id = self.edge_store.create(edge)
+        if edge_id:
+            logger.info(f"创建因子关联: factor:{factor_name} -[{relation}]-> {target_type}:{target_id}")
+            return True, "关联成功", edge_id
+        else:
+            return False, "关联失败（可能已存在）", None
+
+    def get_factor_edges(
+        self,
+        factor_name: str,
+        include_bidirectional: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """
+        获取因子的所有关联
+
+        Args:
+            factor_name: 因子名称
+            include_bidirectional: 是否包含双向关联
+
+        Returns:
+            关联列表
+        """
+        edges = self.edge_store.get_edges_by_entity(
+            entity_type=EdgeEntityType.FACTOR,
+            entity_id=factor_name,
+            include_bidirectional=include_bidirectional,
+        )
+        return [edge.to_dict() for edge in edges]
+
+    def get_edges_to_factor(self, factor_name: str) -> List[Dict[str, Any]]:
+        """
+        获取指向因子的所有关联
+
+        Args:
+            factor_name: 因子名称
+
+        Returns:
+            关联列表
+        """
+        edges = self.edge_store.get_edges_to_entity(
+            entity_type=EdgeEntityType.FACTOR,
+            entity_id=factor_name,
+        )
+        return [edge.to_dict() for edge in edges]
+
+    def trace_factor_lineage(
+        self,
+        factor_name: str,
+        direction: str = "backward",
+        max_depth: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        追溯因子的知识链路
+
+        Args:
+            factor_name: 因子名称
+            direction: 追溯方向
+                - "backward": 向上追溯源头（因子基于什么）
+                - "forward": 向下追溯应用（因子被什么使用/改进）
+            max_depth: 最大追溯深度
+
+        Returns:
+            链路列表，每项包含 depth 和 edge
+        """
+        return self.edge_store.trace_lineage(
+            entity_type=EdgeEntityType.FACTOR,
+            entity_id=factor_name,
+            direction=direction,
+            max_depth=max_depth,
+        )
+
+    def delete_factor_edge(self, edge_id: int) -> Tuple[bool, str]:
+        """
+        删除因子关联
+
+        Args:
+            edge_id: 边 ID
+
+        Returns:
+            (成功, 消息)
+        """
+        success = self.edge_store.delete(edge_id)
+        if success:
+            logger.info(f"删除因子关联: {edge_id}")
+            return True, "删除成功"
+        else:
+            return False, "删除失败"
 
 
 # 单例

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from .base import BaseTool, ToolResult
+from domains.mcp_core.base.tool import ExecutionMode
 
 
 class ListSymbolsTool(BaseTool):
@@ -117,107 +118,83 @@ class GetSymbolInfoTool(BaseTool):
             return ToolResult(success=False, error=str(e))
 
 
-class GetKlineTool(BaseTool):
-    """获取 K 线数据工具"""
+class GetCoinMetadataTool(BaseTool):
+    """获取币种元数据工具"""
+
+    execution_mode = ExecutionMode.COMPUTE  # 需要遍历所有币种
+    execution_timeout = 60.0
 
     @property
     def name(self) -> str:
-        return "get_kline"
+        return "get_coin_metadata"
 
     @property
     def description(self) -> str:
-        return """获取指定币种的 K 线数据。
+        return """获取币种的元数据信息。
 
-可用参数：
-- symbol: 币种名称（必填）
-- data_type: 数据类型，swap 或 spot，默认 swap
-- start_date: 开始日期，格式 YYYY-MM-DD
-- end_date: 结束日期，格式 YYYY-MM-DD
-- limit: 返回条数限制，默认 100
+可用参数:
+- symbols: 币种列表（可选），不传或空列表则返回所有币种
+- data_type: 数据类型，swap（合约）或 spot（现货），默认 swap
 
-返回 K 线数据列表，包含 open, high, low, close, volume 等字段。"""
+返回每个币种的:
+- symbol: 币种名称
+- first_trade_time: 首次交易时间
+- age_days: 上线天数
+- last_close: 最新收盘价"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
         return {
             "type": "object",
             "properties": {
-                "symbol": {
-                    "type": "string",
-                    "description": "币种名称，如 BTC-USDT"
+                "symbols": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "币种列表，如 ['BTC-USDT', 'ETH-USDT']，不传则返回所有币种"
                 },
                 "data_type": {
                     "type": "string",
-                    "description": "数据类型：swap（合约）或 spot（现货）",
+                    "description": "数据类型: swap（合约）或 spot（现货）",
                     "enum": ["swap", "spot"],
                     "default": "swap"
-                },
-                "start_date": {
-                    "type": "string",
-                    "description": "开始日期，格式 YYYY-MM-DD"
-                },
-                "end_date": {
-                    "type": "string",
-                    "description": "结束日期，格式 YYYY-MM-DD"
-                },
-                "limit": {
-                    "type": "integer",
-                    "description": "返回条数限制",
-                    "default": 100,
-                    "minimum": 1,
-                    "maximum": 10000
                 }
-            },
-            "required": ["symbol"]
+            }
         }
 
     async def execute(self, **params) -> ToolResult:
         try:
-            symbol = params["symbol"]
+            symbols = params.get("symbols", [])
             data_type = params.get("data_type", "swap")
-            start_date = params.get("start_date")
-            end_date = params.get("end_date")
-            limit = params.get("limit", 100)
 
-            # 使用异步方法避免阻塞事件循环
-            df = await self.data_loader.get_kline_async(
-                symbol=symbol,
-                data_type=data_type,
-                start_date=start_date,
-                end_date=end_date
-            )
+            # 获取所有币种列表
+            all_symbols = await self.data_loader.get_symbols_async(data_type)
 
-            if df.empty:
-                return ToolResult(
-                    success=False,
-                    error=f"无数据: {symbol}"
-                )
+            # 如果指定了 symbols，过滤
+            if symbols:
+                # 只保留存在的币种
+                all_symbols = [s for s in all_symbols if s in symbols]
 
-            # 限制返回条数
-            df = df.tail(limit)
+            # 获取每个币种的元数据
+            coins = []
+            for symbol in all_symbols:
+                df = await self.data_loader.get_kline_async(symbol, data_type)
+                if not df.empty:
+                    first_time = df['candle_begin_time'].iloc[0]
+                    last_close = df['close'].iloc[-1]
+                    age_days = (datetime.now() - first_time).days
 
-            # 转换为列表
-            records = []
-            for _, row in df.iterrows():
-                record = {
-                    "candle_begin_time": str(row.get("candle_begin_time", "")),
-                    "open": float(row.get("open", 0)),
-                    "high": float(row.get("high", 0)),
-                    "low": float(row.get("low", 0)),
-                    "close": float(row.get("close", 0)),
-                    "volume": float(row.get("volume", 0)),
-                }
-                if "quote_volume" in row:
-                    record["quote_volume"] = float(row["quote_volume"])
-                records.append(record)
+                    coins.append({
+                        "symbol": symbol,
+                        "first_trade_time": str(first_time),
+                        "age_days": age_days,
+                        "last_close": float(last_close),
+                    })
 
             return ToolResult(
                 success=True,
                 data={
-                    "symbol": symbol,
-                    "data_type": data_type,
-                    "count": len(records),
-                    "klines": records,
+                    "coins": coins,
+                    "total": len(coins),
                 }
             )
 

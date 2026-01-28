@@ -27,7 +27,7 @@ class FactorSyncService(BaseSyncService):
         - 评分：llm_score, ic, rank_ic
         - 回测：backtest_sharpe, backtest_ic, backtest_ir, turnover, decay, last_backtest_date
         - 分类：market_regime, best_holding_period, tags
-        - 状态：verified, verify_note, excluded, exclude_reason
+        - 状态：verification_status, verify_note, excluded, exclude_reason
         - 代码质量：code_complexity
         - 参数分析：param_analysis
         - 时间戳：created_at, updated_at
@@ -40,7 +40,7 @@ class FactorSyncService(BaseSyncService):
         'llm_score', 'ic', 'rank_ic',
         'backtest_sharpe', 'backtest_ic', 'backtest_ir', 'turnover', 'decay', 'last_backtest_date',
         'market_regime', 'best_holding_period', 'tags',
-        'verified', 'verify_note', 'excluded', 'exclude_reason',
+        'verification_status', 'verify_note', 'excluded', 'exclude_reason',
         'code_complexity',
         'param_analysis',
         'created_at', 'updated_at',
@@ -177,9 +177,12 @@ class FactorSyncService(BaseSyncService):
             elif field == 'param_analysis':
                 # 将 JSON 字符串解析为结构化数据
                 value = self.parse_json_field(value)
-            elif field in ('verified', 'excluded'):
+            elif field == 'excluded':
                 # 转换为布尔值
                 value = bool(value)
+            elif field == 'verification_status':
+                # 保持整数值（0=未验证, 1=通过, 2=废弃）
+                value = int(value) if value is not None else 0
 
             if value is not None:
                 data[field] = value
@@ -200,9 +203,12 @@ class FactorSyncService(BaseSyncService):
                 elif field == 'param_analysis':
                     # 将结构化数据序列化为 JSON 字符串
                     value = self.serialize_json_field(value)
-                elif field in ('verified', 'excluded'):
+                elif field == 'excluded':
                     # 转换为整数
                     value = 1 if value else 0
+                elif field == 'verification_status':
+                    # 保持整数值（0=未验证, 1=通过, 2=废弃）
+                    value = int(value) if value is not None else 0
 
                 update[field] = value
 

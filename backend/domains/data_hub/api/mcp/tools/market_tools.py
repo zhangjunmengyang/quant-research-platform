@@ -4,11 +4,13 @@
 提供市场概览、板块表现等工具。
 """
 
-from typing import Any, Dict
 import logging
-import pandas as pd
+from typing import Any
 
-from domains.mcp_core import BaseTool, ToolResult
+import pandas as pd
+from domains.mcp_core.base.tool import ExecutionMode
+
+from .base import BaseTool, ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,7 @@ class GetMarketOverviewTool(BaseTool):
         return "获取加密货币市场整体概览，包括总市值、BTC主导率、涨跌分布等"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -114,7 +116,6 @@ class GetMarketOverviewTool(BaseTool):
             bottom_performers = returns_series.nsmallest(5).to_dict()
 
             # 计算BTC主导率（如果有BTC数据）
-            btc_dominance = None
             btc_return = returns.get("BTC-USDT") or returns.get("BTCUSDT")
 
             overview = {
@@ -141,6 +142,232 @@ class GetMarketOverviewTool(BaseTool):
             return ToolResult.fail(f"模块导入失败: {e}")
         except Exception as e:
             logger.exception("获取市场概览失败")
+            return ToolResult.fail(str(e))
+
+
+class DetectKlinePatternsTool(BaseTool):
+    """K线形态识别工具"""
+
+    category = "market"
+    execution_mode = ExecutionMode.COMPUTE
+    execution_timeout = 60.0
+
+    @property
+    def name(self) -> str:
+        return "detect_kline_patterns"
+
+    @property
+    def description(self) -> str:
+        return """识别指定币种在指定时间范围内的K线形态。
+
+支持的形态:
+- doji: 十字星(实体很小)
+- hammer: 锤子线(下影线长,上影线短,实体在上半部分)
+- engulfing_bullish: 看涨吞没(阳包阴)
+- engulfing_bearish: 看跌吞没(阴包阳)
+- shooting_star: 射击之星(上影线长,下影线短,实体在下半部分)
+- morning_star: 晨星(三根K线组合)
+- evening_star: 暮星(三根K线组合)
+
+返回识别到的形态列表及其出现时间。"""
+
+    @property
+    def input_schema(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "symbol": {
+                    "type": "string",
+                    "description": "币种名称,如 BTC-USDT"
+                },
+                "patterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "doji", "hammer", "engulfing_bullish",
+                            "engulfing_bearish", "shooting_star",
+                            "morning_star", "evening_star"
+                        ]
+                    },
+                    "description": "要识别的形态列表"
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "开始日期,格式 YYYY-MM-DD"
+                },
+                "end_date": {
+                    "type": "string",
+                    "description": "结束日期,格式 YYYY-MM-DD"
+                },
+                "data_type": {
+                    "type": "string",
+                    "description": "数据类型: swap(合约) 或 spot(现货)",
+                    "enum": ["swap", "spot"],
+                    "default": "swap"
+                }
+            },
+            "required": ["symbol", "patterns", "start_date", "end_date"]
+        }
+
+    def _detect_patterns(self, df: pd.DataFrame, patterns: list[str]) -> dict[str, list[int]]:
+        """
+        检测K线形态
+
+        Args:
+            df: K线数据
+            patterns: 要检测的形态列表
+
+        Returns:
+            形态检测结果,key为形态名,value为检测到该形态的行索引列表
+        """
+        results = {p: [] for p in patterns}
+
+        if df.empty or len(df) < 3:
+            return results
+
+        # 预计算常用指标
+        body = abs(df['close'] - df['open'])
+        upper_shadow = df['high'] - df[['open', 'close']].max(axis=1)
+        lower_shadow = df[['open', 'close']].min(axis=1) - df['low']
+        candle_range = df['high'] - df['low']
+
+        for i in range(len(df)):
+            # 避免除零错误
+            if candle_range.iloc[i] == 0:
+                continue
+
+            # doji: 十字星,实体很小(小于整体范围的10%)
+            if 'doji' in patterns and body.iloc[i] <= candle_range.iloc[i] * 0.1:
+                results['doji'].append(i)
+
+            # hammer: 锤子线,下影线长(至少为实体的2倍),上影线短(小于实体的0.5倍)
+            if ('hammer' in patterns and body.iloc[i] > 0 and
+                    lower_shadow.iloc[i] >= body.iloc[i] * 2 and
+                    upper_shadow.iloc[i] <= body.iloc[i] * 0.5):
+                results['hammer'].append(i)
+
+            # shooting_star: 射击之星,上影线长,下影线短,实体在下半部分
+            if ('shooting_star' in patterns and body.iloc[i] > 0 and
+                    upper_shadow.iloc[i] >= body.iloc[i] * 2 and
+                    lower_shadow.iloc[i] <= body.iloc[i] * 0.5):
+                results['shooting_star'].append(i)
+
+            # engulfing_bullish: 阳包阴(前一根阴线,当前阳线完全包住前一根)
+            if 'engulfing_bullish' in patterns and i > 0:
+                prev_bearish = df.iloc[i - 1]['close'] < df.iloc[i - 1]['open']
+                curr_bullish = df.iloc[i]['close'] > df.iloc[i]['open']
+                engulfs = (df.iloc[i]['open'] <= df.iloc[i - 1]['close'] and
+                           df.iloc[i]['close'] >= df.iloc[i - 1]['open'])
+                if prev_bearish and curr_bullish and engulfs:
+                    results['engulfing_bullish'].append(i)
+
+            # engulfing_bearish: 阴包阳(前一根阳线,当前阴线完全包住前一根)
+            if 'engulfing_bearish' in patterns and i > 0:
+                prev_bullish = df.iloc[i - 1]['close'] > df.iloc[i - 1]['open']
+                curr_bearish = df.iloc[i]['close'] < df.iloc[i]['open']
+                engulfs = (df.iloc[i]['open'] >= df.iloc[i - 1]['close'] and
+                           df.iloc[i]['close'] <= df.iloc[i - 1]['open'])
+                if prev_bullish and curr_bearish and engulfs:
+                    results['engulfing_bearish'].append(i)
+
+            # morning_star: 晨星(三根K线: 大阴线 + 小实体 + 大阳线)
+            if 'morning_star' in patterns and i >= 2:
+                # 第一根: 大阴线
+                first_bearish = (df.iloc[i - 2]['close'] < df.iloc[i - 2]['open'] and
+                                 body.iloc[i - 2] > candle_range.iloc[i - 2] * 0.5)
+                # 第二根: 小实体
+                second_small = body.iloc[i - 1] <= candle_range.iloc[i - 1] * 0.3 if candle_range.iloc[i - 1] > 0 else False
+                # 第三根: 大阳线
+                third_bullish = (df.iloc[i]['close'] > df.iloc[i]['open'] and
+                                 body.iloc[i] > candle_range.iloc[i] * 0.5)
+                # 第三根收盘价高于第一根的中点
+                first_mid = (df.iloc[i - 2]['open'] + df.iloc[i - 2]['close']) / 2
+                closes_above_mid = df.iloc[i]['close'] > first_mid
+
+                if first_bearish and second_small and third_bullish and closes_above_mid:
+                    results['morning_star'].append(i)
+
+            # evening_star: 暮星(三根K线: 大阳线 + 小实体 + 大阴线)
+            if 'evening_star' in patterns and i >= 2:
+                # 第一根: 大阳线
+                first_bullish = (df.iloc[i - 2]['close'] > df.iloc[i - 2]['open'] and
+                                 body.iloc[i - 2] > candle_range.iloc[i - 2] * 0.5)
+                # 第二根: 小实体
+                second_small = body.iloc[i - 1] <= candle_range.iloc[i - 1] * 0.3 if candle_range.iloc[i - 1] > 0 else False
+                # 第三根: 大阴线
+                third_bearish = (df.iloc[i]['close'] < df.iloc[i]['open'] and
+                                 body.iloc[i] > candle_range.iloc[i] * 0.5)
+                # 第三根收盘价低于第一根的中点
+                first_mid = (df.iloc[i - 2]['open'] + df.iloc[i - 2]['close']) / 2
+                closes_below_mid = df.iloc[i]['close'] < first_mid
+
+                if first_bullish and second_small and third_bearish and closes_below_mid:
+                    results['evening_star'].append(i)
+
+        return results
+
+    async def execute(self, **params) -> ToolResult:
+        try:
+            symbol = params["symbol"]
+            patterns = params["patterns"]
+            start_date = params["start_date"]
+            end_date = params["end_date"]
+            data_type = params.get("data_type", "swap")
+
+            # 参数验证
+            if not patterns:
+                return ToolResult.fail("patterns 不能为空")
+
+            valid_patterns = {
+                "doji", "hammer", "engulfing_bullish",
+                "engulfing_bearish", "shooting_star",
+                "morning_star", "evening_star"
+            }
+            invalid_patterns = set(patterns) - valid_patterns
+            if invalid_patterns:
+                return ToolResult.fail(f"不支持的形态: {invalid_patterns}")
+
+            # 获取K线数据
+            df = await self.data_loader.get_kline_async(
+                symbol=symbol,
+                data_type=data_type,
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            if df.empty:
+                return ToolResult.fail(f"无数据: {symbol}")
+
+            # 检测形态
+            pattern_indices = self._detect_patterns(df, patterns)
+
+            # 构建返回结果
+            patterns_found = {}
+            pattern_counts = {}
+
+            for pattern_name, indices in pattern_indices.items():
+                pattern_counts[pattern_name] = len(indices)
+                if indices:
+                    patterns_found[pattern_name] = []
+                    for idx in indices:
+                        row = df.iloc[idx]
+                        patterns_found[pattern_name].append({
+                            "time": str(row.get("candle_begin_time", "")),
+                            "open": float(row.get("open", 0)),
+                            "close": float(row.get("close", 0)),
+                            "high": float(row.get("high", 0)),
+                            "low": float(row.get("low", 0)),
+                        })
+
+            return ToolResult.ok({
+                "symbol": symbol,
+                "patterns_found": patterns_found,
+                "pattern_counts": pattern_counts,
+            })
+
+        except Exception as e:
+            logger.exception("K线形态识别失败")
             return ToolResult.fail(str(e))
 
 

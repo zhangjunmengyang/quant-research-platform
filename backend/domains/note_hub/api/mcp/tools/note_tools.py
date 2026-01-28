@@ -4,7 +4,7 @@
 提供笔记的创建、搜索和管理功能。
 
 Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
-- 基础 CRUD（create_note, update_note, get_note, list_notes, search_notes）
+- 基础 CRUD（create_note, update_note, delete_note, get_note, list_notes, search_notes）
 - 研究流程：通过 create_note 的 note_type 参数区分
   - observation: 观察 - 对数据或现象的客观记录
   - hypothesis: 假设 - 基于观察提出的待验证假说
@@ -413,6 +413,66 @@ class ListNotesTool(BaseTool):
             return ToolResult(success=False, error=str(e))
 
 
+# ==================== 删除工具 ====================
+
+
+class DeleteNoteTool(BaseTool):
+    """删除笔记工具"""
+
+    @property
+    def name(self) -> str:
+        return "delete_note"
+
+    @property
+    def description(self) -> str:
+        return """永久删除笔记。
+
+删除操作不可恢复，请谨慎使用。
+如果只是想隐藏笔记，建议使用 archive_note 进行归档。
+
+使用场景:
+- 删除错误创建的笔记
+- 清理无价值的临时记录"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "note_id": {
+                    "type": "integer",
+                    "description": "笔记 ID"
+                }
+            },
+            "required": ["note_id"]
+        }
+
+    async def execute(self, **params) -> ToolResult:
+        try:
+            note_id = params.get("note_id")
+
+            # 验证笔记存在
+            note = self.note_service.get_note(note_id)
+            if note is None:
+                return ToolResult(success=False, error=f"笔记不存在: {note_id}")
+
+            success = self.note_service.delete_note(note_id)
+
+            if success:
+                return ToolResult(
+                    success=True,
+                    data={
+                        "note_id": note_id,
+                        "message": "删除成功"
+                    }
+                )
+            else:
+                return ToolResult(success=False, error="删除失败")
+
+        except Exception as e:
+            return ToolResult(success=False, error=str(e))
+
+
 # ==================== 归档管理工具 ====================
 
 
@@ -675,6 +735,59 @@ class LinkNoteTool(BaseTool):
                         "target_type": target_type,
                         "target_id": target_id,
                         "relation": relation,
+                        "message": message
+                    }
+                )
+            else:
+                return ToolResult(success=False, error=message)
+
+        except Exception as e:
+            return ToolResult(success=False, error=str(e))
+
+
+class UnlinkNoteTool(BaseTool):
+    """删除笔记关联工具"""
+
+    @property
+    def name(self) -> str:
+        return "unlink_note"
+
+    @property
+    def description(self) -> str:
+        return """删除笔记与其他实体的关联。
+
+通过边 ID 删除笔记关联。可以先使用 get_note_edges 获取笔记的所有关联，
+找到需要删除的边 ID，然后使用此工具删除。
+
+使用场景:
+- 修正错误的关联关系
+- 清理冗余的关联
+- 重建正确的知识链路"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "edge_id": {
+                    "type": "integer",
+                    "description": "边 ID（从 get_note_edges 获取）"
+                }
+            },
+            "required": ["edge_id"]
+        }
+
+    async def execute(self, **params) -> ToolResult:
+        try:
+            edge_id = params.get("edge_id")
+
+            success, message = self.note_service.delete_note_edge(edge_id)
+
+            if success:
+                return ToolResult(
+                    success=True,
+                    data={
+                        "edge_id": edge_id,
                         "message": message
                     }
                 )

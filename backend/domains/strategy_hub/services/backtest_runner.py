@@ -712,14 +712,56 @@ class BacktestRunner:
             if equity_file.exists():
                 import pandas as pd
                 equity_df = pd.read_csv(equity_file, encoding='utf-8-sig')
-                # 存储简化的资金曲线数据（每日数据点）
+                # 存储完整资金曲线数据（100%还原core引擎展示）
                 if len(equity_df) > 0:
                     # 对于大数据量，采样保存
                     if len(equity_df) > 1000:
                         sample_df = equity_df.iloc[::len(equity_df)//1000]
                     else:
                         sample_df = equity_df
-                    result["equity_curve"] = sample_df[["candle_begin_time", "多空资金曲线"]].to_dict("records")
+
+                    # 提取所有可用字段（按core引擎figure.py的展示需求）
+                    equity_columns = ["candle_begin_time", "净值"]
+
+                    # 子图1: 仓位占比 - 需要 long_pos_value, short_pos_value 计算
+                    if "long_pos_value" in sample_df.columns:
+                        equity_columns.append("long_pos_value")
+                    if "short_pos_value" in sample_df.columns:
+                        equity_columns.append("short_pos_value")
+
+                    # 子图2: 选币数量
+                    if "symbol_long_num" in sample_df.columns:
+                        equity_columns.append("symbol_long_num")
+                    if "symbol_short_num" in sample_df.columns:
+                        equity_columns.append("symbol_short_num")
+
+                    # 子图3: 单币最大持仓比例
+                    if "long_max_ratio" in sample_df.columns:
+                        equity_columns.append("long_max_ratio")
+                    if "short_max_ratio_abs" in sample_df.columns:
+                        equity_columns.append("short_max_ratio_abs")
+                    if "top3_long" in sample_df.columns:
+                        equity_columns.append("top3_long")
+                    if "top3_short" in sample_df.columns:
+                        equity_columns.append("top3_short")
+
+                    # 其他有用字段
+                    if "净值dd2here" in sample_df.columns:
+                        equity_columns.append("净值dd2here")
+                    if "涨跌幅" in sample_df.columns:
+                        equity_columns.append("涨跌幅")
+                    if "leverage_ratio" in sample_df.columns:
+                        equity_columns.append("leverage_ratio")
+                    if "fee" in sample_df.columns:
+                        equity_columns.append("fee")
+                    if "是否爆仓" in sample_df.columns:
+                        equity_columns.append("是否爆仓")
+                    if "equity" in sample_df.columns:
+                        equity_columns.append("equity")
+
+                    # 只选择存在的列
+                    available_columns = [col for col in equity_columns if col in sample_df.columns]
+                    result["equity_curve"] = sample_df[available_columns].to_dict("records")
         except Exception as e:
             logger.warning(f"读取资金曲线失败: {e}")
 

@@ -11,7 +11,7 @@ import logging
 from domains.mcp_core import BaseTool, ToolResult
 from domains.mcp_core.base.tool import ExecutionMode
 
-from domains.strategy_hub.services import get_strategy_service, Strategy
+from domains.strategy_hub.services import get_strategy_service
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ class ListStrategiesTool(BaseTool):
             return ToolResult.ok({
                 "count": len(strategies),
                 "total": total,
-                "strategies": [s.to_dict() for s in strategies],
+                "strategies": [s.to_result_dict() for s in strategies],
             })
         except Exception as e:
             logger.exception("列出策略失败")
@@ -116,7 +116,7 @@ class GetStrategyTool(BaseTool):
             if not strategy:
                 return ToolResult.fail(f"策略不存在: {strategy_id}")
 
-            return ToolResult.ok(strategy.to_dict())
+            return ToolResult.ok(strategy.to_result_dict())
         except Exception as e:
             logger.exception("获取策略失败")
             return ToolResult.fail(str(e))
@@ -155,7 +155,7 @@ class SearchStrategiesTool(BaseTool):
 
             return ToolResult.ok({
                 "count": len(strategies),
-                "strategies": [s.to_dict() for s in strategies],
+                "strategies": [s.to_result_dict() for s in strategies],
             })
         except Exception as e:
             logger.exception("搜索策略失败")
@@ -189,6 +189,154 @@ class GetStrategyStatsTool(BaseTool):
             return ToolResult.ok(stats)
         except Exception as e:
             logger.exception("获取统计失败")
+            return ToolResult.fail(str(e))
+
+
+# 可更新字段的 schema 定义
+STRATEGY_UPDATABLE_FIELDS_SCHEMA = {
+    # 基本信息
+    "name": {
+        "type": "string",
+        "description": "策略名称"
+    },
+    "description": {
+        "type": "string",
+        "description": "策略描述"
+    },
+    # 元数据
+    "verified": {
+        "type": "boolean",
+        "description": "是否已验证"
+    },
+    "tags": {
+        "type": "string",
+        "description": "标签（逗号分隔）"
+    },
+    "notes": {
+        "type": "string",
+        "description": "备注"
+    },
+}
+
+
+class UpdateStrategyTool(BaseTool):
+    """更新策略工具"""
+
+    category = "mutation"
+
+    @property
+    def name(self) -> str:
+        return "update_strategy"
+
+    @property
+    def description(self) -> str:
+        return """更新策略的元数据字段。
+
+可更新的字段包括：
+- name: 策略名称
+- description: 策略描述
+- verified: 是否已验证
+- tags: 标签（逗号分隔）
+- notes: 备注
+
+更新后会自动同步到 YAML 元数据文件。"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "strategy_id": {
+                    "type": "string",
+                    "description": "策略ID",
+                },
+                **STRATEGY_UPDATABLE_FIELDS_SCHEMA
+            },
+            "required": ["strategy_id"],
+        }
+
+    async def execute(
+        self,
+        strategy_id: str,
+        **params
+    ) -> ToolResult:
+        try:
+            service = get_strategy_service()
+            strategy = service.get_strategy(strategy_id)
+
+            if not strategy:
+                return ToolResult.fail(f"策略不存在: {strategy_id}")
+
+            # 过滤掉 None 值，只保留实际提供的字段
+            update_fields = {k: v for k, v in params.items() if v is not None}
+
+            if not update_fields:
+                return ToolResult.fail("没有提供要更新的字段")
+
+            # 更新字段
+            success = service.update_strategy_fields(strategy_id, **update_fields)
+
+            if not success:
+                return ToolResult.fail("更新失败")
+
+            return ToolResult.ok({
+                "strategy_id": strategy_id,
+                "updated_fields": list(update_fields.keys()),
+            })
+        except Exception as e:
+            logger.exception("更新策略失败")
+            return ToolResult.fail(str(e))
+
+
+class DeleteStrategyTool(BaseTool):
+    """删除策略工具"""
+
+    category = "mutation"
+
+    @property
+    def name(self) -> str:
+        return "delete_strategy"
+
+    @property
+    def description(self) -> str:
+        return """删除策略。
+
+从数据库中删除策略记录和相关的 YAML/JSON 文件。
+
+如果只是想标记策略为无效而非删除，建议使用 update_strategy 添加备注。"""
+
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "strategy_id": {
+                    "type": "string",
+                    "description": "策略ID",
+                },
+            },
+            "required": ["strategy_id"],
+        }
+
+    async def execute(self, strategy_id: str) -> ToolResult:
+        try:
+            service = get_strategy_service()
+            strategy = service.get_strategy(strategy_id)
+
+            if not strategy:
+                return ToolResult.fail(f"策略不存在: {strategy_id}")
+
+            success = service.delete_strategy(strategy_id)
+
+            if success:
+                return ToolResult.ok({
+                    "strategy_id": strategy_id,
+                    "name": strategy.name,
+                })
+            else:
+                return ToolResult.fail("删除失败")
+        except Exception as e:
+            logger.exception("删除策略失败")
             return ToolResult.fail(str(e))
 
 
@@ -226,20 +374,23 @@ class RunBacktestTool(BaseTool):
                             "factor_list": {
                                 "type": "array",
                                 "description": (
-                                    "因子列表，每个因子为 [名称, 排序方向, 参数, 权重]。"
-                                    "排序方向: True=因子值小的做多/大的做空, False=反之。"
+                                    "因子列表，每个因子为 [名称, ascending, 参数, 权重]。"
+                                    "ascending 决定排序和选币: "
+                                    "true=升序(做多选因子值最小的N个币); "
+                                    "false=降序(做多选因子值最大的N个币)。"
                                     "参数: 计算窗口(小时)，如 1200。权重: 固定为 1。"
-                                    "示例: [[\"Momentum\", true, 1200, 1]]"
+                                    "示例: [[\"Momentum\", false, 1200, 1]] 表示做多动量最大的币"
                                 ),
                             },
                             "filter_list": {
                                 "type": "array",
                                 "description": (
-                                    "前置过滤因子列表，每个过滤因子为 [名称, 参数, 过滤条件, 排序方向]。"
+                                    "前置过滤因子列表，每个过滤因子为 [名称, 参数, 过滤条件, ascending]。"
                                     "参数: 计算窗口(小时)。"
                                     "过滤条件: \"pct:<0.2\"(百分位<20%), \"rank:<10\"(排名<10), \"val:>100\"(原值>100)。"
-                                    "排序方向: true=升序(值小排名高), false=降序(值大排名高)。对val无效，对pct/rank有效。"
-                                    "示例: [[\"QuoteVolumeMean\", 24, \"pct:<0.2\", true]] 保留成交量最低的20%"
+                                    "ascending 决定排名计算方式(对pct/rank有效，对val无效): "
+                                    "true=升序(值最小的排名第1); false=降序(值最大的排名第1)。"
+                                    "示例: [[\"QuoteVolumeMean\", 24, \"pct:<0.2\", true]] 保留成交量最小的20%币种"
                                 ),
                             },
                             "filter_list_post": {

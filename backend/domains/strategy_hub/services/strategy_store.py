@@ -478,13 +478,34 @@ class StrategyStore(BaseStore[Strategy]):
             logger.debug(f"strategy_sync_trigger_skipped: {strategy_id}, {e}")
 
     def delete(self, strategy_id: str) -> bool:
-        """删除策略"""
+        """删除策略（同时删除关联的边）"""
+        # 先删除关联的边
+        self._delete_strategy_edges(strategy_id)
+
+        # 删除策略记录
         with self._cursor() as cursor:
             cursor.execute("DELETE FROM strategies WHERE id = %s", (strategy_id,))
             deleted = cursor.rowcount > 0
             if deleted:
                 logger.info(f"删除策略: {strategy_id}")
             return deleted
+
+    def _delete_strategy_edges(self, strategy_id: str) -> None:
+        """删除策略关联的所有边"""
+        try:
+            from domains.mcp_core.edge.store import get_edge_store
+            from domains.mcp_core.edge.models import EdgeEntityType
+
+            edge_store = get_edge_store()
+            deleted_count = edge_store.delete_edges_by_entity(
+                EdgeEntityType.STRATEGY,
+                strategy_id
+            )
+            if deleted_count > 0:
+                logger.info(f"deleted_strategy_edges: strategy={strategy_id}, count={deleted_count}")
+        except Exception as e:
+            # 边删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_strategy_edges: {strategy_id}, {e}")
 
     # ===== 查询操作 =====
 

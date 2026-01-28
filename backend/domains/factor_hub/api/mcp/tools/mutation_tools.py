@@ -104,10 +104,10 @@ FACTOR_FIELDS_SCHEMA = {
         "description": "标签（英文逗号分隔）"
     },
     # 验证状态
-    "verified": {
+    "verification_status": {
         "type": "integer",
-        "enum": [0, 1],
-        "description": "是否已验证（0=未验证, 1=已验证）"
+        "enum": [0, 1, 2],
+        "description": "验证状态（0=未验证, 1=通过, 2=废弃）"
     },
     "verify_note": {
         "type": "string",
@@ -226,7 +226,7 @@ class UpdateFactorTool(BaseTool):
 - 评分指标: llm_score, code_complexity
 - 绩效指标: ic, rank_ic, backtest_sharpe, backtest_ic, backtest_ir, turnover, decay, last_backtest_date
 - 分类标签: market_regime, best_holding_period, tags
-- 验证状态: verified, verify_note
+- 验证状态: verification_status, verify_note
 - 排除状态: excluded, exclude_reason
 
 注意：不能更新 filename、uuid、code_path、created_at 等系统字段。"""
@@ -352,3 +352,5 @@ class DeleteFactorTool(BaseTool):
 
         except Exception as e:
             return ToolResult(success=False, error=str(e))
+
+

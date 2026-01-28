@@ -56,8 +56,8 @@ class Factor(FactorBase):
     tags: Optional[str] = Field(None, description="标签（英文逗号分隔）")
 
     # Status
-    verified: bool = Field(False, description="人工校验状态（通过/未审查）")
-    verify_note: Optional[str] = Field(None, description="校验备注")
+    verification_status: int = Field(0, description="验证状态（0=未验证, 1=通过, 2=废弃）")
+    verify_note: Optional[str] = Field(None, description="验证备注")
 
     # Timestamps
     created_at: Optional[datetime] = None
@@ -96,7 +96,7 @@ class FactorListRequest(BaseModel):
     factor_type: Optional[FactorTypeEnum] = Field(None, description="因子类型筛选")
     score_min: Optional[float] = Field(None, ge=0, le=5, description="最低评分")
     score_max: Optional[float] = Field(None, ge=0, le=5, description="最高评分")
-    verified: Optional[bool] = Field(None, description="人工校验状态")
+    verification_status: Optional[int] = Field(None, description="验证状态筛选（0=未验证, 1=通过, 2=废弃）")
     order_by: str = Field("created_at", description="排序字段")
     order_desc: bool = Field(True, description="降序排序")
 
@@ -107,7 +107,8 @@ class FactorStats(BaseModel):
     total: int = Field(..., description="有效因子总数（不含已排除）")
     excluded: int = Field(0, description="已排除因子数量")
     scored: int = Field(..., description="已评分数量")
-    verified: int = Field(..., description="已校验数量")
+    passed: int = Field(..., description="验证通过数量")
+    failed: int = Field(0, description="废弃（失败研究）数量")
     avg_score: Optional[float] = Field(None, description="平均评分")
     style_distribution: Dict[str, int] = Field(default_factory=dict, description="风格分布")
     score_distribution: Dict[str, int] = Field(default_factory=dict, description="评分分布")

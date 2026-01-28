@@ -9,6 +9,9 @@ from .strategy_tools import (
     GetStrategyTool,
     SearchStrategiesTool,
     GetStrategyStatsTool,
+    UpdateStrategyTool,
+    DeleteStrategyTool,
+    RunBacktestTool,
 )
 from .analysis_tools import (
     CompareBacktestLiveTool,
@@ -22,7 +25,11 @@ __all__ = [
     "GetStrategyTool",
     "SearchStrategiesTool",
     "GetStrategyStatsTool",
-    # 分析工具 (参数搜索已移至 factor-hub)
+    # 修改工具
+    "UpdateStrategyTool",
+    "DeleteStrategyTool",
+    "RunBacktestTool",
+    # 分析工具
     "CompareBacktestLiveTool",
     "CompareStrategyCoinsTool",
     "CompareEquityCurvesTool",

@@ -89,26 +89,35 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
 
   const displayFactor = fullFactor || factor
 
+  // 验证状态常量
+  const VERIFICATION_STATUS = {
+    UNVERIFIED: 0,
+    PASSED: 1,
+    FAILED: 2,
+  }
+
   const handleVerify = () => {
     const factorName = stripPyExtension(displayFactor.filename)
-    if (displayFactor.verified) {
+    if (displayFactor.verification_status === VERIFICATION_STATUS.PASSED) {
+      // 已通过 -> 重置为未验证
       unverifyFactor.mutate(displayFactor.filename, {
         onSuccess: (data) => {
           setFullFactor(data)
-          toast.success('已取消校验', `${factorName} 已标记为未校验`)
+          toast.success('已重置验证', `${factorName} 已重置为未验证`)
         },
         onError: (error) => {
-          toast.error('取消校验失败', (error as Error).message)
+          toast.error('重置验证失败', (error as Error).message)
         },
       })
     } else {
+      // 未验证/废弃 -> 标记为通过
       verifyFactor.mutate({ filename: displayFactor.filename }, {
         onSuccess: (data) => {
           setFullFactor(data)
-          toast.success('已标记校验', `${factorName} 已标记为已校验`)
+          toast.success('已标记通过', `${factorName} 已标记为验证通过`)
         },
         onError: (error) => {
-          toast.error('标记校验失败', (error as Error).message)
+          toast.error('标记通过失败', (error as Error).message)
         },
       })
     }
@@ -340,18 +349,18 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
                   disabled={verifyFactor.isPending || unverifyFactor.isPending}
                   className={cn(
                     'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
-                    displayFactor.verified
-                      ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'bg-blue-600 text-white hover:bg-blue-700',
+                    displayFactor.verification_status === VERIFICATION_STATUS.PASSED
+                      ? 'bg-orange-600 text-white hover:bg-orange-700'
+                      : 'bg-green-600 text-white hover:bg-green-700',
                     (verifyFactor.isPending || unverifyFactor.isPending) && 'opacity-50 cursor-not-allowed'
                   )}
                 >
                   {(verifyFactor.isPending || unverifyFactor.isPending) ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : displayFactor.verified ? (
-                    '取消校验'
+                  ) : displayFactor.verification_status === VERIFICATION_STATUS.PASSED ? (
+                    '重置验证'
                   ) : (
-                    '标记校验'
+                    '标记通过'
                   )}
                 </button>
                 <button
@@ -517,12 +526,18 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
               <span
                 className={cn(
                   'rounded-full px-3 py-1 text-xs font-medium',
-                  displayFactor.verified
+                  displayFactor.verification_status === VERIFICATION_STATUS.PASSED
                     ? 'bg-green-100 text-green-800'
+                    : displayFactor.verification_status === VERIFICATION_STATUS.FAILED
+                    ? 'bg-red-100 text-red-800'
                     : 'bg-gray-100 text-gray-800'
                 )}
               >
-                {displayFactor.verified ? '已校验' : '未审查'}
+                {displayFactor.verification_status === VERIFICATION_STATUS.PASSED
+                  ? '通过'
+                  : displayFactor.verification_status === VERIFICATION_STATUS.FAILED
+                  ? '废弃'
+                  : '未验证'}
               </span>
               {/* Style Tags Display */}
               {(isEditing ? formData.style : displayFactor.style)?.split(',').filter(s => s.trim()).map((style, idx) => (

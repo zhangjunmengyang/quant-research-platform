@@ -25,7 +25,7 @@ class ListFactorsTool(BaseTool):
 - search: 按文件名搜索
 - style: 按风格筛选(如"动量"、"反转"、"波动性"等)
 - score_min/score_max: 按评分范围筛选
-- verified: 是否已验证(true/false)
+- verification_status: 验证状态("通过"/"未验证"/"废弃")
 
 返回因子名称列表和总数。如需因子详情，请使用 get_factor 工具。"""
 
@@ -50,9 +50,10 @@ class ListFactorsTool(BaseTool):
                     "type": "number",
                     "description": "最高评分"
                 },
-                "verified": {
-                    "type": "boolean",
-                    "description": "是否已验证"
+                "verification_status": {
+                    "type": "string",
+                    "enum": ["通过", "未验证", "废弃"],
+                    "description": "验证状态筛选"
                 },
                 "page": {
                     "type": "integer",
@@ -88,7 +89,7 @@ class ListFactorsTool(BaseTool):
             style = params.get("style")
             score_min = params.get("score_min")
             score_max = params.get("score_max")
-            verified = params.get("verified")
+            verification_status = params.get("verification_status")
             page = params.get("page", 1)
             page_size = params.get("page_size", 20)
             order_by = params.get("order_by", "filename")
@@ -110,11 +111,7 @@ class ListFactorsTool(BaseTool):
                     score_filter = "< 3.0"
 
             # 验证状态
-            verify_filter = "全部"
-            if verified is True:
-                verify_filter = "已验证"
-            elif verified is False:
-                verify_filter = "未验证"
+            verify_filter = verification_status if verification_status else "全部"
 
             # 调用服务
             factors, total = self.factor_service.list_factors(
@@ -194,22 +191,30 @@ class GetFactorTool(BaseTool):
                 )
 
             # 使用 to_dict() 获取完整字段
-            data = factor.to_dict()
-
-            # 转换日期时间字段为字符串
-            if data.get("created_at"):
-                data["created_at"] = str(data["created_at"])
-            if data.get("updated_at"):
-                data["updated_at"] = str(data["updated_at"])
-
-            # 确保 verified 和 excluded 为布尔值
-            data["verified"] = bool(data.get("verified"))
-            data["excluded"] = bool(data.get("excluded"))
+            raw_data = factor.to_dict()
 
             # 根据参数决定是否包含代码
             if not include_code:
-                data.pop("code_content", None)
-                data.pop("code_path", None)
+                raw_data.pop("code_content", None)
+                raw_data.pop("code_path", None)
+
+            # 过滤空值和默认值，减少输出冗余
+            data = {}
+            for key, value in raw_data.items():
+                # 跳过空字符串
+                if value == "":
+                    continue
+                # 跳过 None/null 值
+                if value is None:
+                    continue
+                # 跳过 verification_status/excluded 字段（这些是内部状态）
+                if key in ("verification_status", "excluded"):
+                    continue
+                # 时间戳转为字符串
+                if key in ("created_at", "updated_at"):
+                    value = str(value)
+                # 保留有效值
+                data[key] = value
 
             return ToolResult(success=True, data=data)
 
@@ -252,7 +257,8 @@ class GetStatsTool(BaseTool):
                     "total": stats.get("total", 0),
                     "scored": stats.get("scored", 0),
                     "unscored": stats.get("unscored", 0),
-                    "verified": stats.get("verified", 0),
+                    "passed": stats.get("passed", 0),
+                    "failed": stats.get("failed", 0),
                     "score_distribution": stats.get("score_distribution", {}),
                     "style_distribution": stats.get("style_distribution", {}),
                     "score_stats": stats.get("score_stats", {}),

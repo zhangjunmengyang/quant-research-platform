@@ -457,7 +457,7 @@ class Strategy:
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典
 
-        返回完整的策略数据，供 REST API 和 MCP 使用。
+        返回完整的策略数据，供内部存储和前端使用。
         """
         return {
             # 基础信息
@@ -465,14 +465,13 @@ class Strategy:
             "name": self.name,
             "description": self.description,
             # 因子配置
-            "factor_list": self.factor_list,  # 保持 JSON 字符串格式
-            "factor_params": self.factor_params,  # 保持 JSON 字符串格式
-            "strategy_config": self.strategy_config,  # 完整策略配置
+            "factor_list": self.factor_list,
+            "factor_params": self.factor_params,
+            "strategy_config": self.strategy_config,
             # 回测配置
             "start_date": self.start_date,
             "end_date": self.end_date,
             "leverage": self.leverage,
-            "select_coin_num": self.select_coin_num,
             "trade_type": self.trade_type,
             # 多空配置
             "long_select_coin_num": self.long_select_coin_num,
@@ -536,6 +535,42 @@ class Strategy:
             "task_id": self.task_id,
             "task_status": self.task_status,
             "error_message": self.error_message,
+        }
+
+    def to_result_dict(self) -> Dict[str, Any]:
+        """转换为结果字典
+
+        只返回绩效结果，供 MCP 工具返回使用。
+        注意: equity_curve 数据量大，需要时通过 compare_equity_curves 工具获取。
+        """
+        return {
+            # 标识
+            "id": self.id,
+            "name": self.name,
+            # 核心绩效
+            "cumulative_return": self.cumulative_return,
+            "annual_return": self.annual_return,
+            "max_drawdown": self.max_drawdown,
+            "max_drawdown_start": self.max_drawdown_start,
+            "max_drawdown_end": self.max_drawdown_end,
+            "sharpe_ratio": self.sharpe_ratio,
+            "recovery_rate": self.recovery_rate,
+            "recovery_time": self.recovery_time,
+            # 交易统计
+            "win_periods": self.win_periods,
+            "loss_periods": self.loss_periods,
+            "win_rate": self.win_rate,
+            "avg_return_per_period": self.avg_return_per_period,
+            "profit_loss_ratio": self.profit_loss_ratio,
+            "max_single_profit": self.max_single_profit,
+            "max_single_loss": self.max_single_loss,
+            "max_consecutive_wins": self.max_consecutive_wins,
+            "max_consecutive_losses": self.max_consecutive_losses,
+            "return_std": self.return_std,
+            # 周期收益
+            "year_return": self.year_return,
+            "quarter_return": self.quarter_return,
+            "month_return": self.month_return,
         }
 
     @classmethod

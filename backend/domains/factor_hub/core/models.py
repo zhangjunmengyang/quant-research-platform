@@ -16,6 +16,13 @@ class FactorType:
     CROSS_SECTION = "cross_section"  # 截面因子
 
 
+class VerificationStatus:
+    """验证状态枚举常量"""
+    UNVERIFIED = 0  # 未验证
+    PASSED = 1  # 通过
+    FAILED = 2  # 废弃（失败研究）
+
+
 @dataclass
 class Factor:
     """
@@ -38,7 +45,7 @@ class Factor:
         llm_score: LLM 评分 (0-5)
         ic: IC 值
         rank_ic: RankIC 值
-        verified: 是否已人工验证
+        verification_status: 验证状态 (0=未验证, 1=通过, 2=废弃)
         verify_note: 验证备注
         created_at: 创建时间
         updated_at: 更新时间
@@ -57,7 +64,7 @@ class Factor:
     llm_score: Optional[float] = None
     ic: Optional[float] = None
     rank_ic: Optional[float] = None
-    verified: int = 0
+    verification_status: int = VerificationStatus.UNVERIFIED  # 0=未验证, 1=通过, 2=废弃
     verify_note: str = ""
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -97,7 +104,7 @@ class Factor:
             'llm_score': self.llm_score,
             'ic': self.ic,
             'rank_ic': self.rank_ic,
-            'verified': self.verified,
+            'verification_status': self.verification_status,
             'verify_note': self.verify_note,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
@@ -124,9 +131,19 @@ class Factor:
         return cls(**valid_fields)
 
     @property
-    def is_verified(self) -> bool:
-        """是否已验证"""
-        return bool(self.verified)
+    def is_passed(self) -> bool:
+        """是否验证通过"""
+        return self.verification_status == VerificationStatus.PASSED
+
+    @property
+    def is_failed(self) -> bool:
+        """是否废弃（失败研究）"""
+        return self.verification_status == VerificationStatus.FAILED
+
+    @property
+    def is_unverified(self) -> bool:
+        """是否未验证"""
+        return self.verification_status == VerificationStatus.UNVERIFIED
 
     @property
     def is_excluded(self) -> bool:
@@ -221,7 +238,8 @@ class FactorStats:
     total: int = 0
     scored: int = 0
     unscored: int = 0
-    verified: int = 0
+    passed: int = 0  # 验证通过数量
+    failed: int = 0  # 废弃（失败研究）数量
     score_distribution: Dict[str, int] = field(default_factory=dict)
     style_distribution: Dict[str, int] = field(default_factory=dict)
     input_field_distribution: Dict[str, int] = field(default_factory=dict)

@@ -27,7 +27,7 @@ async def run_sync(func: Callable[..., T], *args, **kwargs) -> T:
 
     Example:
         # 在 async 路由中安全调用同步服务方法
-        result = await run_sync(service.query_factors, filter_condition={"verified": True})
+        result = await run_sync(service.query_factors, filter_condition={"verification_status": 1})
     """
     return await asyncio.to_thread(func, *args, **kwargs)
 

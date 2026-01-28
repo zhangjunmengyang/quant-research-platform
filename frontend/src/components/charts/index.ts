@@ -7,8 +7,10 @@ export { KlineChart, type KlineData } from './KlineChart'
 export {
   LineChart,
   EquityCurve,
+  EquityCurveSubplots,
   ICTimeSeries,
   type LineSeriesData,
+  type EquityCurveDataPoint,
 } from './LineChart'
 export {
   HeatmapChart,

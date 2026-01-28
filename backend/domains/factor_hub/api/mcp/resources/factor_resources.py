@@ -73,12 +73,20 @@ class FactorResourceProvider(BaseResourceProvider):
             handler=self._read_top_scored,
         )
 
-        # 已验证因子列表
+        # 验证通过的因子列表
         self.register_static(
-            uri="factor://verified",
-            name="已验证因子",
-            description="已通过人工验证的因子列表",
-            handler=self._read_verified,
+            uri="factor://passed",
+            name="验证通过因子",
+            description="验证通过的因子列表",
+            handler=self._read_passed,
+        )
+
+        # 废弃（失败研究）的因子列表
+        self.register_static(
+            uri="factor://failed",
+            name="废弃因子",
+            description="废弃（失败研究）的因子列表",
+            handler=self._read_failed,
         )
 
         # 动态资源模板
@@ -150,10 +158,10 @@ class FactorResourceProvider(BaseResourceProvider):
             text=json.dumps(result, ensure_ascii=False, indent=2),
         )
 
-    async def _read_verified(self) -> ResourceContent:
-        """读取已验证因子列表"""
+    async def _read_passed(self) -> ResourceContent:
+        """读取验证通过的因子列表"""
         factors, _ = self.factor_service.list_factors(
-            verify_filter="已验证",
+            verify_filter="通过",
             page=1,
             page_size=100,
         )
@@ -168,7 +176,30 @@ class FactorResourceProvider(BaseResourceProvider):
             })
 
         return ResourceContent(
-            uri="factor://verified",
+            uri="factor://passed",
+            mime_type="application/json",
+            text=json.dumps(result, ensure_ascii=False, indent=2),
+        )
+
+    async def _read_failed(self) -> ResourceContent:
+        """读取废弃（失败研究）的因子列表"""
+        factors, _ = self.factor_service.list_factors(
+            verify_filter="废弃",
+            page=1,
+            page_size=100,
+        )
+
+        result = []
+        for f in factors:
+            result.append({
+                "filename": f.filename,
+                "style": f.style,
+                "llm_score": f.llm_score,
+                "verify_note": f.verify_note,
+            })
+
+        return ResourceContent(
+            uri="factor://failed",
             mime_type="application/json",
             text=json.dumps(result, ensure_ascii=False, indent=2),
         )
@@ -179,6 +210,8 @@ class FactorResourceProvider(BaseResourceProvider):
         if factor is None:
             return None
 
+        # 验证状态映射
+        status_map = {0: "未验证", 1: "通过", 2: "废弃"}
         data = {
             "filename": factor.filename,
             "uuid": factor.uuid,
@@ -191,7 +224,7 @@ class FactorResourceProvider(BaseResourceProvider):
             "llm_score": factor.llm_score,
             "ic": factor.ic,
             "rank_ic": factor.rank_ic,
-            "verified": bool(factor.verified),
+            "verification_status": status_map.get(factor.verification_status, "未验证"),
             "verify_note": factor.verify_note,
             "code_path": factor.code_path,
             "created_at": str(factor.created_at) if factor.created_at else None,

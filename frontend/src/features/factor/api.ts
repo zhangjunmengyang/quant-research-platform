@@ -64,26 +64,40 @@ export const factorApi = {
   },
 
   /**
-   * Verify factor
+   * Mark factor as passed (verification passed)
    */
   verify: async (filename: string, request?: FactorVerifyRequest): Promise<Factor> => {
     const { data } = await apiClient.post<ApiResponse<Factor>>(
-      `${BASE_URL}/${filename}/verify`,
+      `${BASE_URL}/${filename}/pass`,
       request || {}
     )
     if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to verify factor')
+      throw new Error(data.error || 'Failed to mark factor as passed')
     }
     return data.data
   },
 
   /**
-   * Unverify factor
+   * Reset factor verification status (back to unverified)
    */
   unverify: async (filename: string): Promise<Factor> => {
-    const { data } = await apiClient.post<ApiResponse<Factor>>(`${BASE_URL}/${filename}/unverify`)
+    const { data } = await apiClient.post<ApiResponse<Factor>>(`${BASE_URL}/${filename}/reset-verification`)
     if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to unverify factor')
+      throw new Error(data.error || 'Failed to reset factor verification')
+    }
+    return data.data
+  },
+
+  /**
+   * Mark factor as failed (abandoned research)
+   */
+  markFailed: async (filename: string, request?: FactorVerifyRequest): Promise<Factor> => {
+    const { data } = await apiClient.post<ApiResponse<Factor>>(
+      `${BASE_URL}/${filename}/fail`,
+      request || {}
+    )
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Failed to mark factor as failed')
     }
     return data.data
   },

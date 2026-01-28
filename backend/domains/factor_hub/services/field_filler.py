@@ -23,7 +23,7 @@ from ...mcp_core.logging import setup_task_logger
 
 
 # 不可由大模型生成的字段（系统管理）
-PROTECTED_FIELDS = {'filename', 'code_path', 'code_content', 'created_at', 'updated_at', 'verified', 'verify_note'}
+PROTECTED_FIELDS = {'filename', 'code_path', 'code_content', 'created_at', 'updated_at', 'verification_status', 'verify_note'}
 
 # 可生成字段及其依赖关系（生成时需要先有这些字段）
 FIELD_DEPENDENCIES = {

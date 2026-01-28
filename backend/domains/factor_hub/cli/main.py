@@ -141,7 +141,7 @@ def cmd_review(args):
 
 
 def cmd_verify(args):
-    """执行 verify 命令"""
+    """执行 verify 命令 - 标记因子为验证通过"""
     from ..core.store import get_factor_store
 
     store = get_factor_store()
@@ -153,22 +153,22 @@ def cmd_verify(args):
         filenames = [args.filename]
 
     for filename in filenames:
-        if store.verify(filename, args.note or ""):
-            print(f"v 已验证: {filename}")
+        if store.mark_as_passed(filename, args.note or ""):
+            print(f"v 已标记通过: {filename}")
         else:
-            print(f"x 验证失败: {filename} (因子不存在)")
+            print(f"x 标记失败: {filename} (因子不存在)")
 
 
 def cmd_unverify(args):
-    """执行 unverify 命令"""
+    """执行 unverify 命令 - 重置因子验证状态为未验证"""
     from ..core.store import get_factor_store
 
     store = get_factor_store()
 
-    if store.unverify(args.filename):
-        print(f"v 已取消验证: {args.filename}")
+    if store.reset_verification(args.filename):
+        print(f"v 已重置验证状态: {args.filename}")
     else:
-        print(f"x 取消验证失败: {args.filename} (因子不存在)")
+        print(f"x 重置失败: {args.filename} (因子不存在)")
 
 
 def cmd_status(args):
@@ -179,7 +179,8 @@ def cmd_status(args):
 
     all_factors = store.get_all()
     unscored = store.get_unscored()
-    verified = store.get_verified()
+    passed = store.get_passed()
+    failed = store.get_failed()
     low_score = store.get_low_score(2.5)
 
     no_analysis = [f for f in all_factors if not f.analysis or f.analysis.strip() == '']
@@ -193,7 +194,8 @@ def cmd_status(args):
     print(f"  未评分:        {len(unscored)}")
     print(f"  缺少分析:      {len(no_analysis)}")
     print(f"  低分(<2.5):    {len(low_score)}")
-    print(f"  已验证:        {len(verified)}")
+    print(f"  验证通过:      {len(passed)}")
+    print(f"  废弃:          {len(failed)}")
     print()
 
     score_dist = {'4.5+': 0, '4.0-4.5': 0, '3.0-4.0': 0, '2.5-3.0': 0, '<2.5': 0, '无评分': 0}

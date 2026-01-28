@@ -113,7 +113,7 @@ class BaseTool(ABC):
 
     执行模式说明:
         - FAST: 直接 async 执行，适用于 I/O 密集型、轻量查询（< 100ms）
-          例如：list_factors, get_factor, get_kline
+          例如：list_factors, get_factor, list_symbols
         - COMPUTE: 适用于 CPU 密集型任务，由专用执行器管理
           例如：analyze_factor, calculate_factor, run_backtest
     """
@@ -190,6 +190,43 @@ class BaseTool(ABC):
             input_schema=self.input_schema,
             category=self.category,
         )
+
+    def coerce_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        根据 schema 类型定义转换参数类型
+
+        MCP 客户端（如 Claude）有时会将数字以字符串形式传入，
+        此方法根据 input_schema 的类型定义自动转换参数类型。
+
+        Args:
+            params: 原始输入参数
+
+        Returns:
+            类型转换后的参数字典
+        """
+        schema = self.input_schema
+        properties = schema.get("properties", {})
+        coerced = params.copy()
+
+        for field_name, value in params.items():
+            if field_name not in properties or value is None:
+                continue
+
+            prop_schema = properties[field_name]
+            expected_type = prop_schema.get("type")
+
+            try:
+                if expected_type == "integer" and isinstance(value, str):
+                    coerced[field_name] = int(value)
+                elif expected_type == "number" and isinstance(value, str):
+                    coerced[field_name] = float(value)
+                elif expected_type == "boolean" and isinstance(value, str):
+                    coerced[field_name] = value.lower() in ("true", "1", "yes")
+            except (ValueError, TypeError):
+                # 转换失败，保留原值，让后续验证报错
+                pass
+
+        return coerced
 
     def validate_params(self, params: Dict[str, Any]) -> Optional[str]:
         """
@@ -355,10 +392,15 @@ class ToolRegistry:
         if tool is None:
             return ToolResult.fail(f"工具不存在: {name}")
 
+        # 类型转换（兼容 MCP 客户端传入的字符串类型数字）
+        coerced_params = tool.coerce_params(params)
+
         # 参数验证
-        error = tool.validate_params(params)
+        error = tool.validate_params(coerced_params)
         if error:
             return ToolResult.fail(error)
+
+        params = coerced_params
 
         # 确定超时时间
         execution_mode = getattr(tool, "execution_mode", ExecutionMode.FAST)

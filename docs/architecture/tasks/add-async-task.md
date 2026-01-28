@@ -8,7 +8,7 @@
 
 | 模式 | 适用场景 | 示例 |
 |------|---------|------|
-| FAST | I/O 密集型，轻量查询（< 100ms） | list_factors, get_kline |
+| FAST | I/O 密集型，轻量查询（< 100ms） | list_factors, list_symbols |
 | COMPUTE | CPU 密集型任务 | run_backtest, analyze_factor |
 
 ## 实现示例

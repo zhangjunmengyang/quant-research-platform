@@ -12,11 +12,19 @@ import {
   Calendar,
   Settings,
   CheckCircle,
+  BarChart3,
 } from 'lucide-react'
 import { useStrategy } from '@/features/strategy'
-import { EquityCurve } from '@/components/charts'
+import { EquityCurveSubplots, type EquityCurveDataPoint } from '@/components/charts'
 import { cn, formatPercent } from '@/lib/utils'
 import type { Strategy } from '@/features/strategy'
+
+// 周期收益数据类型
+interface PeriodReturn {
+  candle_begin_time: string
+  涨跌幅?: string
+  [key: string]: unknown
+}
 
 // 指标名称映射
 const METRIC_LABELS: Record<string, string> = {
@@ -128,6 +136,228 @@ function getMetricColor(key: string, value: unknown): string | undefined {
   return undefined
 }
 
+/**
+ * 解析涨跌幅字符串为数值
+ */
+function parseReturnValue(value: string | null | undefined): number | null {
+  if (!value) return null
+  // 处理 "15.23%" 格式
+  const match = value.match(/^(-?[\d.]+)%$/)
+  if (match?.[1]) {
+    return parseFloat(match[1]) / 100
+  }
+  return null
+}
+
+/**
+ * 获取收益热力图背景色
+ * 正收益：绿色系，负收益：红色系
+ */
+function getReturnBgColor(value: number | null): string {
+  if (value === null) return ''
+
+  // 根据收益幅度计算颜色深度
+  const absValue = Math.abs(value)
+
+  if (value >= 0) {
+    // 绿色系：0-5% 浅绿，5-15% 中绿，>15% 深绿
+    if (absValue < 0.02) return 'bg-green-50 dark:bg-green-950/30'
+    if (absValue < 0.05) return 'bg-green-100 dark:bg-green-900/40'
+    if (absValue < 0.10) return 'bg-green-200 dark:bg-green-800/50'
+    if (absValue < 0.20) return 'bg-green-300 dark:bg-green-700/60'
+    return 'bg-green-400 dark:bg-green-600/70'
+  } else {
+    // 红色系
+    if (absValue < 0.02) return 'bg-red-50 dark:bg-red-950/30'
+    if (absValue < 0.05) return 'bg-red-100 dark:bg-red-900/40'
+    if (absValue < 0.10) return 'bg-red-200 dark:bg-red-800/50'
+    if (absValue < 0.20) return 'bg-red-300 dark:bg-red-700/60'
+    return 'bg-red-400 dark:bg-red-600/70'
+  }
+}
+
+/**
+ * 构建月度热力图数据矩阵
+ */
+function buildMonthlyMatrix(
+  monthReturn: PeriodReturn[],
+  yearReturn: PeriodReturn[]
+): {
+  years: number[]
+  matrix: Map<string, { display: string; value: number | null }>
+  yearTotals: Map<number, { display: string; value: number | null }>
+} {
+  const matrix = new Map<string, { display: string; value: number | null }>()
+  const yearsSet = new Set<number>()
+  const yearTotals = new Map<number, { display: string; value: number | null }>()
+
+  // 解析月度数据
+  for (const item of monthReturn) {
+    if (!item.candle_begin_time) continue
+    const date = new Date(item.candle_begin_time)
+    if (Number.isNaN(date.getTime())) continue
+
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    yearsSet.add(year)
+
+    const key = `${year}-${month}`
+    const value = parseReturnValue(item.涨跌幅)
+    matrix.set(key, {
+      display: item.涨跌幅 || '-',
+      value,
+    })
+  }
+
+  // 解析年度汇总数据
+  for (const item of yearReturn) {
+    if (!item.candle_begin_time) continue
+    const date = new Date(item.candle_begin_time)
+    if (Number.isNaN(date.getTime())) continue
+
+    const year = date.getFullYear()
+    yearsSet.add(year)
+
+    const value = parseReturnValue(item.涨跌幅)
+    yearTotals.set(year, {
+      display: item.涨跌幅 || '-',
+      value,
+    })
+  }
+
+  // 按年份升序排列（从古到今）
+  const years = Array.from(yearsSet).sort((a, b) => a - b)
+
+  return { years, matrix, yearTotals }
+}
+
+/**
+ * 周期收益热力图组件
+ */
+function PeriodReturnHeatmap({
+  yearReturn,
+  quarterReturn,
+  monthReturn,
+}: {
+  yearReturn: PeriodReturn[]
+  quarterReturn: PeriodReturn[]
+  monthReturn: PeriodReturn[]
+}) {
+  // 没有任何周期数据时不展示
+  if (yearReturn.length === 0 && quarterReturn.length === 0 && monthReturn.length === 0) {
+    return null
+  }
+
+  const { years, matrix, yearTotals } = buildMonthlyMatrix(monthReturn, yearReturn)
+  const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+  // 如果没有月度数据但有年度数据，显示简化版
+  if (monthReturn.length === 0 && yearReturn.length > 0) {
+    return (
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
+          <BarChart3 className="h-4 w-4" />
+          年度收益
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {yearReturn.map((item, index) => {
+            const date = new Date(item.candle_begin_time)
+            const year = Number.isNaN(date.getTime()) ? '-' : date.getFullYear()
+            const value = parseReturnValue(item.涨跌幅)
+            const colorClass = value !== null
+              ? value >= 0 ? 'text-green-600' : 'text-red-600'
+              : ''
+
+            return (
+              <div
+                key={index}
+                className={cn(
+                  'rounded-md px-3 py-2',
+                  getReturnBgColor(value)
+                )}
+              >
+                <div className="text-xs text-muted-foreground">{year}年</div>
+                <div className={cn('text-sm font-semibold', colorClass)}>
+                  {item.涨跌幅 || '-'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
+        <BarChart3 className="h-4 w-4" />
+        周期收益
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr>
+              <th className="px-1 py-1.5 text-left font-medium text-muted-foreground">年份</th>
+              {months.map((m) => (
+                <th key={m} className="px-1 py-1.5 text-center font-medium text-muted-foreground">
+                  {m}月
+                </th>
+              ))}
+              <th className="px-1 py-1.5 text-center font-medium text-muted-foreground border-l">
+                全年
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {years.map((year) => {
+              const yearTotal = yearTotals.get(year)
+              const yearColorClass = yearTotal?.value !== null && yearTotal?.value !== undefined
+                ? yearTotal.value >= 0 ? 'text-green-600' : 'text-red-600'
+                : ''
+
+              return (
+                <tr key={year} className="border-t">
+                  <td className="px-1 py-1.5 font-medium">{year}</td>
+                  {months.map((month) => {
+                    const key = `${year}-${month}`
+                    const cell = matrix.get(key)
+                    const colorClass = cell?.value !== null && cell?.value !== undefined
+                      ? cell.value >= 0 ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'
+                      : 'text-muted-foreground'
+
+                    return (
+                      <td
+                        key={month}
+                        className={cn(
+                          'px-1 py-1.5 text-center font-mono',
+                          getReturnBgColor(cell?.value ?? null),
+                          colorClass
+                        )}
+                      >
+                        {cell?.display || '-'}
+                      </td>
+                    )
+                  })}
+                  <td
+                    className={cn(
+                      'px-1 py-1.5 text-center font-mono font-semibold border-l',
+                      getReturnBgColor(yearTotal?.value ?? null),
+                      yearColorClass
+                    )}
+                  >
+                    {yearTotal?.display || '-'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export function Component() {
   const { id } = useParams<{ id: string }>()
   const { data: strategy, isLoading, error } = useStrategy(id || '')
@@ -160,7 +390,17 @@ export function Component() {
   const factorList = parseJSON<string[]>(strategy.factor_list, [])
   const factorParams = parseJSON<Record<string, unknown>>(strategy.factor_params, {})
   const sortDirections = parseJSON<Record<string, boolean>>(strategy.sort_directions, {})
-  const equityCurve = parseJSON<Array<{ time: string; value: number }>>(strategy.equity_curve, [])
+
+  // 解析资金曲线数据（支持完整的多子图数据）
+  const equityCurve = parseJSON<EquityCurveDataPoint[]>(
+    strategy.equity_curve,
+    []
+  )
+
+  // 解析周期收益数据
+  const yearReturn = parseJSON<PeriodReturn[]>(strategy.year_return, [])
+  const quarterReturn = parseJSON<PeriodReturn[]>(strategy.quarter_return, [])
+  const monthReturn = parseJSON<PeriodReturn[]>(strategy.month_return, [])
 
   // 格式化因子显示（包含参数和排序方向）
   const formatFactorDisplay = () => {
@@ -375,13 +615,20 @@ export function Component() {
         </div>
       )}
 
-      {/* Equity Curve */}
+      {/* Equity Curve with Subplots */}
       {equityCurve.length > 0 && (
         <div className="rounded-lg border bg-card p-4">
           <h3 className="mb-3 text-sm font-medium">资金曲线</h3>
-          <EquityCurve data={equityCurve} height={350} />
+          <EquityCurveSubplots data={equityCurve} height={600} />
         </div>
       )}
+
+      {/* Period Returns */}
+      <PeriodReturnHeatmap
+        yearReturn={yearReturn}
+        quarterReturn={quarterReturn}
+        monthReturn={monthReturn}
+      />
 
       {/* Notes */}
       {strategy.notes && (

@@ -44,7 +44,7 @@ export interface Factor {
   tags?: string  // 标签（英文逗号分隔）
 
   // Status
-  verified: boolean  // 人工校验状态（通过/未审查）
+  verification_status: number  // 验证状态（0=未验证, 1=通过, 2=废弃）
   verify_note?: string
   excluded?: boolean  // 是否已排除
   exclude_reason?: string  // 排除原因
@@ -178,7 +178,7 @@ export interface FactorListParams {
   factor_type?: FactorType
   score_min?: number
   score_max?: number
-  verified?: boolean
+  verification_status?: number  // 验证状态（0=未验证, 1=通过, 2=废弃）
   excluded?: ExcludedFilter
   order_by?: string
   order_desc?: boolean
@@ -188,7 +188,8 @@ export interface FactorStats {
   total: number
   excluded: number
   scored: number
-  verified: number
+  passed: number  // 验证通过数量
+  failed: number  // 废弃（失败研究）数量
   avg_score?: number
   style_distribution: Record<string, number>
   score_distribution: Record<string, number>
@@ -220,7 +221,7 @@ export const FACTOR_COLUMNS: FactorColumn[] = [
   { key: 'llm_score', label: '评分', width: 70, sortable: true },
   { key: 'ic', label: 'IC', width: 70, sortable: true },
   { key: 'rank_ic', label: 'RankIC', width: 80, sortable: true },
-  { key: 'verified', label: '人工校验', width: 80, sortable: true },
+  { key: 'verification_status', label: '验证状态', width: 80, sortable: true },
   { key: 'created_at', label: '入库时间', width: 150, sortable: true },
 ]
 
@@ -231,7 +232,7 @@ export const DEFAULT_VISIBLE_COLUMNS: (keyof Factor)[] = [
   'tags',
   'formula',
   'llm_score',
-  'verified',
+  'verification_status',
   'created_at',
 ]
 

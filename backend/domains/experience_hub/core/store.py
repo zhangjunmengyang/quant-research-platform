@@ -198,7 +198,11 @@ class ExperienceStore(BaseStore[Experience]):
         return updated
 
     def delete(self, experience_id: int) -> bool:
-        """删除经验"""
+        """删除经验（同时删除关联的边）"""
+        # 先删除关联的边
+        self._delete_experience_edges(experience_id)
+
+        # 删除经验记录
         with self._cursor() as cursor:
             cursor.execute(
                 'DELETE FROM experience_links WHERE experience_id = %s',
@@ -209,6 +213,23 @@ class ExperienceStore(BaseStore[Experience]):
                 (experience_id,)
             )
             return cursor.rowcount > 0
+
+    def _delete_experience_edges(self, experience_id: int) -> None:
+        """删除经验关联的所有边"""
+        try:
+            from domains.mcp_core.edge.store import get_edge_store
+            from domains.mcp_core.edge.models import EdgeEntityType
+
+            edge_store = get_edge_store()
+            deleted_count = edge_store.delete_edges_by_entity(
+                EdgeEntityType.EXPERIENCE,
+                str(experience_id)
+            )
+            if deleted_count > 0:
+                logger.info(f"deleted_experience_edges: experience_id={experience_id}, count={deleted_count}")
+        except Exception as e:
+            # 边删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_experience_edges: {experience_id}, {e}")
 
     # ==================== 查询操作 ====================
 

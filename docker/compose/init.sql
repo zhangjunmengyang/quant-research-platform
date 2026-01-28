@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS factors (
 
     -- 评分和验证
     llm_score FLOAT,
-    verified BOOLEAN DEFAULT FALSE,
+    verification_status INTEGER DEFAULT 0,  -- 验证状态：0=未验证, 1=通过, 2=废弃
     verify_note TEXT DEFAULT '',
 
     -- 排除状态
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS factors (
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_factors_style ON factors(style);
 CREATE INDEX IF NOT EXISTS idx_factors_score ON factors(llm_score);
-CREATE INDEX IF NOT EXISTS idx_factors_verified ON factors(verified);
+CREATE INDEX IF NOT EXISTS idx_factors_verification_status ON factors(verification_status);
 CREATE INDEX IF NOT EXISTS idx_factors_uuid ON factors(uuid);
 CREATE INDEX IF NOT EXISTS idx_factors_factor_type ON factors(factor_type);
 CREATE INDEX IF NOT EXISTS idx_factors_excluded ON factors(excluded);

@@ -345,17 +345,30 @@ function FactorTable({
             }
             break
 
-          case 'verified':
+          case 'verification_status':
             column.align = 'center'
-            column.render = (value) => (
-              <div className="flex items-center justify-center">
-                {value ? (
-                  <Check className="h-4 w-4 text-success" />
-                ) : (
-                  <X className="h-4 w-4 text-muted-foreground/50" />
-                )}
-              </div>
-            )
+            column.render = (value) => {
+              const status = value as number
+              const VERIFICATION_STATUS = { UNVERIFIED: 0, PASSED: 1, FAILED: 2 }
+              return (
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-1 text-xs font-medium',
+                    status === VERIFICATION_STATUS.PASSED
+                      ? 'bg-success-muted text-success'
+                      : status === VERIFICATION_STATUS.FAILED
+                      ? 'bg-destructive-muted text-destructive'
+                      : 'bg-muted text-muted-foreground'
+                  )}
+                >
+                  {status === VERIFICATION_STATUS.PASSED
+                    ? '通过'
+                    : status === VERIFICATION_STATUS.FAILED
+                    ? '废弃'
+                    : '未验证'}
+                </span>
+              )
+            }
             break
 
           case 'ic':

@@ -23,7 +23,7 @@ function validateEnum<T extends string>(value: string | null, validValues: reado
 }
 
 // 各业务域的有效枚举值 (必须与 types.ts 中的定义保持一致)
-const FACTOR_ORDER_BY_VALUES = ['filename', 'verified', 'created_at'] as const
+const FACTOR_ORDER_BY_VALUES = ['filename', 'verification_status', 'created_at'] as const
 const FACTOR_EXCLUDED_VALUES: readonly ExcludedFilter[] = ['all', 'active', 'excluded']
 const FACTOR_TYPE_VALUES: readonly FactorType[] = ['time_series', 'cross_section']
 const STRATEGY_ORDER_BY_VALUES = ['created_at', 'updated_at', 'name'] as const
@@ -36,13 +36,14 @@ const NOTE_TYPE_VALUES: readonly NoteType[] = [NoteType.OBSERVATION, NoteType.HY
 // 将 URLSearchParams 转换为 FactorListParams
 export function paramsToFactorFilters(searchParams: URLSearchParams): FactorListParams {
   const factorType = searchParams.get('factor_type')
+  const verificationStatus = searchParams.get('verification_status')
   return {
     page: Number(searchParams.get('page')) || 1,
     page_size: Number(searchParams.get('page_size')) || 50,
     search: searchParams.get('search') || undefined,
     style: searchParams.get('style') || undefined,
     factor_type: factorType ? validateEnum(factorType, FACTOR_TYPE_VALUES, 'time_series') : undefined,
-    verified: searchParams.get('verified') === 'true' ? true : searchParams.get('verified') === 'false' ? false : undefined,
+    verification_status: verificationStatus ? Number(verificationStatus) : undefined,
     order_by: validateEnum(searchParams.get('order_by'), FACTOR_ORDER_BY_VALUES, 'filename'),
     excluded: searchParams.get('excluded')
       ? validateEnum(searchParams.get('excluded'), FACTOR_EXCLUDED_VALUES, 'active')
@@ -58,7 +59,7 @@ export function factorFiltersToParams(filters: Partial<FactorListParams>): Recor
   if (filters.search) params.search = filters.search
   if (filters.style) params.style = filters.style
   if (filters.factor_type) params.factor_type = filters.factor_type
-  if (filters.verified !== undefined) params.verified = String(filters.verified)
+  if (filters.verification_status !== undefined) params.verification_status = String(filters.verification_status)
   if (filters.order_by) params.order_by = filters.order_by
   if (filters.excluded) params.excluded = filters.excluded
   return params

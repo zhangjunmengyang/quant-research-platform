@@ -13,7 +13,8 @@ export interface PipelineStatus {
   total: number
   scored: number
   unscored: number
-  verified: number
+  passed: number  // 验证通过数量
+  failed: number  // 废弃（失败研究）数量
   pending: number
   score_distribution: Record<string, number>
   style_distribution: Record<string, number>
@@ -122,7 +123,7 @@ export interface IngestResult {
 export interface ReviewRequest {
   factors?: string[] | null
   fields?: string[]
-  filter_verified?: boolean | null
+  filter_verification_status?: number | null  // 验证状态筛选（0=未验证, 1=通过, 2=废弃）
   filter_score_min?: number | null
   filter_score_max?: number | null
   delay?: number  // 请求间隔时间（秒），用于适应低 RPM 场景

@@ -80,6 +80,49 @@ class MCPServerAdapter:
         # 注册处理器
         self._register_handlers()
 
+    def _coerce_tool_arguments(self, tool_name: str, arguments: dict) -> dict:
+        """
+        根据工具的 input_schema 转换参数类型
+
+        MCP 客户端（如 Claude）有时会将数字以字符串形式传入，
+        此方法根据工具定义的 schema 自动转换参数类型，
+        避免 jsonschema 验证失败。
+
+        Args:
+            tool_name: 工具名称
+            arguments: 原始参数
+
+        Returns:
+            类型转换后的参数
+        """
+        tool = self.base_server.tool_registry.get(tool_name)
+        if tool is None:
+            return arguments
+
+        schema = tool.input_schema
+        properties = schema.get("properties", {})
+        coerced = arguments.copy()
+
+        for field_name, value in arguments.items():
+            if field_name not in properties or value is None:
+                continue
+
+            prop_schema = properties[field_name]
+            expected_type = prop_schema.get("type")
+
+            try:
+                if expected_type == "integer" and isinstance(value, str):
+                    coerced[field_name] = int(value)
+                elif expected_type == "number" and isinstance(value, str):
+                    coerced[field_name] = float(value)
+                elif expected_type == "boolean" and isinstance(value, str):
+                    coerced[field_name] = value.lower() in ("true", "1", "yes")
+            except (ValueError, TypeError):
+                # 转换失败，保留原值，让 jsonschema 验证报错
+                pass
+
+        return coerced
+
     def _log_mcp_request(
         self,
         method: str,
@@ -163,13 +206,15 @@ class MCPServerAdapter:
 
             return result
 
-        @self.mcp_server.call_tool()
+        @self.mcp_server.call_tool(validate_input=False)
         async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             """调用工具"""
             start_time = time.time()
 
             try:
-                result = await self.base_server.tool_registry.execute(name, arguments)
+                # 类型转换：MCP 客户端可能将数字以字符串形式传入
+                coerced_arguments = self._coerce_tool_arguments(name, arguments)
+                result = await self.base_server.tool_registry.execute(name, coerced_arguments)
 
                 if result.success:
                     # 记录成功日志

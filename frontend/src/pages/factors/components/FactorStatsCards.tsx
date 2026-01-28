@@ -54,8 +54,8 @@ export function FactorStatsCards({ stats, statsLoading, pipelineStatus }: Factor
         icon={<BarChart3 className="h-5 w-5" />}
       />
       <StatsCard
-        title="已校验"
-        value={stats?.verified ?? 0}
+        title="验证通过"
+        value={stats?.passed ?? 0}
         icon={<CheckCircle className="h-5 w-5" />}
       />
       <StatsCard

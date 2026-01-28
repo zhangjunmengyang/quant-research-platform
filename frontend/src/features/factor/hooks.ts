@@ -123,6 +123,15 @@ export function useFactorMutations() {
     },
   })
 
+  const markFailedMutation = useMutation({
+    mutationFn: ({ filename, request }: { filename: string; request?: FactorVerifyRequest }) =>
+      factorApi.markFailed(filename, request),
+    onSuccess: (data) => {
+      queryClient.setQueryData(factorKeys.detail(data.filename), data)
+      invalidateListAndStats()
+    },
+  })
+
   const excludeMutation = useMutation({
     mutationFn: ({ filename, reason }: { filename: string; reason?: string }) =>
       factorApi.exclude(filename, reason),
@@ -145,6 +154,7 @@ export function useFactorMutations() {
     deleteFactor: deleteMutation,
     verifyFactor: verifyMutation,
     unverifyFactor: unverifyMutation,
+    markFailedFactor: markFailedMutation,
     excludeFactor: excludeMutation,
     unexcludeFactor: unexcludeMutation,
   }

@@ -111,7 +111,7 @@ class CompareFactorsTool(BaseTool):
                         "filename": filename,
                         "style": factor.style,
                         "llm_score": factor.llm_score,
-                        "verified": factor.verified,
+                        "verification_status": factor.verification_status,
                     })
 
             if len(comparisons) < 2:

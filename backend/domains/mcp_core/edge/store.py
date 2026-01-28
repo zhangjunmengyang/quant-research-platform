@@ -175,6 +175,68 @@ class EdgeStore(ThreadSafeConnectionMixin):
                 self._trigger_edge_sync(edge)
             return deleted
 
+    def delete_edges_by_entity(
+        self,
+        entity_type: EdgeEntityType,
+        entity_id: str,
+    ) -> int:
+        """
+        删除与实体相关的所有边（作为 source 或 target）
+
+        用于实体删除时的级联清理。
+
+        Args:
+            entity_type: 实体类型
+            entity_id: 实体 ID
+
+        Returns:
+            删除的边数量
+        """
+        entity_type_value = entity_type.value if isinstance(entity_type, EdgeEntityType) else entity_type
+
+        # 先获取所有相关边，用于触发同步
+        edges_as_source = self.get_edges_by_entity(entity_type, entity_id, include_bidirectional=False)
+        edges_as_target = self.get_edges_to_entity(entity_type, entity_id)
+
+        # 收集需要同步的关系类型
+        affected_relations = set()
+        for edge in edges_as_source + edges_as_target:
+            relation = edge.relation.value if hasattr(edge.relation, 'value') else edge.relation
+            affected_relations.add(relation)
+
+        # 执行删除
+        with self._cursor() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM knowledge_edges
+                WHERE (source_type = %s AND source_id = %s)
+                   OR (target_type = %s AND target_id = %s)
+                """,
+                (entity_type_value, entity_id, entity_type_value, entity_id),
+            )
+            deleted_count = cursor.rowcount
+
+        if deleted_count > 0:
+            logger.info(f"级联删除边: {entity_type_value}:{entity_id}, 共 {deleted_count} 条")
+            # 触发每种关系类型的同步
+            for relation in affected_relations:
+                try:
+                    from domains.mcp_core.sync.trigger import SyncTrigger
+                    trigger = SyncTrigger.get_instance()
+                    # 构建临时 edge 触发同步
+                    temp_edge = KnowledgeEdge(
+                        source_type=entity_type,
+                        source_id=entity_id,
+                        target_type=entity_type,
+                        target_id=entity_id,
+                        relation=EdgeRelationType(relation) if isinstance(relation, str) else relation,
+                    )
+                    trigger.sync_edge(temp_edge)
+                except Exception as e:
+                    logger.warning(f"边同步触发失败: {relation}, {e}")
+
+        return deleted_count
+
     def exists(
         self,
         source_type: EdgeEntityType,

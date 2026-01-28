@@ -37,7 +37,8 @@ class PipelineStatus(BaseModel):
     total: int = Field(description="Total factors in database")
     scored: int = Field(description="Factors with LLM score")
     unscored: int = Field(description="Factors without LLM score")
-    verified: int = Field(description="Verified factors")
+    passed: int = Field(description="Passed factors")
+    failed: int = Field(description="Failed research factors")
     pending: int = Field(description="Pending factors to ingest")
     score_distribution: Dict[str, int] = Field(default_factory=dict)
     style_distribution: Dict[str, int] = Field(default_factory=dict)
@@ -141,7 +142,7 @@ class ReviewRequest(BaseModel):
     fields: List[str] = Field(
         default=["style", "formula"], description="Fields to review"
     )
-    filter_verified: Optional[bool] = Field(default=None)
+    filter_verification_status: Optional[int] = Field(default=None, description="验证状态筛选（0=未验证, 1=通过, 2=废弃）")
     filter_score_min: Optional[float] = Field(default=None)
     filter_score_max: Optional[float] = Field(default=None)
     concurrency: int = Field(default=1, ge=1, le=10, description="Number of concurrent LLM calls")
@@ -285,7 +286,8 @@ async def get_pipeline_status(store=Depends(get_factor_store)):
                 total=stats.get("total", 0),
                 scored=stats.get("scored", 0),
                 unscored=stats.get("unscored", 0),
-                verified=stats.get("verified", 0),
+                passed=stats.get("passed", 0),
+                failed=stats.get("failed", 0),
                 pending=pending_count,
                 score_distribution=stats.get("score_distribution", {}),
                 style_distribution=stats.get("style_distribution", {}),
@@ -713,8 +715,8 @@ async def review_factors(
 
         # Build filter condition
         filter_condition = {}
-        if request.filter_verified is not None:
-            filter_condition["verified"] = 1 if request.filter_verified else 0
+        if request.filter_verification_status is not None:
+            filter_condition["verification_status"] = request.filter_verification_status
 
         # 支持范围过滤：同时指定 min 和 max 时使用列表形式
         score_filters = []
@@ -813,7 +815,7 @@ def _get_factor_variables() -> List[PromptVariable]:
         PromptVariable(name="turnover", desc="换手率", type="float"),
         PromptVariable(name="decay", desc="IC半衰期 (周期数)", type="int"),
         # 验证状态
-        PromptVariable(name="verified", desc="是否已验证 (0/1)", type="int"),
+        PromptVariable(name="verification_status", desc="验证状态 (0=未验证, 1=通过, 2=废弃)", type="int"),
         PromptVariable(name="verify_note", desc="验证备注", type="str"),
         # 分类标签
         PromptVariable(name="market_regime", desc="适用市场环境 (牛市/熊市/震荡)", type="str"),

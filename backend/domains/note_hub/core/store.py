@@ -178,11 +178,14 @@ class NoteStore(BaseStore[Note]):
         return updated
 
     def delete(self, note_id: int) -> bool:
-        """删除笔记（同时删除数据库记录和对应的文件）"""
+        """删除笔记（同时删除数据库记录、关联边和对应的文件）"""
         # 先获取笔记信息，用于后续删除文件
         note = self.get(note_id)
         if note is None:
             return False
+
+        # 删除关联的边
+        self._delete_note_edges(note_id)
 
         # 删除数据库记录
         with self._cursor() as cursor:
@@ -194,6 +197,23 @@ class NoteStore(BaseStore[Note]):
             self._delete_note_file(note)
 
         return deleted
+
+    def _delete_note_edges(self, note_id: int) -> None:
+        """删除笔记关联的所有边"""
+        try:
+            from domains.mcp_core.edge.store import get_edge_store
+            from domains.mcp_core.edge.models import EdgeEntityType
+
+            edge_store = get_edge_store()
+            deleted_count = edge_store.delete_edges_by_entity(
+                EdgeEntityType.NOTE,
+                str(note_id)
+            )
+            if deleted_count > 0:
+                logger.info(f"deleted_note_edges: note_id={note_id}, count={deleted_count}")
+        except Exception as e:
+            # 边删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_note_edges: {note_id}, {e}")
 
     def _delete_note_file(self, note: Note) -> None:
         """删除笔记对应的文件"""

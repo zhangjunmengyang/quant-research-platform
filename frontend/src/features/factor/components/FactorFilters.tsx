@@ -18,11 +18,12 @@ const FACTOR_TYPE_OPTIONS: SelectOption[] = [
   { value: 'cross_section', label: FACTOR_TYPE_LABELS.cross_section },
 ]
 
-// 验证状态选项
-const VERIFIED_OPTIONS: SelectOption[] = [
+// 验证状态选项（0=未验证, 1=通过, 2=废弃）
+const VERIFICATION_STATUS_OPTIONS: SelectOption[] = [
   { value: '', label: '全部状态' },
-  { value: 'true', label: '已校验' },
-  { value: 'false', label: '未审查' },
+  { value: '0', label: '未验证' },
+  { value: '1', label: '通过' },
+  { value: '2', label: '废弃' },
 ]
 
 // 排除状态选项
@@ -57,7 +58,7 @@ export function FactorFilters({ filters, setFilters, resetFilters, onSearch, sea
     searchValue ||
     filters.factor_type ||
     filters.style ||
-    filters.verified !== undefined ||
+    filters.verification_status !== undefined ||
     (filters.excluded && filters.excluded !== 'active')
   )
 
@@ -87,12 +88,12 @@ export function FactorFilters({ filters, setFilters, resetFilters, onSearch, sea
         onChange={(value) => setFilters({ style: value || undefined, page: 1 })}
       />
       <FilterSelect
-        label="校验"
-        options={VERIFIED_OPTIONS}
-        value={filters.verified === undefined ? undefined : String(filters.verified)}
+        label="验证"
+        options={VERIFICATION_STATUS_OPTIONS}
+        value={filters.verification_status === undefined ? undefined : String(filters.verification_status)}
         onChange={(value) =>
           setFilters({
-            verified: value === undefined ? undefined : value === 'true',
+            verification_status: value === undefined || value === '' ? undefined : Number(value),
             page: 1,
           })
         }

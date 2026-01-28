@@ -19,16 +19,29 @@ from domains.mcp_core.server.server import run_server as mcp_run_server
 
 from .tools.data_tools import (
     ListSymbolsTool,
-    GetKlineTool,
     GetSymbolInfoTool,
+    GetCoinMetadataTool,
 )
 from .tools.factor_tools import (
     ListFactorsTool,
     CalculateFactorTool,
+    GetSymbolRankAtTool,
     GetFactorRankingTool,
 )
 from .tools.market_tools import (
     GetMarketOverviewTool,
+    DetectKlinePatternsTool,
+)
+from .tools.research_tools import (
+    CalculateReturnsTool,
+    CalculateDrawdownTool,
+    FindPeaksTroughsTool,
+    CalculateStageStatsTool,
+)
+from .tools.signal_tools import (
+    DetectSymbolEventsTool,
+    ScreenMarketTool,
+    SimulateHoldingStrategyTool,
 )
 from .tools.tag_tools import (
     AddTagTool,
@@ -58,16 +71,29 @@ class DataHubMCPServer(BaseMCPServer):
         """注册数据模块工具"""
         # 数据查询工具
         self.register_tool(ListSymbolsTool(), "data")
-        self.register_tool(GetKlineTool(), "data")
         self.register_tool(GetSymbolInfoTool(), "data")
+        self.register_tool(GetCoinMetadataTool(), "data")
 
         # 因子计算工具
         self.register_tool(ListFactorsTool(), "factor")
         self.register_tool(CalculateFactorTool(), "factor")
+        self.register_tool(GetSymbolRankAtTool(), "factor")
         self.register_tool(GetFactorRankingTool(), "factor")
 
         # 市场分析工具
         self.register_tool(GetMarketOverviewTool(), "market")
+        self.register_tool(DetectKlinePatternsTool(), "market")
+
+        # 研究分析工具
+        self.register_tool(CalculateReturnsTool(), "research")
+        self.register_tool(CalculateDrawdownTool(), "research")
+        self.register_tool(FindPeaksTroughsTool(), "research")
+        self.register_tool(CalculateStageStatsTool(), "research")
+
+        # 信号分析工具
+        self.register_tool(DetectSymbolEventsTool(), "signal")
+        self.register_tool(ScreenMarketTool(), "signal")
+        self.register_tool(SimulateHoldingStrategyTool(), "signal")
 
         # 标签管理工具
         self.register_tool(AddTagTool(), "tag")

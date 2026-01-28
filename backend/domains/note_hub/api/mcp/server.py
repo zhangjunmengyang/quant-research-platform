@@ -5,7 +5,7 @@ MCP Server - 笔记知识库 MCP 服务器
 使用 Streamable HTTP 传输协议（MCP 2025-03-26 规范推荐）。
 
 Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
-- 基础 CRUD（create_note, update_note, get_note, list_notes, search_notes）
+- 基础 CRUD（create_note, update_note, delete_note, get_note, list_notes, search_notes）
 - 研究流程：通过 create_note 的 note_type 参数区分
   - observation: 观察 - 对数据或现象的客观记录
   - hypothesis: 假设 - 基于观察提出的待验证假说
@@ -31,6 +31,7 @@ from .tools.note_tools import (
     # 基础 CRUD
     CreateNoteTool,
     UpdateNoteTool,
+    DeleteNoteTool,
     SearchNotesTool,
     GetNoteTool,
     ListNotesTool,
@@ -41,6 +42,7 @@ from .tools.note_tools import (
     PromoteToExperienceTool,
     # 知识边关联
     LinkNoteTool,
+    UnlinkNoteTool,
     GetNoteEdgesTool,
     TraceNoteLineageTool,
 )
@@ -66,9 +68,10 @@ class NoteHubMCPServer(BaseMCPServer):
         self.register_tool(GetNoteTool(), "query")
         self.register_tool(SearchNotesTool(), "query")
 
-        # 基础创建和更新工具
+        # 基础创建、更新和删除工具
         self.register_tool(CreateNoteTool(), "mutation")
         self.register_tool(UpdateNoteTool(), "mutation")
+        self.register_tool(DeleteNoteTool(), "mutation")
 
         # 归档管理工具
         self.register_tool(ArchiveNoteTool(), "mutation")
@@ -79,6 +82,7 @@ class NoteHubMCPServer(BaseMCPServer):
 
         # 知识边关联工具
         self.register_tool(LinkNoteTool(), "mutation")
+        self.register_tool(UnlinkNoteTool(), "mutation")
         self.register_tool(GetNoteEdgesTool(), "query")
         self.register_tool(TraceNoteLineageTool(), "query")
 

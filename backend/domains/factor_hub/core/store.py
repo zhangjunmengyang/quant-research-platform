@@ -41,7 +41,7 @@ class FactorStore(BaseStore[Factor]):
     allowed_columns = {
         'filename', 'factor_type', 'uuid', 'style', 'formula', 'input_data',
         'value_range', 'description', 'analysis', 'code_path', 'code_content',
-        'llm_score', 'ic', 'rank_ic', 'verified', 'verify_note',
+        'llm_score', 'ic', 'rank_ic', 'verification_status', 'verify_note',
         'created_at', 'updated_at', 'backtest_sharpe', 'backtest_ic',
         'backtest_ir', 'turnover', 'decay', 'market_regime',
         'best_holding_period', 'tags', 'code_complexity',
@@ -70,7 +70,7 @@ class FactorStore(BaseStore[Factor]):
         '因子分析': 'analysis',
         '代码': 'code_path',
         '大模型评分': 'llm_score',
-        '已验证': 'verified',
+        '验证状态': 'verification_status',
         '验证备注': 'verify_note',
     }
 
@@ -82,9 +82,9 @@ class FactorStore(BaseStore[Factor]):
 
     def _row_to_factor(self, row: Dict[str, Any]) -> Factor:
         """将数据库行转换为 Factor 对象"""
-        # 处理 PostgreSQL 的布尔值 -> int（Factor 模型中定义为 int）
-        if 'verified' in row:
-            row['verified'] = 1 if row['verified'] else 0
+        # 处理 PostgreSQL 的整数字段
+        if 'verification_status' in row:
+            row['verification_status'] = int(row['verification_status']) if row['verification_status'] is not None else 0
         if 'excluded' in row:
             row['excluded'] = 1 if row['excluded'] else 0
 
@@ -144,7 +144,7 @@ class FactorStore(BaseStore[Factor]):
                     INSERT INTO factors (
                         filename, factor_type, uuid, style, formula, input_data, value_range,
                         description, analysis, code_path, code_content, llm_score,
-                        ic, rank_ic, verified, verify_note, created_at, updated_at,
+                        ic, rank_ic, verification_status, verify_note, created_at, updated_at,
                         backtest_sharpe, backtest_ic, backtest_ir, turnover, decay,
                         market_regime, best_holding_period, tags, code_complexity,
                         last_backtest_date, excluded, exclude_reason, param_analysis
@@ -156,7 +156,7 @@ class FactorStore(BaseStore[Factor]):
                     factor.filename, factor.factor_type, factor.uuid, factor.style,
                     factor.formula, factor.input_data, factor.value_range, factor.description,
                     factor.analysis, factor.code_path, factor.code_content,
-                    factor.llm_score, factor.ic, factor.rank_ic, bool(factor.verified),
+                    factor.llm_score, factor.ic, factor.rank_ic, factor.verification_status,
                     factor.verify_note, factor.created_at, factor.updated_at,
                     factor.backtest_sharpe, factor.backtest_ic, factor.backtest_ir,
                     factor.turnover, factor.decay, factor.market_regime,
@@ -182,10 +182,9 @@ class FactorStore(BaseStore[Factor]):
         safe_fields['updated_at'] = datetime.now()
 
         # 处理布尔字段
-        if 'verified' in safe_fields:
-            safe_fields['verified'] = bool(safe_fields['verified'])
         if 'excluded' in safe_fields:
             safe_fields['excluded'] = bool(safe_fields['excluded'])
+        # verification_status 是整数 (0/1/2)，不需要特殊处理
 
         set_clause = ', '.join(f'{k} = %s' for k in safe_fields.keys())
         values = list(safe_fields.values()) + [filename]
@@ -213,10 +212,31 @@ class FactorStore(BaseStore[Factor]):
             logger.debug(f"factor_metadata_sync_trigger_skipped: {filename}, {e}")
 
     def delete(self, filename: str) -> bool:
-        """删除因子"""
+        """删除因子（同时删除关联的边）"""
+        # 先删除关联的边
+        self._delete_factor_edges(filename)
+
+        # 删除因子记录
         with self._cursor() as cursor:
             cursor.execute('DELETE FROM factors WHERE filename = %s', (filename,))
             return cursor.rowcount > 0
+
+    def _delete_factor_edges(self, filename: str) -> None:
+        """删除因子关联的所有边"""
+        try:
+            from domains.mcp_core.edge.store import get_edge_store
+            from domains.mcp_core.edge.models import EdgeEntityType
+
+            edge_store = get_edge_store()
+            deleted_count = edge_store.delete_edges_by_entity(
+                EdgeEntityType.FACTOR,
+                filename
+            )
+            if deleted_count > 0:
+                logger.info(f"deleted_factor_edges: factor={filename}, count={deleted_count}")
+        except Exception as e:
+            # 边删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_factor_edges: {filename}, {e}")
 
     # ==================== 批量操作 ====================
 
@@ -285,9 +305,15 @@ class FactorStore(BaseStore[Factor]):
         """获取未评分的因子"""
         return self.query({'llm_score': 'empty'})
 
-    def get_verified(self) -> List[Factor]:
-        """获取已验证的因子"""
-        return self.query({'verified': True})
+    def get_passed(self) -> List[Factor]:
+        """获取验证通过的因子"""
+        from .models import VerificationStatus
+        return self.query({'verification_status': VerificationStatus.PASSED})
+
+    def get_failed(self) -> List[Factor]:
+        """获取废弃（失败研究）的因子"""
+        from .models import VerificationStatus
+        return self.query({'verification_status': VerificationStatus.FAILED})
 
     def get_low_score(self, threshold: float = 2.0) -> List[Factor]:
         """获取低分因子"""
@@ -322,7 +348,8 @@ class FactorStore(BaseStore[Factor]):
                 SELECT
                     COUNT(*) FILTER (WHERE excluded = FALSE) as total,
                     COUNT(*) FILTER (WHERE excluded = FALSE AND llm_score IS NOT NULL) as scored,
-                    COUNT(*) FILTER (WHERE excluded = FALSE AND verified = TRUE) as verified,
+                    COUNT(*) FILTER (WHERE excluded = FALSE AND verification_status = 1) as passed,
+                    COUNT(*) FILTER (WHERE excluded = FALSE AND verification_status = 2) as failed,
                     COUNT(*) FILTER (WHERE excluded = TRUE) as excluded_count,
                     AVG(llm_score) FILTER (WHERE excluded = FALSE AND llm_score IS NOT NULL) as avg_score,
                     MIN(llm_score) FILTER (WHERE excluded = FALSE AND llm_score IS NOT NULL) as min_score,
@@ -333,7 +360,8 @@ class FactorStore(BaseStore[Factor]):
 
             total = stats_row['total'] or 0
             scored = stats_row['scored'] or 0
-            verified = stats_row['verified'] or 0
+            passed = stats_row['passed'] or 0
+            failed = stats_row['failed'] or 0
             excluded_count = stats_row['excluded_count'] or 0
 
             def safe_float(val, default=0.0, decimals=None):
@@ -427,7 +455,8 @@ class FactorStore(BaseStore[Factor]):
             'total': total,
             'scored': scored,
             'unscored': total - scored,
-            'verified': verified,
+            'passed': passed,
+            'failed': failed,
             'excluded': excluded_count,
             'score_distribution': score_dist,
             'style_distribution': style_dist,
@@ -439,13 +468,30 @@ class FactorStore(BaseStore[Factor]):
 
     # ==================== 状态管理 ====================
 
-    def verify(self, filename: str, note: str = "") -> bool:
-        """标记因子为已验证"""
-        return self.update(filename, verified=True, verify_note=note)
+    def set_verification_status(self, filename: str, status: int, note: str = "") -> bool:
+        """设置因子验证状态
 
-    def unverify(self, filename: str) -> bool:
-        """取消因子验证状态"""
-        return self.update(filename, verified=False, verify_note="")
+        Args:
+            filename: 因子文件名
+            status: 验证状态 (0=未验证, 1=通过, 2=废弃)
+            note: 验证备注
+        """
+        return self.update(filename, verification_status=status, verify_note=note)
+
+    def mark_as_passed(self, filename: str, note: str = "") -> bool:
+        """标记因子为验证通过"""
+        from .models import VerificationStatus
+        return self.set_verification_status(filename, VerificationStatus.PASSED, note)
+
+    def mark_as_failed(self, filename: str, note: str = "") -> bool:
+        """标记因子为废弃（失败研究）"""
+        from .models import VerificationStatus
+        return self.set_verification_status(filename, VerificationStatus.FAILED, note)
+
+    def reset_verification(self, filename: str) -> bool:
+        """重置因子验证状态为未验证"""
+        from .models import VerificationStatus
+        return self.set_verification_status(filename, VerificationStatus.UNVERIFIED, "")
 
     # ==================== 排除因子管理 ====================
 
@@ -564,9 +610,16 @@ class FactorStore(BaseStore[Factor]):
         lines = [
             "# 因子目录",
             "",
-            "| 文件名 | 因子风格 | 核心公式 | 输入数据 | 值域 | 刻画特征 | 因子分析 | 代码 | 大模型评分 | 已验证 | 验证备注 |",
-            "|--------|----------|----------|----------|------|----------|----------|------|------------|--------|----------|",
+            "| 文件名 | 因子风格 | 核心公式 | 输入数据 | 值域 | 刻画特征 | 因子分析 | 代码 | 大模型评分 | 验证状态 | 验证备注 |",
+            "|--------|----------|----------|----------|------|----------|----------|------|------------|----------|----------|",
         ]
+
+        from .models import VerificationStatus
+        status_map = {
+            VerificationStatus.UNVERIFIED: '',
+            VerificationStatus.PASSED: '通过',
+            VerificationStatus.FAILED: '废弃',
+        }
 
         for f in factors:
             def escape(s):
@@ -575,9 +628,9 @@ class FactorStore(BaseStore[Factor]):
                 return str(s).replace('|', '\\|').replace('\n', ' ')
 
             score = f'{f.llm_score:.1f}' if f.llm_score is not None else ''
-            verified = 'v' if f.verified else ''
+            status = status_map.get(f.verification_status, '')
 
-            line = f"| {escape(f.filename)} | {escape(f.style)} | {escape(f.formula)} | {escape(f.input_data)} | {escape(f.value_range)} | {escape(f.description)} | {escape(f.analysis)} | {escape(f.code_path)} | {score} | {verified} | {escape(f.verify_note)} |"
+            line = f"| {escape(f.filename)} | {escape(f.style)} | {escape(f.formula)} | {escape(f.input_data)} | {escape(f.value_range)} | {escape(f.description)} | {escape(f.analysis)} | {escape(f.code_path)} | {score} | {status} | {escape(f.verify_note)} |"
             lines.append(line)
 
         content = '\n'.join(lines) + '\n'

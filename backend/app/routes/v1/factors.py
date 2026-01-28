@@ -41,7 +41,7 @@ async def list_factors(
     factor_type: Optional[FactorTypeEnum] = None,
     score_min: Optional[float] = Query(None, ge=0, le=5),
     score_max: Optional[float] = Query(None, ge=0, le=5),
-    verified: Optional[bool] = None,
+    verification_status: Optional[int] = Query(None, description="验证状态筛选（0=未验证, 1=通过, 2=废弃）"),
     excluded: ExcludedFilter = Query(ExcludedFilter.ACTIVE, description="排除状态筛选"),
     order_by: str = "created_at",
     order_desc: bool = True,
@@ -73,8 +73,8 @@ async def list_factors(
     if score_filters:
         filter_condition["llm_score"] = score_filters if len(score_filters) > 1 else score_filters[0]
 
-    if verified is not None:
-        filter_condition["verified"] = verified
+    if verification_status is not None:
+        filter_condition["verification_status"] = verification_status
 
     # 处理排除状态筛选
     include_excluded = False
@@ -133,7 +133,8 @@ async def get_stats(service=Depends(get_factor_service)):
             total=stats.get("total", 0),
             excluded=stats.get("excluded", 0),
             scored=stats.get("scored", 0),
-            verified=stats.get("verified", 0),
+            passed=stats.get("passed", 0),
+            failed=stats.get("failed", 0),
             avg_score=score_stats.get("avg"),
             style_distribution=stats.get("style_distribution", {}),
             score_distribution=stats.get("score_distribution", {}),
@@ -202,36 +203,53 @@ async def delete_factor(
     return ApiResponse(message="删除成功")
 
 
-@router.post("/{filename}/verify", response_model=ApiResponse[Factor])
-async def verify_factor(
+@router.post("/{filename}/pass", response_model=ApiResponse[Factor])
+async def mark_factor_passed(
     request: FactorVerifyRequest = None,
     factor=Depends(get_factor_or_404),
     service=Depends(get_factor_service),
 ):
-    """验证因子"""
+    """标记因子为验证通过"""
     note = request.note if request else None
     filename = factor.filename
-    success = await run_sync(service.verify_factor, filename, note or "")
+    success = await run_sync(service.mark_factor_as_passed, filename, note or "")
     if not success:
-        raise HTTPException(status_code=500, detail="验证失败")
+        raise HTTPException(status_code=500, detail="标记失败")
 
     updated = await run_sync(service.get_factor, filename)
-    return ApiResponse(data=Factor(**model_to_dict(updated)), message="验证成功")
+    return ApiResponse(data=Factor(**model_to_dict(updated)), message="已标记为通过")
 
 
-@router.post("/{filename}/unverify", response_model=ApiResponse[Factor])
-async def unverify_factor(
+@router.post("/{filename}/fail", response_model=ApiResponse[Factor])
+async def mark_factor_failed(
+    request: FactorVerifyRequest = None,
     factor=Depends(get_factor_or_404),
     service=Depends(get_factor_service),
 ):
-    """取消验证"""
+    """标记因子为废弃（失败研究）"""
+    note = request.note if request else None
     filename = factor.filename
-    success = await run_sync(service.unverify_factor, filename)
+    success = await run_sync(service.mark_factor_as_failed, filename, note or "")
     if not success:
-        raise HTTPException(status_code=500, detail="取消验证失败")
+        raise HTTPException(status_code=500, detail="标记失败")
 
     updated = await run_sync(service.get_factor, filename)
-    return ApiResponse(data=Factor(**model_to_dict(updated)), message="已取消验证")
+    return ApiResponse(data=Factor(**model_to_dict(updated)), message="已标记为废弃")
+
+
+@router.post("/{filename}/reset-verification", response_model=ApiResponse[Factor])
+async def reset_factor_verification(
+    factor=Depends(get_factor_or_404),
+    service=Depends(get_factor_service),
+):
+    """重置因子验证状态为未验证"""
+    filename = factor.filename
+    success = await run_sync(service.reset_factor_verification, filename)
+    if not success:
+        raise HTTPException(status_code=500, detail="重置失败")
+
+    updated = await run_sync(service.get_factor, filename)
+    return ApiResponse(data=Factor(**model_to_dict(updated)), message="已重置验证状态")
 
 
 @router.post("/", response_model=ApiResponse[FactorCreateResponse])
@@ -352,3 +370,41 @@ async def unexclude_factor(
 
     updated = await run_sync(service.get_factor, filename)
     return ApiResponse(data=Factor(**model_to_dict(updated)), message="已取消排除")
+
+
+# ===== 一致性检测和清理 =====
+
+
+@router.get("/consistency/check", response_model=ApiResponse)
+async def check_consistency(service=Depends(get_factor_service)):
+    """
+    检测因子库一致性
+
+    对比代码文件、数据库记录、元数据YAML三者是否同步。
+
+    返回：
+    - is_consistent: 是否一致
+    - orphan_db_records: 数据库中存在但代码文件已删除的因子
+    - orphan_metadata: 元数据存在但代码文件已删除的因子
+    """
+    result = await run_sync(service.check_consistency)
+    return ApiResponse(data=result)
+
+
+@router.post("/consistency/cleanup", response_model=ApiResponse)
+async def cleanup_orphans(
+    dry_run: bool = Query(True, description="是否仅预览（不实际删除）"),
+    service=Depends(get_factor_service),
+):
+    """
+    清理孤立数据
+
+    删除代码文件已不存在但数据库/元数据仍残留的记录。
+
+    参数：
+    - dry_run: 是否仅预览（默认 true，不实际删除）
+
+    设置 dry_run=false 才会实际执行删除操作。
+    """
+    result = await run_sync(service.cleanup_orphans, dry_run=dry_run)
+    return ApiResponse(data=result, message="预览完成" if dry_run else "清理完成")
