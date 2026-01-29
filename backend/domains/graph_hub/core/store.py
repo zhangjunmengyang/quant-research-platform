@@ -24,6 +24,7 @@ from neo4j.exceptions import (
 
 from .models import (
     GraphEdge,
+    LEGACY_RELATION_MAPPING,
     LineageNode,
     LineageResult,
     NodeType,
@@ -151,6 +152,7 @@ class GraphStore:
         创建边
 
         使用 MERGE 语义，如果边已存在则更新属性。
+        subtype 存储为关系属性。
 
         Args:
             edge: GraphEdge 对象
@@ -177,6 +179,7 @@ class GraphStore:
                 MERGE (t:{target_label} {{id: $target_id}})
                 MERGE (s)-[r:{relation_type}]->(t)
                 SET r.created_at = datetime(),
+                    r.subtype = $subtype,
                     r.is_bidirectional = $is_bidirectional,
                     r.metadata = $metadata
                 RETURN r
@@ -186,15 +189,17 @@ class GraphStore:
                     cypher,
                     source_id=edge.source_id,
                     target_id=edge.target_id,
+                    subtype=edge.subtype,
                     is_bidirectional=edge.is_bidirectional,
                     metadata=metadata_json,
                 )
 
                 record = result.single()
                 if record is not None:
+                    subtype_str = f":{edge.subtype}" if edge.subtype else ""
                     logger.info(
                         f"创建边成功: {source_label}:{edge.source_id} "
-                        f"-[{relation_type}]-> {target_label}:{edge.target_id}"
+                        f"-[{relation_type}{subtype_str}]-> {target_label}:{edge.target_id}"
                     )
                     return True
                 return False
@@ -295,6 +300,7 @@ class GraphStore:
                        labels(t)[0] as target_type,
                        t.id as target_id,
                        type(r) as relation,
+                       r.subtype as subtype,
                        r.is_bidirectional as is_bidirectional,
                        r.metadata as metadata,
                        r.created_at as created_at
@@ -315,6 +321,7 @@ class GraphStore:
                            labels(t)[0] as target_type,
                            t.id as target_id,
                            type(r) as relation,
+                           r.subtype as subtype,
                            r.is_bidirectional as is_bidirectional,
                            r.metadata as metadata,
                            r.created_at as created_at
@@ -361,6 +368,7 @@ class GraphStore:
                        labels(t)[0] as target_type,
                        t.id as target_id,
                        type(r) as relation,
+                       r.subtype as subtype,
                        r.is_bidirectional as is_bidirectional,
                        r.metadata as metadata,
                        r.created_at as created_at
@@ -524,7 +532,8 @@ class GraphStore:
                     RETURN idx as depth,
                            labels(node)[0] as node_type,
                            node.id as node_id,
-                           type(rel) as relation
+                           type(rel) as relation,
+                           rel.subtype as subtype
                     ORDER BY depth
                     """
                 else:
@@ -538,7 +547,8 @@ class GraphStore:
                     RETURN depth,
                            labels(node)[0] as node_type,
                            node.id as node_id,
-                           type(rel) as relation
+                           type(rel) as relation,
+                           rel.subtype as subtype
                     ORDER BY depth
                     """
 
@@ -552,11 +562,15 @@ class GraphStore:
                         continue
                     seen.add(node_key)
 
+                    relation, subtype = self._parse_relation_with_subtype(
+                        record["relation"], record.get("subtype")
+                    )
                     node = LineageNode(
                         depth=record["depth"],
                         node_type=self._parse_node_type(record["node_type"]),
                         node_id=record["node_id"],
-                        relation=self._parse_relation_type(record["relation"]),
+                        relation=relation,
+                        subtype=subtype,
                         direction=direction,
                     )
                     result.nodes.append(node)
@@ -654,6 +668,7 @@ class GraphStore:
                 return result
 
     # ==================== 标签操作 ====================
+    # 标签作为节点属性 (tags: list[str]) 存储，不再使用关系
 
     def add_tag(
         self,
@@ -664,7 +679,7 @@ class GraphStore:
         """
         给实体添加标签
 
-        通过创建到 Tag 节点的 HAS_TAG 边实现。
+        将标签添加到节点的 tags 属性数组中。
 
         Args:
             entity_type: 实体类型
@@ -674,14 +689,36 @@ class GraphStore:
         Returns:
             是否添加成功
         """
-        edge = GraphEdge(
-            source_type=entity_type,
-            source_id=entity_id,
-            target_type=NodeType.TAG,
-            target_id=tag,
-            relation=RelationType.HAS_TAG,
-        )
-        return self.create_edge(edge)
+        with self._session() as session:
+            if session is None:
+                logger.warning("Neo4j 不可用，跳过添加标签")
+                return False
+
+            try:
+                label = self._get_label(entity_type)
+
+                # 使用 COALESCE 处理 tags 不存在的情况
+                # 使用集合操作确保不重复
+                cypher = f"""
+                MATCH (e:{label} {{id: $entity_id}})
+                SET e.tags = CASE
+                    WHEN e.tags IS NULL THEN [$tag]
+                    WHEN NOT $tag IN e.tags THEN e.tags + $tag
+                    ELSE e.tags
+                END
+                RETURN e.tags as tags
+                """
+
+                result = session.run(cypher, entity_id=entity_id, tag=tag)
+                record = result.single()
+                if record is not None:
+                    logger.info(f"添加标签成功: {label}:{entity_id} <- {tag}")
+                    return True
+                return False
+
+            except Neo4jError as e:
+                logger.error(f"添加标签失败: {e}")
+                return False
 
     def remove_tag(
         self,
@@ -700,13 +737,33 @@ class GraphStore:
         Returns:
             是否移除成功
         """
-        return self.delete_edge(
-            source_type=entity_type,
-            source_id=entity_id,
-            target_type=NodeType.TAG,
-            target_id=tag,
-            relation=RelationType.HAS_TAG,
-        )
+        with self._session() as session:
+            if session is None:
+                logger.warning("Neo4j 不可用，跳过移除标签")
+                return False
+
+            try:
+                label = self._get_label(entity_type)
+
+                cypher = f"""
+                MATCH (e:{label} {{id: $entity_id}})
+                SET e.tags = CASE
+                    WHEN e.tags IS NULL THEN []
+                    ELSE [t IN e.tags WHERE t <> $tag]
+                END
+                RETURN e.tags as tags
+                """
+
+                result = session.run(cypher, entity_id=entity_id, tag=tag)
+                record = result.single()
+                if record is not None:
+                    logger.info(f"移除标签成功: {label}:{entity_id} -x- {tag}")
+                    return True
+                return False
+
+            except Neo4jError as e:
+                logger.error(f"移除标签失败: {e}")
+                return False
 
     def get_entity_tags(
         self,
@@ -731,17 +788,56 @@ class GraphStore:
                 label = self._get_label(entity_type)
 
                 cypher = f"""
-                MATCH (e:{label} {{id: $entity_id}})-[:HAS_TAG]->(t:Tag)
-                RETURN t.id as tag
-                ORDER BY t.id
+                MATCH (e:{label} {{id: $entity_id}})
+                RETURN COALESCE(e.tags, []) as tags
                 """
 
                 result = session.run(cypher, entity_id=entity_id)
-                return [record["tag"] for record in result]
+                record = result.single()
+                if record:
+                    tags = record["tags"]
+                    return sorted(tags) if tags else []
+                return []
 
             except Neo4jError as e:
                 logger.error(f"获取实体标签失败: {e}")
                 return []
+
+    def get_all_tags_by_type(
+        self,
+        entity_type: NodeType,
+    ) -> dict[str, list[str]]:
+        """
+        获取指定类型所有实体的标签映射
+
+        Args:
+            entity_type: 实体类型
+
+        Returns:
+            {entity_id: [tags]} 映射
+        """
+        with self._session() as session:
+            if session is None:
+                return {}
+
+            try:
+                label = self._get_label(entity_type)
+
+                cypher = f"""
+                MATCH (e:{label})
+                WHERE e.tags IS NOT NULL AND size(e.tags) > 0
+                RETURN e.id as entity_id, e.tags as tags
+                """
+
+                result = session.run(cypher)
+                return {
+                    record["entity_id"]: sorted(record["tags"])
+                    for record in result
+                }
+
+            except Neo4jError as e:
+                logger.error(f"获取所有实体标签失败: {e}")
+                return {}
 
     def get_entities_by_tag(
         self,
@@ -766,14 +862,15 @@ class GraphStore:
                 if entity_type:
                     label = self._get_label(entity_type)
                     cypher = f"""
-                    MATCH (e:{label})-[:HAS_TAG]->(t:Tag {{id: $tag}})
+                    MATCH (e:{label})
+                    WHERE $tag IN COALESCE(e.tags, [])
                     RETURN labels(e)[0] as type, e.id as id
                     ORDER BY e.id
                     """
                 else:
                     cypher = """
-                    MATCH (e)-[:HAS_TAG]->(t:Tag {id: $tag})
-                    WHERE NOT 'Tag' IN labels(e)
+                    MATCH (e)
+                    WHERE $tag IN COALESCE(e.tags, []) AND NOT 'Tag' IN labels(e)
                     RETURN labels(e)[0] as type, e.id as id
                     ORDER BY type, e.id
                     """
@@ -801,9 +898,10 @@ class GraphStore:
 
             try:
                 cypher = """
-                MATCH (e)-[:HAS_TAG]->(t:Tag)
-                WHERE NOT 'Tag' IN labels(e)
-                RETURN t.id as tag, count(e) as count
+                MATCH (e)
+                WHERE e.tags IS NOT NULL AND size(e.tags) > 0
+                UNWIND e.tags as tag
+                RETURN tag, count(e) as count
                 ORDER BY count DESC, tag
                 """
 
@@ -846,6 +944,7 @@ class GraphStore:
                        labels(t)[0] as target_type,
                        t.id as target_id,
                        type(r) as relation,
+                       r.subtype as subtype,
                        r.is_bidirectional as is_bidirectional,
                        r.metadata as metadata,
                        r.created_at as created_at
@@ -908,7 +1007,7 @@ class GraphStore:
                 # 获取节点 ID 集合用于过滤边
                 node_ids = {(n["type"], n["id"]) for n in nodes}
 
-                # 获取所有边 (不含 HAS_TAG)
+                # 获取所有边 (不含 Tag 节点)
                 edges_cypher = """
                 MATCH (s)-[r]->(t)
                 WHERE NOT 'Tag' IN labels(t) AND NOT 'Tag' IN labels(s)
@@ -917,6 +1016,7 @@ class GraphStore:
                        labels(t)[0] as target_type,
                        t.id as target_id,
                        type(r) as relation,
+                       r.subtype as subtype,
                        r.is_bidirectional as is_bidirectional
                 LIMIT $limit
                 """
@@ -933,7 +1033,8 @@ class GraphStore:
                             "source_id": record["source_id"],
                             "target_type": tgt_type,
                             "target_id": record["target_id"],
-                            "relation": record["relation"].lower() if record["relation"] else "related",
+                            "relation": record["relation"].lower() if record["relation"] else "relates",
+                            "subtype": record["subtype"] or "",
                             "is_bidirectional": record["is_bidirectional"] or False,
                         })
 
@@ -995,7 +1096,7 @@ class GraphStore:
         获取边的统计信息，按关系类型分组
 
         Returns:
-            [{"relation": "derived_from", "count": 10}, ...]
+            [{"relation": "derives", "count": 10}, ...]
         """
         with self._session() as session:
             if session is None:
@@ -1069,6 +1170,8 @@ class GraphStore:
         """
         解析 Neo4j 关系类型为枚举
 
+        支持旧格式自动映射到新格式。
+
         Args:
             rel_type: Neo4j 关系类型
 
@@ -1076,12 +1179,58 @@ class GraphStore:
             RelationType 枚举值
         """
         if rel_type is None:
-            return RelationType.RELATED
+            return RelationType.RELATES
 
+        rel_lower = rel_type.lower()
+
+        # 先尝试直接解析新格式
         try:
-            return RelationType(rel_type.lower())
+            return RelationType(rel_lower)
         except ValueError:
-            return RelationType.RELATED
+            pass
+
+        # 尝试旧格式映射
+        if rel_lower in LEGACY_RELATION_MAPPING:
+            new_rel, _ = LEGACY_RELATION_MAPPING[rel_lower]
+            return RelationType(new_rel)
+
+        # 默认返回 RELATES
+        return RelationType.RELATES
+
+    def _parse_relation_with_subtype(
+        self, rel_type: str, subtype: str | None
+    ) -> tuple[RelationType, str]:
+        """
+        解析 Neo4j 关系类型和子类型
+
+        支持旧格式自动映射。
+
+        Args:
+            rel_type: Neo4j 关系类型
+            subtype: 子类型（可能为 None）
+
+        Returns:
+            (RelationType, subtype) 元组
+        """
+        if rel_type is None:
+            return RelationType.RELATES, subtype or ""
+
+        rel_lower = rel_type.lower()
+
+        # 先尝试直接解析新格式
+        try:
+            relation = RelationType(rel_lower)
+            return relation, subtype or ""
+        except ValueError:
+            pass
+
+        # 尝试旧格式映射
+        if rel_lower in LEGACY_RELATION_MAPPING:
+            new_rel, default_subtype = LEGACY_RELATION_MAPPING[rel_lower]
+            return RelationType(new_rel), subtype or default_subtype
+
+        # 默认返回 RELATES
+        return RelationType.RELATES, subtype or ""
 
     def _record_to_edge(self, record) -> GraphEdge | None:
         """
@@ -1115,12 +1264,18 @@ class GraphStore:
                 except Exception:
                     pass
 
+            # 解析 relation 和 subtype（支持旧格式迁移）
+            relation, subtype = self._parse_relation_with_subtype(
+                record["relation"], record.get("subtype")
+            )
+
             return GraphEdge(
                 source_type=self._parse_node_type(record["source_type"]),
                 source_id=record["source_id"],
                 target_type=self._parse_node_type(record["target_type"]),
                 target_id=record["target_id"],
-                relation=self._parse_relation_type(record["relation"]),
+                relation=relation,
+                subtype=subtype,
                 is_bidirectional=record.get("is_bidirectional", False) or False,
                 metadata=metadata,
                 created_at=created_at,

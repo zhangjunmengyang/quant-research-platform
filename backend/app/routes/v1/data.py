@@ -476,18 +476,8 @@ async def get_all_symbol_tags():
     """获取所有币种的标签映射"""
     try:
         graph_store = get_graph_store()
-        tags_map: dict[str, list[str]] = {}
-        # 使用 get_edges_by_relation 获取所有 HAS_TAG 关系
-        from domains.graph_hub.core import RelationType
-        edges = graph_store.get_edges_by_relation(RelationType.HAS_TAG, limit=10000)
-        for edge in edges:
-            if edge.source_type == NodeType.DATA:
-                entity_id = edge.source_id
-                tag = edge.target_id
-                if entity_id not in tags_map:
-                    tags_map[entity_id] = []
-                if tag not in tags_map[entity_id]:
-                    tags_map[entity_id].append(tag)
+        # 标签现在是节点属性，直接查询
+        tags_map = graph_store.get_all_tags_by_type(NodeType.DATA)
         return ApiResponse(data=tags_map)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

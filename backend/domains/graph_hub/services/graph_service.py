@@ -9,6 +9,7 @@ from typing import Any
 from ..core import (
     GraphEdge,
     GraphStore,
+    LEGACY_RELATION_MAPPING,
     NodeType,
     RelationType,
     get_graph_store,
@@ -39,8 +40,9 @@ class GraphService:
         source_id: str,
         target_type: str,
         target_id: str,
-        relation: str = "related",
-        is_bidirectional: bool = False,
+        relation: str = "relates",
+        subtype: str = "",
+        is_bidirectional: bool | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> tuple[bool, str]:
         """
@@ -51,8 +53,9 @@ class GraphService:
             source_id: 源实体 ID
             target_type: 目标实体类型
             target_id: 目标实体 ID
-            relation: 关系类型
-            is_bidirectional: 是否双向
+            relation: 关系类型 (derives/relates，兼容旧格式)
+            subtype: 关系子类型 (based/uses/refs/validates 等)
+            is_bidirectional: 是否双向（None 时使用默认逻辑）
             metadata: 扩展元数据
 
         Returns:
@@ -61,9 +64,21 @@ class GraphService:
         try:
             src_type = NodeType(source_type)
             tgt_type = NodeType(target_type)
-            rel_type = RelationType(relation)
+
+            # 兼容旧关系类型
+            if relation in LEGACY_RELATION_MAPPING:
+                new_rel, default_subtype = LEGACY_RELATION_MAPPING[relation]
+                rel_type = RelationType(new_rel)
+                if not subtype:
+                    subtype = default_subtype
+            else:
+                rel_type = RelationType(relation)
         except ValueError as e:
             return False, f"无效的类型: {e}"
+
+        # 双向逻辑: 如果未指定，RELATES 默认双向，DERIVES 默认单向
+        if is_bidirectional is None:
+            is_bidirectional = rel_type == RelationType.RELATES
 
         edge = GraphEdge(
             source_type=src_type,
@@ -71,6 +86,7 @@ class GraphService:
             target_type=tgt_type,
             target_id=target_id,
             relation=rel_type,
+            subtype=subtype,
             is_bidirectional=is_bidirectional,
             metadata=metadata or {},
         )
@@ -86,13 +102,19 @@ class GraphService:
         source_id: str,
         target_type: str,
         target_id: str,
-        relation: str = "related",
+        relation: str = "relates",
     ) -> tuple[bool, str]:
         """删除关联"""
         try:
             src_type = NodeType(source_type)
             tgt_type = NodeType(target_type)
-            rel_type = RelationType(relation)
+
+            # 兼容旧关系类型
+            if relation in LEGACY_RELATION_MAPPING:
+                new_rel, _ = LEGACY_RELATION_MAPPING[relation]
+                rel_type = RelationType(new_rel)
+            else:
+                rel_type = RelationType(relation)
         except ValueError as e:
             return False, f"无效的类型: {e}"
 

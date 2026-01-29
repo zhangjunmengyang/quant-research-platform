@@ -84,7 +84,7 @@ interface GraphChartProps {
   gravity?: number
   edgeLength?: number | [number, number]
   // 事件回调
-  onNodeClick?: (node: GraphNodeData) => void
+  onNodeClick?: (node: GraphNodeData, event: { offsetX: number; offsetY: number }) => void
   onNodeDblClick?: (node: GraphNodeData) => void
   onChartReady?: (chart: EChartsType) => void
   // 聚焦节点
@@ -296,9 +296,16 @@ export function GraphChart({
 
       if (onNodeClick) {
         chart.on('click', 'series.graph', (params) => {
-          const p = params as { dataType?: string; data?: GraphNodeData }
+          const p = params as {
+            dataType?: string
+            data?: GraphNodeData
+            event?: { offsetX?: number; offsetY?: number }
+          }
           if (p.dataType === 'node' && p.data) {
-            onNodeClick(p.data)
+            onNodeClick(p.data, {
+              offsetX: p.event?.offsetX ?? 0,
+              offsetY: p.event?.offsetY ?? 0,
+            })
           }
         })
       }

@@ -3,31 +3,27 @@
 
 将 Neo4j 图数据库中的关系数据导出到文件系统。
 
-同步策略：
-1. 标签关系 (has_tag): 存储在 private/tags/{entity_type}/{entity_id}.yaml
-2. 其他关系: 存储在 private/edges/{relation}.yaml
+同步策略:
+1. 标签: 存储在 private/tags/{entity_type}/{entity_id}.yaml (标签是节点属性)
+2. 关系: 存储在 private/edges/{relation}.yaml
 
-文件结构示例：
+文件结构示例:
     private/
-      tags/                    # 标签关系
+      tags/                    # 标签 (节点属性)
         data/BTC-USDT.yaml     # 币种标签
         factor/Mtm_5d.yaml     # 因子标签
-      edges/                   # 其他关系
-        verifies.yaml          # 验证关系
-        derived_from.yaml      # 派生关系
-        references.yaml        # 引用关系
-        summarizes.yaml        # 总结关系
-        applied_to.yaml        # 应用关系
-        related.yaml           # 通用关联
+      edges/                   # 关系
+        derives.yaml           # 派生关系 (subtype: based/uses/produces/...)
+        relates.yaml           # 关联关系 (subtype: refs/validates/similar/...)
 
-关系文件格式 (YAML)：
-    # private/edges/verifies.yaml
-    # 验证关系：检验笔记 verifies 假设笔记
+关系文件格式 (YAML):
+    # private/edges/derives.yaml
     edges:
-      - source_type: note
-        source_id: "180"
-        target_type: note
-        target_id: "168"
+      - source_type: factor
+        source_id: "Momentum_v2"
+        target_type: factor
+        target_id: "Momentum_v1"
+        subtype: based
         is_bidirectional: false
         metadata: {}
         created_at: "2026-01-27T10:00:00"
@@ -47,9 +43,9 @@ class EdgeSyncService(BaseSyncService):
     知识边同步服务
 
     从 Neo4j 图数据库读取数据，导出到文件系统。
-    支持两种同步模式：
-    1. 标签同步: has_tag 关系，按实体组织存储在 private/tags/
-    2. 关系同步: 其他关系，按关系类型组织存储在 private/edges/
+    支持两种同步模式:
+    1. 标签同步: 节点 tags 属性，按实体组织存储在 private/tags/
+    2. 关系同步: derives/relates 关系，按关系类型组织存储在 private/edges/
     """
 
     # 支持同步的实体类型（用于标签同步）
@@ -61,14 +57,10 @@ class EdgeSyncService(BaseSyncService):
         "experience",  # 经验
     ]
 
-    # 支持同步的关系类型（排除 has_tag，has_tag 单独处理）
+    # 支持同步的关系类型 (2 主类型 + subtype)
     SUPPORTED_RELATION_TYPES = [
-        "derived_from",  # 派生关系
-        "applied_to",    # 应用关系
-        "verifies",      # 验证关系
-        "references",    # 引用关系
-        "summarizes",    # 总结关系
-        "related",       # 通用关联
+        "derives",  # 派生关系 (subtype: based/inspired/uses/produces/evolves/enables)
+        "relates",  # 关联关系 (subtype: refs/similar/validates/contrasts/temporal)
     ]
 
     def __init__(self, data_dir: Path, store: Any = None):
@@ -95,7 +87,7 @@ class EdgeSyncService(BaseSyncService):
                 logger.warning(f"graph_store_init_failed: {e}")
         return self._graph_store
 
-    # ==================== 标签同步 (has_tag) ====================
+    # ==================== 标签同步 (节点属性) ====================
 
     def _get_tag_entity_dir(self, entity_type: str) -> Path:
         """获取实体类型对应的标签目录"""
@@ -197,26 +189,17 @@ class EdgeSyncService(BaseSyncService):
         return stats
 
     def _get_all_entity_tags_by_type(self, entity_type) -> dict[str, list[str]]:
-        """从 Neo4j 获取指定类型所有实体的标签映射"""
+        """从 Neo4j 获取指定类型所有实体的标签映射
+
+        标签现在是节点属性 (tags: list[str])，不再是 HAS_TAG 关系。
+        """
         result = {}
         if self.graph_store is None:
             return result
 
         try:
-            # 查询所有 has_tag 关系
-            from domains.graph_hub.core import RelationType
-            edges = self.graph_store.get_edges_by_relation(RelationType.HAS_TAG, limit=10000)
-
-            entity_type_value = entity_type.value if hasattr(entity_type, 'value') else entity_type
-
-            for edge in edges:
-                src_type = edge.source_type.value if hasattr(edge.source_type, 'value') else edge.source_type
-                if src_type == entity_type_value:
-                    entity_id = edge.source_id
-                    tag = edge.target_id
-                    if entity_id not in result:
-                        result[entity_id] = []
-                    result[entity_id].append(tag)
+            # 标签是节点属性，直接查询所有该类型节点的 tags 属性
+            result = self.graph_store.get_all_tags_by_type(entity_type)
         except Exception as e:
             logger.error(f"get_all_entity_tags_error: {entity_type}, {e}")
 
@@ -568,11 +551,15 @@ class EdgeSyncService(BaseSyncService):
         return stats
 
     def _edge_key(self, edge) -> str:
-        """生成边的唯一键（用于比较）"""
+        """生成边的唯一键（用于比较）
+
+        包含 relation + subtype 以区分不同子类型的关系。
+        """
         source_type = edge.source_type.value if hasattr(edge.source_type, 'value') else edge.source_type
         target_type = edge.target_type.value if hasattr(edge.target_type, 'value') else edge.target_type
         relation = edge.relation.value if hasattr(edge.relation, 'value') else edge.relation
-        return f"{source_type}:{edge.source_id}-[{relation}]->{target_type}:{edge.target_id}"
+        subtype = getattr(edge, 'subtype', '') or ''
+        return f"{source_type}:{edge.source_id}-[{relation}:{subtype}]->{target_type}:{edge.target_id}"
 
     # ==================== 单个实体同步 ====================
 
@@ -619,12 +606,7 @@ class EdgeSyncService(BaseSyncService):
     def export_edge(self, edge) -> bool:
         """导出单条边（触发该关系类型的完整导出）"""
         relation = edge.relation.value if hasattr(edge.relation, 'value') else edge.relation
-
-        if relation == "has_tag":
-            source_type = edge.source_type.value if hasattr(edge.source_type, 'value') else edge.source_type
-            return self.export_single(source_type, edge.source_id)
-        else:
-            return self.export_relation(relation)
+        return self.export_relation(relation)
 
     # ==================== 状态查询 ====================
 

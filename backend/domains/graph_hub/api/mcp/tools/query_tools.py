@@ -27,8 +27,10 @@ class GetEdgesTool(BaseTool):
 
 返回内容包括:
 - 关联的目标实体类型和 ID
-- 关系类型
+- 关系主类型 (derives/relates)
+- 关系子类型 (based/uses/refs/validates 等)
 - 是否双向关联
+- 元数据
 - 创建时间
 
 使用示例:

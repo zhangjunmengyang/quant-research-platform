@@ -19,16 +19,33 @@ export type GraphNodeType =
   | 'tag'
 
 /**
- * 关系类型
+ * 关系类型 (2 主类型 + subtype)
+ *
+ * - derives: 派生关系 (有方向)，subtype: based/inspired/uses/produces/evolves/enables
+ * - relates: 关联关系 (默认双向)，subtype: refs/similar/validates/contrasts/temporal
  */
-export type GraphRelationType =
-  | 'derived_from'
-  | 'applied_to'
-  | 'verifies'
-  | 'references'
-  | 'summarizes'
-  | 'has_tag'
-  | 'related'
+export type GraphRelationType = 'derives' | 'relates'
+
+/**
+ * 派生关系子类型
+ */
+export type DeriveSubtype =
+  | 'based'
+  | 'inspired'
+  | 'uses'
+  | 'produces'
+  | 'evolves'
+  | 'enables'
+
+/**
+ * 关联关系子类型
+ */
+export type RelateSubtype =
+  | 'refs'
+  | 'similar'
+  | 'validates'
+  | 'contrasts'
+  | 'temporal'
 
 // ==================== 数据结构 ====================
 
@@ -41,6 +58,7 @@ export interface GraphEdge {
   target_type: GraphNodeType
   target_id: string
   relation: GraphRelationType
+  subtype?: string
   is_bidirectional: boolean
   metadata?: Record<string, unknown>
   created_at?: string
@@ -64,6 +82,7 @@ export interface LineageNode {
   node_type: GraphNodeType
   node_id: string
   relation: GraphRelationType
+  subtype?: string
   direction: 'forward' | 'backward'
 }
 
@@ -157,6 +176,7 @@ export interface GraphOverviewEdge {
   target_type: GraphNodeType
   target_id: string
   relation: GraphRelationType
+  subtype?: string
   is_bidirectional: boolean
 }
 
@@ -233,13 +253,38 @@ export const NODE_TYPE_CONFIG: Record<GraphNodeType, NodeTypeConfig> = {
  * 关系类型显示名称
  */
 export const RELATION_TYPE_LABELS: Record<GraphRelationType, string> = {
-  derived_from: '派生自',
-  applied_to: '应用于',
-  verifies: '验证',
-  references: '引用',
-  summarizes: '总结为',
-  has_tag: '拥有标签',
-  related: '关联',
+  derives: '派生',
+  relates: '关联',
+}
+
+/**
+ * 子类型显示名称
+ */
+export const SUBTYPE_LABELS: Record<string, string> = {
+  // DeriveSubtype
+  based: '基于',
+  inspired: '启发自',
+  uses: '使用',
+  produces: '产出',
+  evolves: '演化',
+  enables: '使能',
+  // RelateSubtype
+  refs: '引用',
+  similar: '相似',
+  validates: '验证',
+  contrasts: '对比',
+  temporal: '时序',
+}
+
+/**
+ * 获取关系的完整显示名称
+ */
+export function getRelationLabel(relation: GraphRelationType, subtype?: string): string {
+  const baseLabel = RELATION_TYPE_LABELS[relation] || relation
+  if (subtype && SUBTYPE_LABELS[subtype]) {
+    return SUBTYPE_LABELS[subtype]
+  }
+  return baseLabel
 }
 
 /**

@@ -90,7 +90,7 @@ class NoteService:
 
         Note:
             创建笔记后，可使用 link_note() 建立与其他实体的关联。
-            例如检验关联假设：link_note(note_id, "note", str(hypothesis_id), "verifies")
+            例如检验关联假设：link_note(note_id, "note", str(hypothesis_id), "relates", subtype="validates")
         """
         if not title.strip():
             return False, "标题不能为空", None
@@ -277,7 +277,8 @@ class NoteService:
                 note_id=note_id,
                 target_type="note",
                 target_id=str(hypothesis_id),
-                relation="verifies",
+                relation="relates",
+                subtype="validates",
             )
 
         return success, message, note_id
@@ -320,18 +321,19 @@ class NoteService:
         Returns:
             验证笔记列表
         """
-        # 通过 Graph Hub 查找 verifies 关系
+        # 通过 Graph Hub 查找 validates 关系
         edges = self.graph_store.get_edges_to_entity(
             entity_type=NodeType.NOTE,
             entity_id=str(hypothesis_id),
         )
 
-        # 筛选 verifies 关系的笔记
+        # 筛选 validates 子类型的笔记关联
         note_ids = [
             int(edge.source_id)
             for edge in edges
             if edge.source_type == NodeType.NOTE
-            and edge.relation == RelationType.VERIFIES
+            and edge.relation == RelationType.RELATES
+            and edge.subtype == "validates"
         ]
 
         # 获取笔记详情
@@ -433,7 +435,8 @@ class NoteService:
         note_id: int,
         target_type: str,
         target_id: str,
-        relation: str = "related",
+        relation: str = "relates",
+        subtype: str = "",
         is_bidirectional: bool = False,
         metadata: dict[str, Any] | None = None,
     ) -> tuple[bool, str, int | None]:
@@ -444,7 +447,8 @@ class NoteService:
             note_id: 笔记 ID
             target_type: 目标实体类型（data/factor/strategy/note/research/experience）
             target_id: 目标实体 ID
-            relation: 关系类型（derived_from/applied_to/verifies/references/summarizes/related）
+            relation: 关系类型（derives/relates）
+            subtype: 关系子类型（based/uses/refs/validates 等）
             is_bidirectional: 是否双向关联
             metadata: 扩展元数据
 
@@ -475,6 +479,7 @@ class NoteService:
             target_type=target_node_type,
             target_id=target_id,
             relation=relation_type,
+            subtype=subtype,
             is_bidirectional=is_bidirectional,
             metadata=metadata or {},
         )

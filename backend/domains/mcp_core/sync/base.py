@@ -10,7 +10,10 @@ import os
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+# Python 3.10 兼容性
+UTC = timezone.utc
 from pathlib import Path
 from typing import Any
 

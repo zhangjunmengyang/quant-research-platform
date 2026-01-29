@@ -40,8 +40,8 @@ class CreateNoteTool(BaseTool):
 - verification: 检验 - 对假设的验证过程和结论
 
 创建笔记后，可使用 link_note 工具建立与其他实体的关联:
-- 关联数据源: link_note(note_id, "data", "BTC-USDT", "derived_from")
-- 检验关联假设: link_note(verification_id, "note", str(hypothesis_id), "verifies")
+- 关联数据源: link_note(note_id, "data", "BTC-USDT", "derives", subtype="based")
+- 检验关联假设: link_note(verification_id, "note", str(hypothesis_id), "relates", subtype="validates")
 
 使用场景:
 - 记录因子在特定条件下的表现（observation）

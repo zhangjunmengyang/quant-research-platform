@@ -24,15 +24,15 @@ class GraphNodeType(str, Enum):
 
 
 class GraphRelationType(str, Enum):
-    """关系类型"""
+    """关系类型
 
-    DERIVED_FROM = "derived_from"
-    APPLIED_TO = "applied_to"
-    VERIFIES = "verifies"
-    REFERENCES = "references"
-    SUMMARIZES = "summarizes"
-    HAS_TAG = "has_tag"
-    RELATED = "related"
+    2 主类型 + subtype 设计:
+    - DERIVES: 派生关系 (有方向)，subtype: based/inspired/uses/produces/evolves/enables
+    - RELATES: 关联关系 (默认双向)，subtype: refs/similar/validates/contrasts/temporal
+    """
+
+    DERIVES = "derives"
+    RELATES = "relates"
 
 
 # ==================== 边相关 ====================
@@ -46,6 +46,7 @@ class GraphEdge(BaseModel):
     target_type: GraphNodeType
     target_id: str
     relation: GraphRelationType
+    subtype: str = ""
     is_bidirectional: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime | None = None
@@ -70,6 +71,7 @@ class LineageNode(BaseModel):
     node_type: GraphNodeType
     node_id: str
     relation: GraphRelationType
+    subtype: str = ""
     direction: str
 
 
@@ -163,6 +165,7 @@ class GraphOverviewEdge(BaseModel):
     target_type: GraphNodeType
     target_id: str
     relation: GraphRelationType
+    subtype: str = ""
     is_bidirectional: bool = False
 
 

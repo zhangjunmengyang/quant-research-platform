@@ -110,7 +110,7 @@ class ExperienceLinkRequest(BaseModel):
     """关联经验请求"""
     entity_type: EntityTypeEnum = Field(..., description="实体类型")
     entity_id: str = Field(..., description="实体 ID")
-    relation: str = Field("related", description="关系类型（related/derived_from/applied_to）")
+    relation: str = Field("relates", description="关系类型（derives/relates）")
 
 
 # ==================== 响应 Schema ====================

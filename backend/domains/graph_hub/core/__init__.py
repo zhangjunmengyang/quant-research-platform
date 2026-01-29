@@ -7,6 +7,7 @@ graph_hub 核心模块
 from .models import (
     BIDIRECTIONAL_RELATIONS,
     ENTITY_TYPE_NAMES,
+    LEGACY_RELATION_MAPPING,
     RELATION_TYPE_NAMES,
     GraphEdge,
     GraphNode,
@@ -26,6 +27,7 @@ __all__ = [
     # 常量映射
     "BIDIRECTIONAL_RELATIONS",
     "ENTITY_TYPE_NAMES",
+    "LEGACY_RELATION_MAPPING",
     "RELATION_TYPE_NAMES",
     # 数据模型
     "GraphNode",

@@ -10,7 +10,7 @@
  * - 链路追溯视图
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Search,
@@ -37,6 +37,7 @@ import {
   parseNodeKey,
 } from '../types'
 import { createNodeStyle, createLinkStyle } from '../utils/graphStyles'
+import { NodePreviewCard } from './NodePreviewCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -80,6 +81,13 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
   const [lineageDirection, setLineageDirection] = useState<'forward' | 'backward'>(
     'backward'
   )
+
+  // 预览卡片状态
+  const graphContainerRef = useRef<HTMLDivElement>(null)
+  const [previewState, setPreviewState] = useState<{
+    nodeKey: string
+    position: { x: number; y: number }
+  } | null>(null)
 
   // 数据获取
   // 1. 全量概览 (无聚焦时使用)
@@ -319,13 +327,15 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
     }
   }, [edgesData, lineageData, tagEntities, overviewData, selectedTypes, viewMode, focusEntity, lineageDirection, tagParam])
 
-  // 节点点击 - 更新聚焦
+  // 节点点击 - 显示预览卡片
   const handleNodeClick = useCallback(
-    (node: GraphNodeData) => {
-      const { type, id } = parseNodeKey(node.id)
-      setSearchParams({ focus: buildNodeKey(type, id) })
+    (node: GraphNodeData, event: { offsetX: number; offsetY: number }) => {
+      setPreviewState({
+        nodeKey: node.id,
+        position: { x: event.offsetX, y: event.offsetY },
+      })
     },
-    [setSearchParams]
+    []
   )
 
   // 节点双击 - 跳转详情
@@ -340,6 +350,29 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
     },
     [navigate]
   )
+
+  // 关闭预览卡片
+  const handleClosePreview = useCallback(() => {
+    setPreviewState(null)
+  }, [])
+
+  // 从预览卡片跳转详情
+  const handleViewDetail = useCallback(() => {
+    if (!previewState) return
+    const { type, id } = parseNodeKey(previewState.nodeKey)
+    const config = NODE_TYPE_CONFIG[type]
+    if (config) {
+      navigate(config.getRoute(id))
+    }
+    setPreviewState(null)
+  }, [previewState, navigate])
+
+  // 从预览卡片在图谱中展开
+  const handleExpandInGraph = useCallback(() => {
+    if (!previewState) return
+    setSearchParams({ focus: previewState.nodeKey })
+    setPreviewState(null)
+  }, [previewState, setSearchParams])
 
   // 类型筛选切换
   const toggleType = (type: GraphNodeType) => {
@@ -540,7 +573,7 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
       )}
 
       {/* 图表区域 */}
-      <div className="flex-1 relative">
+      <div ref={graphContainerRef} className="flex-1 relative">
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-background/50">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -574,6 +607,18 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
             focusNodeId={
               focusEntity ? buildNodeKey(focusEntity.type, focusEntity.id) : undefined
             }
+          />
+        )}
+
+        {/* 节点预览卡片 */}
+        {previewState && (
+          <NodePreviewCard
+            nodeKey={previewState.nodeKey}
+            position={previewState.position}
+            containerRect={graphContainerRef.current?.getBoundingClientRect() ?? null}
+            onClose={handleClosePreview}
+            onViewDetail={handleViewDetail}
+            onExpandInGraph={handleExpandInGraph}
           />
         )}
       </div>

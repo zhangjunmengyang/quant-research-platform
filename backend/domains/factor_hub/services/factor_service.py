@@ -673,7 +673,7 @@ class FactorService:
             factor_name: 因子名称
             target_type: 目标实体类型（data/factor/strategy/note/research/experience）
             target_id: 目标实体 ID
-            relation: 关系类型（derived_from/applied_to/verifies/references/summarizes/related）
+            relation: 关系类型（derives/relates），可配合 subtype 细化语义
             is_bidirectional: 是否双向关联
             metadata: 扩展元数据
 

@@ -32,13 +32,17 @@ from .base.tool import (
     register_tool,
 )
 
-# Config & Paths
+# Config
 from .config import (
     MCPConfig,
     get_config,
+    set_config,
+)
+
+# Paths
+from .paths import (
     get_data_dir,
     get_project_root,
-    set_config,
 )
 
 # Middleware - Error handling only

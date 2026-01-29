@@ -42,37 +42,61 @@ class NodeType(str, Enum):
 
 class RelationType(str, Enum):
     """
-    关系类型枚举
+    关系主类型枚举
 
-    定义实体间的关联关系，支持链路追溯。
+    简化为两个主类型，具体语义通过 subtype 字段细化:
+    - DERIVES: 有方向的派生/因果关系（A 产生/影响 B）
+    - RELATES: 语义关联关系（A 与 B 相关，默认双向）
     """
 
-    # 派生关系
-    DERIVED_FROM = "derived_from"  # A 派生自 B（如：因子 derived_from 数据）
-
-    # 应用关系
-    APPLIED_TO = "applied_to"  # A 应用于 B（如：策略 applied_to 因子）
-
-    # 验证关系
-    VERIFIES = "verifies"  # A 验证 B（如：检验笔记 verifies 假设笔记）
-
-    # 引用关系
-    REFERENCES = "references"  # A 引用 B（如：笔记 references 研报）
-
-    # 总结关系
-    SUMMARIZES = "summarizes"  # A 总结 B（如：经验 summarizes 笔记）
-
-    # 标签关系
-    HAS_TAG = "has_tag"  # A 拥有标签 B（如：data:BTC-USDT has_tag tag:妖币）
-
-    # 通用关联
-    RELATED = "related"  # 一般关联（默认）
+    DERIVES = "derives"  # 派生关系: A -> B（A 产生/影响 B）
+    RELATES = "relates"  # 关联关系: A <-> B（A 与 B 相关）
 
 
-# 典型双向关系
+class DeriveSubtype:
+    """
+    DERIVES 关系的子类型常量
+
+    这些是建议值，实际使用时可以传入任意字符串，便于扩展。
+    """
+
+    BASED = "based"  # 基于（代码/数据直接派生）
+    INSPIRED = "inspired"  # 启发自（思路来源）
+    USES = "uses"  # 使用（策略使用因子）
+    PRODUCES = "produces"  # 产出（检验产出因子，经验产出自笔记）
+    EVOLVES = "evolves"  # 演化（版本迭代）
+    ENABLES = "enables"  # 使能（A 使 B 成为可能）
+
+
+class RelateSubtype:
+    """
+    RELATES 关系的子类型常量
+
+    这些是建议值，实际使用时可以传入任意字符串，便于扩展。
+    """
+
+    REFS = "refs"  # 引用（笔记引用研报）
+    SIMILAR = "similar"  # 相似（两个因子逻辑相似）
+    VALIDATES = "validates"  # 验证（支持/反驳，direction 放 metadata）
+    CONTRASTS = "contrasts"  # 对比（A 与 B 形成对照）
+    TEMPORAL = "temporal"  # 时序共现（同时发生的事件）
+
+
+# 旧关系类型 -> 新关系类型映射（用于数据迁移和兼容）
+LEGACY_RELATION_MAPPING: dict[str, tuple[str, str]] = {
+    "derived_from": ("derives", "based"),
+    "applied_to": ("derives", "uses"),
+    "verifies": ("relates", "validates"),
+    "references": ("relates", "refs"),
+    "summarizes": ("derives", "produces"),
+    "related": ("relates", "similar"),
+    # has_tag 不再映射，改为节点属性
+}
+
+
+# 典型双向关系（RELATES 默认双向）
 BIDIRECTIONAL_RELATIONS = {
-    RelationType.RELATED,
-    RelationType.REFERENCES,
+    RelationType.RELATES,
 }
 
 # 实体类型中文映射
@@ -88,13 +112,25 @@ ENTITY_TYPE_NAMES = {
 
 # 关系类型中文映射
 RELATION_TYPE_NAMES = {
-    RelationType.DERIVED_FROM: "派生自",
-    RelationType.APPLIED_TO: "应用于",
-    RelationType.VERIFIES: "验证",
-    RelationType.REFERENCES: "引用",
-    RelationType.SUMMARIZES: "总结为",
-    RelationType.HAS_TAG: "拥有标签",
-    RelationType.RELATED: "关联",
+    RelationType.DERIVES: "派生",
+    RelationType.RELATES: "关联",
+}
+
+# 子类型中文映射
+SUBTYPE_NAMES = {
+    # DERIVES subtypes
+    "based": "基于",
+    "inspired": "启发自",
+    "uses": "使用",
+    "produces": "产出",
+    "evolves": "演化自",
+    "enables": "使能",
+    # RELATES subtypes
+    "refs": "引用",
+    "similar": "相似",
+    "validates": "验证",
+    "contrasts": "对比",
+    "temporal": "共现",
 }
 
 
@@ -106,11 +142,15 @@ EdgeRelationType = RelationType
 __all__ = [
     "NodeType",
     "RelationType",
+    "DeriveSubtype",
+    "RelateSubtype",
     "EdgeEntityType",
     "EdgeRelationType",
     "BIDIRECTIONAL_RELATIONS",
+    "LEGACY_RELATION_MAPPING",
     "ENTITY_TYPE_NAMES",
     "RELATION_TYPE_NAMES",
+    "SUBTYPE_NAMES",
     "GraphNode",
     "GraphEdge",
     "KnowledgeEdge",
@@ -166,13 +206,15 @@ class GraphEdge:
     source_id: str
     target_type: NodeType
     target_id: str
-    relation: RelationType = RelationType.RELATED
+    relation: RelationType = RelationType.RELATES
+    subtype: str = ""  # 关系子类型，用于细化语义
     is_bidirectional: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime | None = None
 
     def __post_init__(self):
         """初始化后自动设置双向标记"""
+        # RELATES 默认双向，DERIVES 默认单向
         if self.relation in BIDIRECTIONAL_RELATIONS and not self.is_bidirectional:
             self.is_bidirectional = True
 
@@ -196,6 +238,7 @@ class GraphEdge:
                 if isinstance(self.relation, RelationType)
                 else self.relation
             ),
+            "subtype": self.subtype,
             "is_bidirectional": self.is_bidirectional,
             "metadata": self.metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -203,7 +246,7 @@ class GraphEdge:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "GraphEdge":
-        """从字典创建"""
+        """从字典创建，支持旧格式自动迁移"""
         # 解析 source_type
         source_type = data.get("source_type", "data")
         if isinstance(source_type, str):
@@ -220,13 +263,24 @@ class GraphEdge:
             except ValueError:
                 target_type = NodeType.DATA
 
-        # 解析 relation
-        relation = data.get("relation", "related")
-        if isinstance(relation, str):
-            try:
-                relation = RelationType(relation)
-            except ValueError:
-                relation = RelationType.RELATED
+        # 解析 relation 和 subtype（支持旧格式迁移）
+        relation_raw = data.get("relation", "relates")
+        subtype = data.get("subtype", "")
+
+        if isinstance(relation_raw, str):
+            # 检查是否为旧格式关系类型
+            if relation_raw in LEGACY_RELATION_MAPPING:
+                new_rel, default_subtype = LEGACY_RELATION_MAPPING[relation_raw]
+                relation = RelationType(new_rel)
+                if not subtype:
+                    subtype = default_subtype
+            else:
+                try:
+                    relation = RelationType(relation_raw)
+                except ValueError:
+                    relation = RelationType.RELATES
+        else:
+            relation = relation_raw if isinstance(relation_raw, RelationType) else RelationType.RELATES
 
         # 处理 created_at 类型转换
         created_at_raw = data.get("created_at")
@@ -249,6 +303,7 @@ class GraphEdge:
             target_type=target_type,
             target_id=data.get("target_id", ""),
             relation=relation,
+            subtype=subtype,
             is_bidirectional=data.get("is_bidirectional", False),
             metadata=data.get("metadata", {}),
             created_at=created_at,
@@ -263,7 +318,8 @@ class LineageNode:
     node_type: NodeType
     node_id: str
     relation: RelationType
-    direction: str  # "forward" 或 "backward"
+    subtype: str = ""  # 关系子类型
+    direction: str = "forward"  # "forward" 或 "backward"
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
@@ -280,12 +336,13 @@ class LineageNode:
                 if isinstance(self.relation, RelationType)
                 else self.relation
             ),
+            "subtype": self.subtype,
             "direction": self.direction,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "LineageNode":
-        """从字典创建"""
+        """从字典创建，支持旧格式自动迁移"""
         # 解析 node_type
         node_type = data.get("node_type", "data")
         if isinstance(node_type, str):
@@ -294,19 +351,30 @@ class LineageNode:
             except ValueError:
                 node_type = NodeType.DATA
 
-        # 解析 relation
-        relation = data.get("relation", "related")
-        if isinstance(relation, str):
-            try:
-                relation = RelationType(relation)
-            except ValueError:
-                relation = RelationType.RELATED
+        # 解析 relation 和 subtype（支持旧格式迁移）
+        relation_raw = data.get("relation", "relates")
+        subtype = data.get("subtype", "")
+
+        if isinstance(relation_raw, str):
+            if relation_raw in LEGACY_RELATION_MAPPING:
+                new_rel, default_subtype = LEGACY_RELATION_MAPPING[relation_raw]
+                relation = RelationType(new_rel)
+                if not subtype:
+                    subtype = default_subtype
+            else:
+                try:
+                    relation = RelationType(relation_raw)
+                except ValueError:
+                    relation = RelationType.RELATES
+        else:
+            relation = relation_raw if isinstance(relation_raw, RelationType) else RelationType.RELATES
 
         return cls(
             depth=data.get("depth", 0),
             node_type=node_type,
             node_id=data.get("node_id", ""),
             relation=relation,
+            subtype=subtype,
             direction=data.get("direction", "forward"),
         )
 
@@ -440,7 +508,8 @@ class KnowledgeEdge:
     source_id: str
     target_type: NodeType
     target_id: str
-    relation: RelationType = RelationType.RELATED
+    relation: RelationType = RelationType.RELATES
+    subtype: str = ""  # 关系子类型
     is_bidirectional: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
     id: int | None = None
@@ -460,6 +529,7 @@ class KnowledgeEdge:
             "target_type": self.target_type.value if isinstance(self.target_type, NodeType) else self.target_type,
             "target_id": self.target_id,
             "relation": self.relation.value if isinstance(self.relation, RelationType) else self.relation,
+            "subtype": self.subtype,
             "is_bidirectional": self.is_bidirectional,
             "metadata": self.metadata,
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -467,7 +537,7 @@ class KnowledgeEdge:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "KnowledgeEdge":
-        """从字典创建"""
+        """从字典创建，支持旧格式自动迁移"""
         source_type = data.get("source_type", "data")
         if isinstance(source_type, str):
             try:
@@ -482,12 +552,23 @@ class KnowledgeEdge:
             except ValueError:
                 target_type = NodeType.DATA
 
-        relation = data.get("relation", "related")
-        if isinstance(relation, str):
-            try:
-                relation = RelationType(relation)
-            except ValueError:
-                relation = RelationType.RELATED
+        # 解析 relation 和 subtype（支持旧格式迁移）
+        relation_raw = data.get("relation", "relates")
+        subtype = data.get("subtype", "")
+
+        if isinstance(relation_raw, str):
+            if relation_raw in LEGACY_RELATION_MAPPING:
+                new_rel, default_subtype = LEGACY_RELATION_MAPPING[relation_raw]
+                relation = RelationType(new_rel)
+                if not subtype:
+                    subtype = default_subtype
+            else:
+                try:
+                    relation = RelationType(relation_raw)
+                except ValueError:
+                    relation = RelationType.RELATES
+        else:
+            relation = relation_raw if isinstance(relation_raw, RelationType) else RelationType.RELATES
 
         created_at_raw = data.get("created_at")
         created_at: datetime | None = None
@@ -509,6 +590,7 @@ class KnowledgeEdge:
             target_type=target_type,
             target_id=data.get("target_id", ""),
             relation=relation,
+            subtype=subtype,
             is_bidirectional=data.get("is_bidirectional", False),
             metadata=data.get("metadata", {}),
             created_at=created_at,

@@ -17,7 +17,10 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
+
+# Python 3.10 兼容性
+UTC = timezone.utc
 from typing import Any
 
 import asyncpg

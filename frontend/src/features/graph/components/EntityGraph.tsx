@@ -9,7 +9,7 @@
  * - 提供「在大图中查看」按钮
  */
 
-import { useMemo, useCallback, useState, useEffect } from 'react'
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, Loader2, Network, Maximize2, Minimize2 } from 'lucide-react'
@@ -29,6 +29,7 @@ import {
 } from '../types'
 import { createNodeStyle, createLinkStyle } from '../utils/graphStyles'
 import { Button } from '@/components/ui/button'
+import { NodePreviewCard } from './NodePreviewCard'
 
 // 稳定的配置常量，避免每次渲染创建新引用
 const EDGE_LENGTH_NORMAL: [number, number] = [60, 120]
@@ -54,6 +55,14 @@ export function EntityGraph({
   const navigate = useNavigate()
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { data: edgesData, isLoading, isError } = useEntityEdges(entityType, entityId)
+
+  // 预览卡片状态
+  const graphContainerRef = useRef<HTMLDivElement>(null)
+  const fullscreenContainerRef = useRef<HTMLDivElement>(null)
+  const [previewState, setPreviewState] = useState<{
+    nodeKey: string
+    position: { x: number; y: number }
+  } | null>(null)
 
   // 构建图数据
   const { nodes, links, categories } = useMemo(() => {
@@ -137,29 +146,51 @@ export function EntityGraph({
     }
   }, [edgesData, entityType, entityId, entityName])
 
-  // 节点点击处理
+  // 节点点击处理 - 显示预览卡片
   const handleNodeClick = useCallback(
-    (node: GraphNodeData) => {
+    (node: GraphNodeData, event: { offsetX: number; offsetY: number }) => {
       const { type, id } = parseNodeKey(node.id)
 
-      // 中心节点不跳转
+      // 中心节点不显示预览卡片
       if (type === entityType && id === entityId) {
         return
       }
 
-      // 跳转到对应详情页
-      const config = NODE_TYPE_CONFIG[type]
-      if (config) {
-        navigate(config.getRoute(id))
-      }
+      setPreviewState({
+        nodeKey: node.id,
+        position: { x: event.offsetX, y: event.offsetY },
+      })
     },
-    [entityType, entityId, navigate]
+    [entityType, entityId]
   )
 
   // 跳转到大图
   const handleViewInGraph = useCallback(() => {
     navigate(`/graph?focus=${encodeURIComponent(buildNodeKey(entityType, entityId))}`)
   }, [navigate, entityType, entityId])
+
+  // 关闭预览卡片
+  const handleClosePreview = useCallback(() => {
+    setPreviewState(null)
+  }, [])
+
+  // 从预览卡片跳转详情
+  const handlePreviewViewDetail = useCallback(() => {
+    if (!previewState) return
+    const { type, id } = parseNodeKey(previewState.nodeKey)
+    const config = NODE_TYPE_CONFIG[type]
+    if (config) {
+      navigate(config.getRoute(id))
+    }
+    setPreviewState(null)
+  }, [previewState, navigate])
+
+  // 从预览卡片跳转到大图查看该节点
+  const handlePreviewViewInGraph = useCallback(() => {
+    if (!previewState) return
+    navigate(`/graph?focus=${encodeURIComponent(previewState.nodeKey)}`)
+    setPreviewState(null)
+  }, [previewState, navigate])
 
   // ESC 键退出全屏 - 必须在条件返回之前调用
   useEffect(() => {
@@ -236,7 +267,7 @@ export function EntityGraph({
           </div>
         </div>
         {/* 画布区域 - 完全填充 */}
-        <div className="flex-1 min-h-0">
+        <div ref={fullscreenContainerRef} className="flex-1 min-h-0 relative">
           <GraphChart
             nodes={nodes}
             links={links}
@@ -251,6 +282,18 @@ export function EntityGraph({
             onNodeClick={handleNodeClick}
             showToolbar={true}
           />
+
+          {/* 节点预览卡片 */}
+          {previewState && (
+            <NodePreviewCard
+              nodeKey={previewState.nodeKey}
+              position={previewState.position}
+              containerRect={fullscreenContainerRef.current?.getBoundingClientRect() ?? null}
+              onClose={handleClosePreview}
+              onViewDetail={handlePreviewViewDetail}
+              onExpandInGraph={handlePreviewViewInGraph}
+            />
+          )}
         </div>
       </div>
     )
@@ -299,7 +342,8 @@ export function EntityGraph({
         </div>
       </div>
       <div
-        className="rounded-lg border bg-card overflow-hidden"
+        ref={graphContainerRef}
+        className="rounded-lg border bg-card overflow-hidden relative"
         style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -317,6 +361,18 @@ export function EntityGraph({
           onNodeClick={handleNodeClick}
           showToolbar={true}
         />
+
+        {/* 节点预览卡片 */}
+        {previewState && (
+          <NodePreviewCard
+            nodeKey={previewState.nodeKey}
+            position={previewState.position}
+            containerRect={graphContainerRef.current?.getBoundingClientRect() ?? null}
+            onClose={handleClosePreview}
+            onViewDetail={handlePreviewViewDetail}
+            onExpandInGraph={handlePreviewViewInGraph}
+          />
+        )}
       </div>
     </div>
   )
