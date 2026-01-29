@@ -15,18 +15,16 @@ Streamable HTTP 传输层
 """
 
 import json
-import time
 import logging
-from typing import Optional
+import time
 from contextlib import asynccontextmanager
 
-from starlette.routing import Route
-from starlette.applications import Starlette
-from starlette.types import Scope, Receive, Send
-
+import mcp.types as types
 from mcp.server import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
-import mcp.types as types
+from starlette.applications import Starlette
+from starlette.routing import Route
+from starlette.types import Receive, Scope, Send
 
 from .server import BaseMCPServer
 
@@ -127,12 +125,12 @@ class MCPServerAdapter:
         self,
         method: str,
         tool_name: str = "",
-        tool_arguments: Optional[dict] = None,
+        tool_arguments: dict | None = None,
         resource_uri: str = "",
         start_time: float = 0,
         success: bool = True,
         error_message: str = "",
-        response_data: Optional[dict] = None,
+        response_data: dict | None = None,
     ):
         """记录 MCP 请求日志"""
         slog = get_server_logger()
@@ -176,7 +174,7 @@ class MCPServerAdapter:
             res_count = data.get("resource_count", 0)
             return f"返回 {res_count} 个资源"
         elif method == "resources/read":
-            return f"读取资源成功"
+            return "读取资源成功"
         return "请求完成"
 
     def _register_handlers(self):
@@ -476,7 +474,6 @@ def create_streamable_http_app(
     # 创建 Starlette 应用
     from starlette.middleware import Middleware
     from starlette.middleware.cors import CORSMiddleware as StarletteCORSMiddleware
-    from starlette.routing import Mount
 
     routes = [
         Route("/", endpoint=root_handler, methods=["GET"]),
@@ -508,8 +505,8 @@ def create_streamable_http_app(
 
 def run_streamable_http_server(
     server: BaseMCPServer,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
+    host: str | None = None,
+    port: int | None = None,
     log_level: str = "info",
     reload: bool = False,
 ):

@@ -5,13 +5,18 @@
 """
 
 import os
-import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
+
+import yaml
+from domains.mcp_core.paths import (
+    get_config_dir,
+    get_data_dir,
+    get_factors_dir,
+    get_project_root,
+    get_sections_dir,
+)
 from dotenv import load_dotenv
-
-from domains.mcp_core.paths import get_project_root, get_config_dir, get_factors_dir, get_sections_dir, get_data_dir
-
 
 # 加载项目根目录的 .env 文件
 load_dotenv(get_project_root() / '.env')
@@ -24,7 +29,7 @@ class ConfigLoader:
     负责加载用户变量和 Prompt 配置文件。
     """
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         """
         初始化配置加载器
 
@@ -41,10 +46,10 @@ class ConfigLoader:
         self.data_dir = get_data_dir()
 
         # 缓存
-        self._llm_models: Optional[Dict[str, Any]] = None
-        self._prompts: Dict[str, Dict[str, Any]] = {}
+        self._llm_models: dict[str, Any] | None = None
+        self._prompts: dict[str, dict[str, Any]] = {}
 
-    def load_llm_models(self, reload: bool = False) -> Dict[str, Any]:
+    def load_llm_models(self, reload: bool = False) -> dict[str, Any]:
         """
         加载 LLM 模型配置
 
@@ -61,17 +66,17 @@ class ConfigLoader:
             self._llm_models = {}
             return self._llm_models
 
-        with open(self.llm_models_path, 'r', encoding='utf-8') as f:
+        with open(self.llm_models_path, encoding='utf-8') as f:
             self._llm_models = yaml.safe_load(f) or {}
 
         return self._llm_models
 
     # 兼容旧接口
-    def load_user_vars(self, reload: bool = False) -> Dict[str, Any]:
+    def load_user_vars(self, reload: bool = False) -> dict[str, Any]:
         """兼容旧接口，返回 LLM 模型配置"""
         return self.load_llm_models(reload)
 
-    def load_prompt(self, task_name: str, reload: bool = False) -> Dict[str, Any]:
+    def load_prompt(self, task_name: str, reload: bool = False) -> dict[str, Any]:
         """
         加载指定任务的 Prompt 配置
 
@@ -89,13 +94,13 @@ class ConfigLoader:
         if not prompt_path.exists():
             raise FileNotFoundError(f"Prompt 配置文件不存在: {prompt_path}")
 
-        with open(prompt_path, 'r', encoding='utf-8') as f:
+        with open(prompt_path, encoding='utf-8') as f:
             prompt_config = yaml.safe_load(f) or {}
 
         self._prompts[task_name] = prompt_config
         return prompt_config
 
-    def load_field_prompt(self, field_name: str, reload: bool = False) -> Dict[str, Any]:
+    def load_field_prompt(self, field_name: str, reload: bool = False) -> dict[str, Any]:
         """
         加载字段填充的 Prompt 配置
 
@@ -114,13 +119,13 @@ class ConfigLoader:
         if not prompt_path.exists():
             raise FileNotFoundError(f"字段 Prompt 配置文件不存在: {prompt_path}")
 
-        with open(prompt_path, 'r', encoding='utf-8') as f:
+        with open(prompt_path, encoding='utf-8') as f:
             prompt_config = yaml.safe_load(f) or {}
 
         self._prompts[cache_key] = prompt_config
         return prompt_config
 
-    def load_all_prompts(self, reload: bool = False) -> Dict[str, Dict[str, Any]]:
+    def load_all_prompts(self, reload: bool = False) -> dict[str, dict[str, Any]]:
         """
         加载所有 Prompt 配置
 
@@ -140,7 +145,7 @@ class ConfigLoader:
 
         return self._prompts
 
-    def get_api_config(self, task_name: Optional[str] = None) -> Dict[str, Any]:
+    def get_api_config(self, task_name: str | None = None) -> dict[str, Any]:
         """
         获取 API 配置
 
@@ -213,7 +218,7 @@ class ConfigLoader:
 
 
 # 单例实例
-_config_loader: Optional[ConfigLoader] = None
+_config_loader: ConfigLoader | None = None
 
 
 def get_config_loader() -> ConfigLoader:

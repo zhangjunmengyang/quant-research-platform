@@ -5,23 +5,23 @@
 """
 
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 
-from ..core.store import (
-    get_research_store,
-    get_chunk_store,
-    ResearchStore,
-    ChunkStore,
-)
-from ..core.models import (
-    ResearchReport,
-    ResearchChunk,
-    ProcessingStatus,
-)
 from ..core.config import get_research_hub_settings
-from .llamaindex_rag import get_llamaindex_rag_service, LlamaIndexRAGService
+from ..core.models import (
+    ProcessingStatus,
+    ResearchChunk,
+    ResearchReport,
+)
+from ..core.store import (
+    ChunkStore,
+    ResearchStore,
+    get_chunk_store,
+    get_research_store,
+)
+from .llamaindex_rag import LlamaIndexRAGService, get_llamaindex_rag_service
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +52,8 @@ class ReportService:
 
     def __init__(
         self,
-        upload_dir: Optional[str] = None,
-        database_url: Optional[str] = None,
+        upload_dir: str | None = None,
+        database_url: str | None = None,
     ):
         settings = get_research_hub_settings()
         self.base_dir = Path(upload_dir or settings.upload_dir)
@@ -68,9 +68,9 @@ class ReportService:
         self.upload_dir = self.uploads_dir
 
         self.database_url = database_url
-        self._research_store: Optional[ResearchStore] = None
-        self._chunk_store: Optional[ChunkStore] = None
-        self._rag_service: Optional[LlamaIndexRAGService] = None
+        self._research_store: ResearchStore | None = None
+        self._chunk_store: ChunkStore | None = None
+        self._rag_service: LlamaIndexRAGService | None = None
 
     @property
     def research_store(self) -> ResearchStore:
@@ -96,9 +96,9 @@ class ReportService:
         self,
         file_content: bytes,
         filename: str,
-        title: Optional[str] = None,
-        author: Optional[str] = None,
-        source_url: Optional[str] = None,
+        title: str | None = None,
+        author: str | None = None,
+        source_url: str | None = None,
     ) -> ResearchReport:
         """
         上传研报文件
@@ -145,9 +145,9 @@ class ReportService:
     async def upload_from_path(
         self,
         file_path: str,
-        title: Optional[str] = None,
-        author: Optional[str] = None,
-        source_url: Optional[str] = None,
+        title: str | None = None,
+        author: str | None = None,
+        source_url: str | None = None,
     ) -> ResearchReport:
         """从本地路径上传研报"""
         path = Path(file_path)
@@ -165,10 +165,10 @@ class ReportService:
 
     async def upload_batch(
         self,
-        file_paths: List[str],
+        file_paths: list[str],
         auto_process: bool = False,
-        pipeline_name: Optional[str] = None,
-    ) -> List[ResearchReport]:
+        pipeline_name: str | None = None,
+    ) -> list[ResearchReport]:
         """批量上传研报"""
         reports = []
         for file_path in file_paths:
@@ -192,8 +192,8 @@ class ReportService:
         pattern: str = "*.pdf",
         recursive: bool = True,
         auto_process: bool = False,
-        pipeline_name: Optional[str] = None,
-    ) -> List[ResearchReport]:
+        pipeline_name: str | None = None,
+    ) -> list[ResearchReport]:
         """扫描目录并上传所有 PDF"""
         dir_path = Path(directory)
         if not dir_path.exists():
@@ -217,7 +217,7 @@ class ReportService:
     async def process(
         self,
         report_id: int,
-        pipeline_name: Optional[str] = None,  # 保留兼容性
+        pipeline_name: str | None = None,  # 保留兼容性
     ) -> bool:
         """
         处理研报（使用 LlamaIndex）
@@ -298,12 +298,12 @@ class ReportService:
 
     async def list_reports(
         self,
-        search: Optional[str] = None,
-        status: Optional[str] = None,
-        category: Optional[str] = None,
+        search: str | None = None,
+        status: str | None = None,
+        category: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> Tuple[List[ResearchReport], int]:
+    ) -> tuple[list[ResearchReport], int]:
         """列出研报"""
         return self.research_store.query(
             search=search,
@@ -313,7 +313,7 @@ class ReportService:
             offset=offset,
         )
 
-    async def get_report(self, report_id: int) -> Optional[ResearchReport]:
+    async def get_report(self, report_id: int) -> ResearchReport | None:
         """获取研报详情"""
         return self.research_store.get(report_id)
 
@@ -349,16 +349,16 @@ class ReportService:
     async def get_report_chunks(
         self,
         report_id: int,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
-    ) -> Tuple[List[ResearchChunk], int]:
+    ) -> tuple[list[ResearchChunk], int]:
         """获取研报的切块"""
         return self.chunk_store.get_by_report(report_id, limit=limit, offset=offset)
 
     async def get_processing_status(
         self,
         report_id: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """获取处理状态"""
         report = self.research_store.get(report_id)
         if not report:
@@ -378,12 +378,12 @@ class ReportService:
 
 
 # 单例管理
-_report_service: Optional[ReportService] = None
+_report_service: ReportService | None = None
 
 
 def get_report_service(
-    upload_dir: Optional[str] = None,
-    database_url: Optional[str] = None,
+    upload_dir: str | None = None,
+    database_url: str | None = None,
 ) -> ReportService:
     """获取研报服务单例"""
     global _report_service

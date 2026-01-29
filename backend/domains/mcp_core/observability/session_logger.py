@@ -9,7 +9,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .llm_logger import get_trace_id, set_session_id, set_trace_id
 from .models import (
@@ -18,7 +18,6 @@ from .models import (
     generate_id,
 )
 from .storage import LogStorage, get_log_storage
-
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +74,7 @@ class SessionLogger:
 
     def __init__(
         self,
-        storage: Optional[LogStorage] = None,
+        storage: LogStorage | None = None,
         enabled: bool = True,
         auto_cost_estimate: bool = True,
         console_output: bool = True,
@@ -84,12 +83,12 @@ class SessionLogger:
         self.enabled = enabled
         self.auto_cost_estimate = auto_cost_estimate
         self.console_output = console_output
-        self._active_sessions: Dict[str, SessionRecord] = {}
+        self._active_sessions: dict[str, SessionRecord] = {}
 
     def start_session(
         self,
-        session_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         开始新会话
@@ -138,7 +137,7 @@ class SessionLogger:
         session_id: str,
         status: SessionStatus = SessionStatus.COMPLETED,
         error_message: str = "",
-    ) -> Optional[SessionRecord]:
+    ) -> SessionRecord | None:
         """
         结束会话
 
@@ -212,7 +211,7 @@ class SessionLogger:
 
         return session
 
-    def get_session(self, session_id: str) -> Optional[SessionRecord]:
+    def get_session(self, session_id: str) -> SessionRecord | None:
         """获取会话记录"""
         # 先检查活跃会话
         if session_id in self._active_sessions:
@@ -220,7 +219,7 @@ class SessionLogger:
         # 再从存储加载
         return self.storage.get_session(session_id)
 
-    def get_session_summary(self, session_id: str) -> Dict[str, Any]:
+    def get_session_summary(self, session_id: str) -> dict[str, Any]:
         """
         获取会话摘要
 
@@ -303,9 +302,9 @@ class SessionLogger:
 
     def list_sessions(
         self,
-        status: Optional[SessionStatus] = None,
+        status: SessionStatus | None = None,
         limit: int = 100,
-    ) -> List[SessionRecord]:
+    ) -> list[SessionRecord]:
         """列出会话"""
         # 目前简单实现，返回活跃会话
         sessions = list(self._active_sessions.values())
@@ -317,7 +316,7 @@ class SessionLogger:
 
 
 # 全局会话日志实例
-_session_logger: Optional[SessionLogger] = None
+_session_logger: SessionLogger | None = None
 
 
 def get_session_logger() -> SessionLogger:
@@ -329,7 +328,7 @@ def get_session_logger() -> SessionLogger:
 
 
 def configure_session_logger(
-    storage: Optional[LogStorage] = None,
+    storage: LogStorage | None = None,
     **kwargs,
 ) -> SessionLogger:
     """配置全局会话日志实例"""
@@ -350,8 +349,8 @@ class Session:
 
     def __init__(
         self,
-        session_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        session_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.session_id = session_id
         self.metadata = metadata
@@ -390,6 +389,6 @@ class Session:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         return self.__exit__(exc_type, exc_val, exc_tb)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """获取会话摘要"""
         return self._session_logger.get_session_summary(self.session_id)

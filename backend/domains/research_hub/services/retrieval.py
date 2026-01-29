@@ -5,11 +5,11 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from ..core.store import get_research_store, ResearchStore
-from .llamaindex_rag import get_llamaindex_rag_service, LlamaIndexRAGService
-from .query_processor import get_query_processor, QueryProcessor
+from ..core.store import ResearchStore, get_research_store
+from .llamaindex_rag import LlamaIndexRAGService, get_llamaindex_rag_service
+from .query_processor import QueryProcessor, get_query_processor
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +37,11 @@ class RetrievalService:
         )
     """
 
-    def __init__(self, database_url: Optional[str] = None):
+    def __init__(self, database_url: str | None = None):
         self.database_url = database_url
-        self._research_store: Optional[ResearchStore] = None
-        self._rag_service: Optional[LlamaIndexRAGService] = None
-        self._query_processor: Optional[QueryProcessor] = None
+        self._research_store: ResearchStore | None = None
+        self._rag_service: LlamaIndexRAGService | None = None
+        self._query_processor: QueryProcessor | None = None
 
     @property
     def research_store(self) -> ResearchStore:
@@ -65,14 +65,14 @@ class RetrievalService:
         self,
         query: str,
         top_k: int = 10,
-        report_ids: Optional[List[int]] = None,
-        report_uuids: Optional[List[str]] = None,
-        categories: Optional[List[str]] = None,
+        report_ids: list[int] | None = None,
+        report_uuids: list[str] | None = None,
+        categories: list[str] | None = None,
         min_score: float = 0.0,
         enable_rewrite: bool = False,
         enable_rerank: bool = False,
-        rerank_top_k: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        rerank_top_k: int | None = None,
+    ) -> dict[str, Any]:
         """
         统一检索接口
 
@@ -158,10 +158,10 @@ class RetrievalService:
         self,
         query: str,
         top_k: int = 10,
-        report_id: Optional[int] = None,
-        report_uuid: Optional[str] = None,
+        report_id: int | None = None,
+        report_uuid: str | None = None,
         min_score: float = 0.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         基础语义检索（兼容旧接口）
 
@@ -186,7 +186,7 @@ class RetrievalService:
         self._enrich_results(results)
         return results
 
-    def _enrich_results(self, results: List[Dict[str, Any]]) -> None:
+    def _enrich_results(self, results: list[dict[str, Any]]) -> None:
         """丰富检索结果的研报信息"""
         for result in results:
             if not result.get("report_title") and result.get("report_uuid"):
@@ -198,11 +198,11 @@ class RetrievalService:
 
 
 # 单例管理
-_retrieval_service: Optional[RetrievalService] = None
+_retrieval_service: RetrievalService | None = None
 
 
 def get_retrieval_service(
-    database_url: Optional[str] = None,
+    database_url: str | None = None,
     **kwargs,  # 兼容旧参数
 ) -> RetrievalService:
     """获取检索服务单例"""

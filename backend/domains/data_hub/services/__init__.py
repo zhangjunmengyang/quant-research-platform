@@ -5,8 +5,8 @@
 """
 
 from .data_loader import DataLoader
-from .factor_calculator import FactorCalculator
 from .data_slicer import DataSlicer
+from .factor_calculator import FactorCalculator
 from .factor_data_loader import (
     FactorDataLoader,
     get_factor_data_loader,

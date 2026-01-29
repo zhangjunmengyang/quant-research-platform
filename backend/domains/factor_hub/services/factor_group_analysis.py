@@ -11,14 +11,13 @@
 """
 
 import asyncio
-import os
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Literal, Any
-import logging
+from typing import Any, Literal
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from ..core.config import get_config_loader
 
@@ -32,11 +31,11 @@ class FactorGroupAnalysisResult:
     bins: int
     method: str
     data_type: str
-    group_curve: Optional[pd.DataFrame] = None
-    bar_data: Optional[pd.DataFrame] = None
-    labels: List[str] = field(default_factory=list)
-    html_path: Optional[str] = None
-    error: Optional[str] = None
+    group_curve: pd.DataFrame | None = None
+    bar_data: pd.DataFrame | None = None
+    labels: list[str] = field(default_factory=list)
+    html_path: str | None = None
+    error: str | None = None
 
 
 class FactorGroupAnalysisService:
@@ -51,7 +50,7 @@ class FactorGroupAnalysisService:
     - 与回测引擎使用相同的因子计算逻辑
     """
 
-    def __init__(self, data_path: Optional[Path] = None):
+    def __init__(self, data_path: Path | None = None):
         """
         初始化服务
 
@@ -85,9 +84,9 @@ class FactorGroupAnalysisService:
 
     def _load_kline_data(
         self,
-        symbols: Optional[List[str]] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        symbols: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         data_type: str = 'all'
     ) -> pd.DataFrame:
         """
@@ -109,9 +108,9 @@ class FactorGroupAnalysisService:
 
     def _build_kline_data(
         self,
-        symbols: Optional[List[str]] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        symbols: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         data_type: str = 'all'
     ) -> pd.DataFrame:
         """
@@ -291,7 +290,7 @@ class FactorGroupAnalysisService:
         factor_col: str,
         bins: int,
         method: str
-    ) -> Tuple[List[str], pd.DataFrame]:
+    ) -> tuple[list[str], pd.DataFrame]:
         """
         计算分组收益
 
@@ -352,10 +351,10 @@ class FactorGroupAnalysisService:
         data_type: Literal['spot', 'swap', 'all'] = 'swap',
         bins: int = 5,
         method: Literal['pct', 'val'] = 'pct',
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
-        filter_configs: Optional[List[Tuple]] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        symbols: list[str] | None = None,
+        filter_configs: list[tuple] | None = None,
         generate_html: bool = False
     ) -> FactorGroupAnalysisResult:
         """
@@ -548,15 +547,15 @@ class FactorGroupAnalysisService:
 
     def analyze_multiple_factors(
         self,
-        factor_dict: Dict[str, List[Any]],
+        factor_dict: dict[str, list[Any]],
         data_type: Literal['spot', 'swap', 'all'] = 'swap',
         bins: int = 5,
         method: Literal['pct', 'val'] = 'pct',
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
-        filter_configs: Optional[List[Tuple]] = None
-    ) -> List[FactorGroupAnalysisResult]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+        symbols: list[str] | None = None,
+        filter_configs: list[tuple] | None = None
+    ) -> list[FactorGroupAnalysisResult]:
         """
         分析多个因子
 
@@ -601,10 +600,10 @@ class FactorGroupAnalysisService:
         data_type: Literal['spot', 'swap', 'all'] = 'swap',
         bins: int = 5,
         method: Literal['pct', 'val'] = 'pct',
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
-        filter_configs: Optional[List[Tuple]] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        symbols: list[str] | None = None,
+        filter_configs: list[tuple] | None = None,
         generate_html: bool = False
     ) -> FactorGroupAnalysisResult:
         """
@@ -643,15 +642,15 @@ class FactorGroupAnalysisService:
 
     async def analyze_multiple_factors_async(
         self,
-        factor_dict: Dict[str, List[Any]],
+        factor_dict: dict[str, list[Any]],
         data_type: Literal['spot', 'swap', 'all'] = 'swap',
         bins: int = 5,
         method: Literal['pct', 'val'] = 'pct',
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
-        filter_configs: Optional[List[Tuple]] = None
-    ) -> List[FactorGroupAnalysisResult]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+        symbols: list[str] | None = None,
+        filter_configs: list[tuple] | None = None
+    ) -> list[FactorGroupAnalysisResult]:
         """
         异步分析多个因子
 
@@ -684,7 +683,7 @@ class FactorGroupAnalysisService:
 
 
 # 单例模式
-_factor_group_analysis_service: Optional[FactorGroupAnalysisService] = None
+_factor_group_analysis_service: FactorGroupAnalysisService | None = None
 
 
 def get_factor_group_analysis_service() -> FactorGroupAnalysisService:

@@ -7,14 +7,13 @@
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-
 from domains.mcp_core.paths import get_data_dir
-from ..utils.plot_functions import draw_params_heatmap_plotly, merge_html_flexible
+
 from ..utils.data_functions import coins_difference_all_pairs
+from ..utils.plot_functions import draw_params_heatmap_plotly, merge_html_flexible
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +21,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CoinSimilarityResult:
     """选币相似度分析结果"""
-    strategies: List[str] = field(default_factory=list)
-    similarity_matrix: Optional[pd.DataFrame] = None
-    html_path: Optional[str] = None
-    error: Optional[str] = None
+    strategies: list[str] = field(default_factory=list)
+    similarity_matrix: pd.DataFrame | None = None
+    html_path: str | None = None
+    error: str | None = None
 
 
 class CoinSimilarityService:
@@ -35,7 +34,7 @@ class CoinSimilarityService:
     计算多策略之间的选币重合度。
     """
 
-    def __init__(self, data_path: Optional[Path] = None):
+    def __init__(self, data_path: Path | None = None):
         """
         初始化服务
 
@@ -46,7 +45,7 @@ class CoinSimilarityService:
         self.output_path = self.data_path / "analysis_results" / "coin_similarity"
         self.output_path.mkdir(parents=True, exist_ok=True)
 
-    def analyze(self, strategy_list: List[str]) -> CoinSimilarityResult:
+    def analyze(self, strategy_list: list[str]) -> CoinSimilarityResult:
         """
         分析多策略选币相似度
 
@@ -102,7 +101,7 @@ class CoinSimilarityService:
 
 
 # 单例模式
-_coin_similarity_service: Optional[CoinSimilarityService] = None
+_coin_similarity_service: CoinSimilarityService | None = None
 
 
 def get_coin_similarity_service() -> CoinSimilarityService:

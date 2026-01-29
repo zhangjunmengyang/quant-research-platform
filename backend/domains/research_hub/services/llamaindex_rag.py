@@ -7,15 +7,15 @@ LlamaIndex 向量存储服务
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from llama_index.core import Settings, VectorStoreIndex
 from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.postprocessor import SimilarityPostprocessor
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
-from llama_index.core.schema import NodeWithScore, TextNode, QueryBundle
-from llama_index.core.vector_stores import MetadataFilter, MetadataFilters, FilterOperator
+from llama_index.core.schema import NodeWithScore, QueryBundle, TextNode
+from llama_index.core.vector_stores import FilterOperator, MetadataFilter, MetadataFilters
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.vector_stores.postgres import PGVectorStore
 
@@ -35,17 +35,17 @@ class ExcludeSameReportPostProcessor(BaseNodePostprocessor):
     发现跨研报的相似观点。
     """
 
-    exclude_report_id: Optional[str] = None
+    exclude_report_id: str | None = None
 
-    def __init__(self, exclude_report_id: Optional[str] = None, **kwargs):
+    def __init__(self, exclude_report_id: str | None = None, **kwargs):
         super().__init__(**kwargs)
         self.exclude_report_id = exclude_report_id
 
     def _postprocess_nodes(
         self,
-        nodes: List[NodeWithScore],
-        query_bundle: Optional[QueryBundle] = None,
-    ) -> List[NodeWithScore]:
+        nodes: list[NodeWithScore],
+        query_bundle: QueryBundle | None = None,
+    ) -> list[NodeWithScore]:
         if not self.exclude_report_id:
             return nodes
 
@@ -96,9 +96,9 @@ class LlamaIndexRAGService:
         self.chunk_overlap = chunk_overlap
         self.table_name = table_name
 
-        self._vector_store: Optional[PGVectorStore] = None
-        self._index: Optional[VectorStoreIndex] = None
-        self._pipeline: Optional[IngestionPipeline] = None
+        self._vector_store: PGVectorStore | None = None
+        self._index: VectorStoreIndex | None = None
+        self._pipeline: IngestionPipeline | None = None
         self._is_setup = False
 
     async def setup(self) -> None:
@@ -153,7 +153,7 @@ class LlamaIndexRAGService:
         report_id: int,
         report_uuid: str,
         report_title: str = "",
-    ) -> List[TextNode]:
+    ) -> list[TextNode]:
         """
         摄取文档
 
@@ -194,10 +194,10 @@ class LlamaIndexRAGService:
         report_id: int,
         report_uuid: str,
         report_title: str = "",
-        page_start: Optional[int] = None,
+        page_start: int | None = None,
         section_title: str = "",
         chunk_type: str = "text",
-    ) -> List[TextNode]:
+    ) -> list[TextNode]:
         """
         摄取文本内容（用于已解析的 Markdown）
 
@@ -240,10 +240,10 @@ class LlamaIndexRAGService:
         self,
         query: str,
         top_k: int = 10,
-        report_id: Optional[int] = None,
-        report_uuid: Optional[str] = None,
+        report_id: int | None = None,
+        report_uuid: str | None = None,
         min_score: float = 0.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         语义检索
 
@@ -299,7 +299,7 @@ class LlamaIndexRAGService:
         chunk_id: str,
         top_k: int = 5,
         exclude_same_report: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取相似切块
 
@@ -393,9 +393,9 @@ class LlamaIndexRAGService:
 
     def _build_filters(
         self,
-        report_id: Optional[int] = None,
-        report_uuid: Optional[str] = None,
-    ) -> Optional[MetadataFilters]:
+        report_id: int | None = None,
+        report_uuid: str | None = None,
+    ) -> MetadataFilters | None:
         """构建元数据过滤器"""
         filter_list = []
 
@@ -423,7 +423,7 @@ class LlamaIndexRAGService:
 # =============================================================================
 
 
-_llamaindex_rag_service: Optional[LlamaIndexRAGService] = None
+_llamaindex_rag_service: LlamaIndexRAGService | None = None
 
 
 def get_llamaindex_rag_service(**kwargs) -> LlamaIndexRAGService:

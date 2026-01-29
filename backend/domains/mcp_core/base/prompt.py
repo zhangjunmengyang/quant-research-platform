@@ -7,11 +7,12 @@ MCP Prompt 基类和提供者
 - Prompt 分类管理
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Callable, Awaitable
-from dataclasses import dataclass, field
 import logging
 import re
+from abc import ABC
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,9 @@ class PromptDefinition:
     """MCP Prompt 定义"""
     name: str
     description: str
-    arguments: List[PromptArgument] = field(default_factory=list)
+    arguments: list[PromptArgument] = field(default_factory=list)
 
-    def to_mcp_format(self) -> Dict[str, Any]:
+    def to_mcp_format(self) -> dict[str, Any]:
         """转换为 MCP 协议格式"""
         return {
             "name": self.name,
@@ -53,7 +54,7 @@ class PromptMessage:
     role: str  # "user" | "assistant"
     content: str
 
-    def to_mcp_format(self) -> Dict[str, Any]:
+    def to_mcp_format(self) -> dict[str, Any]:
         """转换为 MCP 协议格式"""
         return {
             "role": self.role,
@@ -67,10 +68,10 @@ class PromptMessage:
 @dataclass
 class PromptResult:
     """Prompt 获取结果"""
-    description: Optional[str]
-    messages: List[PromptMessage]
+    description: str | None
+    messages: list[PromptMessage]
 
-    def to_mcp_format(self) -> Dict[str, Any]:
+    def to_mcp_format(self) -> dict[str, Any]:
         """转换为 MCP 协议格式"""
         result = {
             "messages": [msg.to_mcp_format() for msg in self.messages],
@@ -113,14 +114,14 @@ class BasePromptProvider(ABC):
     """
 
     def __init__(self):
-        self._prompts: Dict[str, Dict[str, Any]] = {}
+        self._prompts: dict[str, dict[str, Any]] = {}
 
     def register(
         self,
         name: str,
         description: str,
         handler: Callable[..., Awaitable[PromptResult]],
-        arguments: Optional[List[PromptArgument]] = None,
+        arguments: list[PromptArgument] | None = None,
     ) -> None:
         """
         注册 Prompt
@@ -141,11 +142,11 @@ class BasePromptProvider(ABC):
         }
         logger.debug(f"注册 Prompt: {name}")
 
-    def list_prompts(self) -> List[PromptDefinition]:
+    def list_prompts(self) -> list[PromptDefinition]:
         """列出所有可用 Prompt"""
         return [p["definition"] for p in self._prompts.values()]
 
-    async def get_prompt(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Optional[PromptResult]:
+    async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> PromptResult | None:
         """
         获取 Prompt
 
@@ -174,7 +175,7 @@ class BasePromptProvider(ABC):
         try:
             result = await handler(**arguments)
             return result
-        except Exception as e:
+        except Exception:
             logger.exception(f"获取 Prompt {name} 失败")
             return None
 
@@ -192,7 +193,7 @@ class TemplatePromptProvider(BasePromptProvider):
         description: str,
         template: str,
         role: str = "user",
-        arguments: Optional[List[PromptArgument]] = None,
+        arguments: list[PromptArgument] | None = None,
     ) -> None:
         """
         注册模板 Prompt
@@ -222,8 +223,8 @@ class TemplatePromptProvider(BasePromptProvider):
 class EmptyPromptProvider(BasePromptProvider):
     """空 Prompt 提供者，用于不需要 Prompt 的场景"""
 
-    def list_prompts(self) -> List[PromptDefinition]:
+    def list_prompts(self) -> list[PromptDefinition]:
         return []
 
-    async def get_prompt(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Optional[PromptResult]:
+    async def get_prompt(self, name: str, arguments: dict[str, Any] | None = None) -> PromptResult | None:
         return None

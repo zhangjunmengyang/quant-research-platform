@@ -5,11 +5,10 @@
 注意: 参数搜索/分析工具已移至 factor-hub，实现因子粒度的参数敏感性分析。
 """
 
-from typing import Any, Dict, List
 import logging
+from typing import Any
 
 from domains.mcp_core import BaseTool, ToolResult
-
 from domains.strategy_hub.services import (
     get_backtest_comparison_service,
     get_coin_similarity_service,
@@ -33,7 +32,7 @@ class CompareBacktestLiveTool(BaseTool):
         return "对比回测和实盘的资金曲线、选币结果"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -92,7 +91,7 @@ class CompareStrategyCoinsTool(BaseTool):
         return "计算多策略之间的选币重合度"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -105,7 +104,7 @@ class CompareStrategyCoinsTool(BaseTool):
             "required": ["strategy_list"],
         }
 
-    async def execute(self, strategy_list: List[str]) -> ToolResult:
+    async def execute(self, strategy_list: list[str]) -> ToolResult:
         try:
             service = get_coin_similarity_service()
             result = service.analyze(strategy_list)
@@ -132,7 +131,7 @@ class CompareEquityCurvesTool(BaseTool):
         return "计算多策略资金曲线涨跌幅之间的相关性"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -145,7 +144,7 @@ class CompareEquityCurvesTool(BaseTool):
             "required": ["strategy_list"],
         }
 
-    async def execute(self, strategy_list: List[str]) -> ToolResult:
+    async def execute(self, strategy_list: list[str]) -> ToolResult:
         try:
             service = get_equity_correlation_service()
             result = service.analyze(strategy_list)

@@ -10,7 +10,8 @@ OpenAI 兼容模式的 ChatOpenAI 扩展
 - https://github.com/langchain-ai/langchain/issues/34056
 """
 
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import openai
 from langchain_core.language_models import LanguageModelInput

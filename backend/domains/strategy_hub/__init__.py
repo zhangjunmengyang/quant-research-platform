@@ -27,12 +27,12 @@ if str(_engine_path) not in sys.path:
 
 # 导出服务层
 from .services import (
-    Strategy,
-    TaskStatus,
-    TaskInfo,
-    StrategyStore,
-    get_strategy_store,
     BacktestRunner,
+    Strategy,
+    StrategyStore,
+    TaskInfo,
+    TaskStatus,
+    get_strategy_store,
     isolated_cache,
 )
 

@@ -4,14 +4,13 @@
 提供灵活的数据查询和切片能力。
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 import pandas as pd
+from domains.core.exceptions import DataNotFoundError
 
 from .data_loader import DataLoader
 from .factor_calculator import FactorCalculator
-from ..core.models import DataConfig
-from domains.core.exceptions import DataNotFoundError
 
 
 class DataSlicer:
@@ -24,8 +23,8 @@ class DataSlicer:
 
     def __init__(
         self,
-        loader: Optional[DataLoader] = None,
-        calculator: Optional[FactorCalculator] = None,
+        loader: DataLoader | None = None,
+        calculator: FactorCalculator | None = None,
     ):
         """
         初始化数据切片器
@@ -41,7 +40,7 @@ class DataSlicer:
         self,
         start: str,
         end: str,
-        symbols: Optional[List[str]] = None,
+        symbols: list[str] | None = None,
         data_type: str = 'swap',
     ) -> pd.DataFrame:
         """
@@ -75,10 +74,10 @@ class DataSlicer:
 
     def slice_by_symbol(
         self,
-        symbols: List[str],
-        start: Optional[str] = None,
-        end: Optional[str] = None,
-        with_factors: Optional[Dict[str, List[Any]]] = None,
+        symbols: list[str],
+        start: str | None = None,
+        end: str | None = None,
+        with_factors: dict[str, list[Any]] | None = None,
         data_type: str = 'swap',
     ) -> pd.DataFrame:
         """
@@ -116,8 +115,8 @@ class DataSlicer:
     def get_cross_section(
         self,
         timestamp: str,
-        symbols: Optional[List[str]] = None,
-        factors: Optional[Dict[str, List[Any]]] = None,
+        symbols: list[str] | None = None,
+        factors: dict[str, list[Any]] | None = None,
         data_type: str = 'swap',
         lookback_hours: int = 500,
     ) -> pd.DataFrame:
@@ -177,8 +176,8 @@ class DataSlicer:
 
     def get_latest_data(
         self,
-        symbols: Optional[List[str]] = None,
-        factors: Optional[Dict[str, List[Any]]] = None,
+        symbols: list[str] | None = None,
+        factors: dict[str, list[Any]] | None = None,
         data_type: str = 'swap',
         lookback_hours: int = 500,
     ) -> pd.DataFrame:
@@ -231,10 +230,10 @@ class DataSlicer:
         self,
         factor_name: str,
         param: Any,
-        timestamp: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
+        timestamp: str | None = None,
+        symbols: list[str] | None = None,
         ascending: bool = True,
-        top_n: Optional[int] = None,
+        top_n: int | None = None,
         data_type: str = 'swap',
     ) -> pd.DataFrame:
         """

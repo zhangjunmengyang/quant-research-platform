@@ -105,7 +105,6 @@ const NavItemComponent = memo(function NavItemComponent({
 }: {
   item: NavItem
   isActive: boolean
-  index: number
 }) {
   const { t } = useTranslation()
 
@@ -155,7 +154,6 @@ const NavGroupComponent = memo(function NavGroupComponent({
 }: {
   group: NavGroup
   activeStates: Map<string, boolean>
-  groupIndex: number
 }) {
   const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(group.defaultOpen ?? true)
@@ -189,12 +187,11 @@ const NavGroupComponent = memo(function NavGroupComponent({
             transition={{ duration: 0.15, ease: 'easeInOut' }}
             className="mt-1 space-y-0.5 overflow-hidden"
           >
-            {group.items.map((item, index) => (
+            {group.items.map((item) => (
               <NavItemComponent
                 key={item.href}
                 item={item}
                 isActive={activeStates.get(item.href) ?? false}
-                index={index}
               />
             ))}
           </motion.ul>
@@ -234,12 +231,11 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-auto px-2.5 py-3">
-        {navigation.map((group, index) => (
+        {navigation.map((group) => (
           <NavGroupComponent
             key={group.titleKey}
             group={group}
             activeStates={activeStates}
-            groupIndex={index}
           />
         ))}
       </nav>

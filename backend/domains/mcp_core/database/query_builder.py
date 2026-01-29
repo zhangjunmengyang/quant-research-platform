@@ -10,7 +10,7 @@ SQL 查询构建器
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +38,16 @@ class QueryBuilder:
     """
 
     table: str
-    allowed_columns: Set[str]
-    numeric_fields: Set[str] = field(default_factory=set)
+    allowed_columns: set[str]
+    numeric_fields: set[str] = field(default_factory=set)
 
     # 内部状态
     _select: str = "*"
-    _where_clauses: List[str] = field(default_factory=list)
-    _params: List[Any] = field(default_factory=list)
-    _order_by: Optional[str] = None
-    _limit: Optional[int] = None
-    _offset: Optional[int] = None
+    _where_clauses: list[str] = field(default_factory=list)
+    _params: list[Any] = field(default_factory=list)
+    _order_by: str | None = None
+    _limit: int | None = None
+    _offset: int | None = None
 
     def __post_init__(self):
         # 确保使用新列表，避免共享状态
@@ -93,7 +93,7 @@ class QueryBuilder:
 
         return self
 
-    def where_raw(self, clause: str, params: List[Any] = None) -> 'QueryBuilder':
+    def where_raw(self, clause: str, params: list[Any] = None) -> 'QueryBuilder':
         """
         添加原始 WHERE 条件（谨慎使用）
 
@@ -162,7 +162,7 @@ class QueryBuilder:
         self._offset = offset
         return self
 
-    def build(self) -> Tuple[str, List[Any]]:
+    def build(self) -> tuple[str, list[Any]]:
         """
         构建 SQL 查询
 
@@ -189,7 +189,7 @@ class QueryBuilder:
 
         return sql, params
 
-    def build_count(self) -> Tuple[str, List[Any]]:
+    def build_count(self) -> tuple[str, list[Any]]:
         """
         构建 COUNT 查询
 
@@ -217,7 +217,7 @@ class QueryBuilder:
         self,
         field_name: str,
         value: Any
-    ) -> Tuple[Optional[str], List[Any]]:
+    ) -> tuple[str | None, list[Any]]:
         """
         解析条件值，返回 SQL 子句和参数
 
@@ -263,7 +263,7 @@ class QueryBuilder:
         # 普通等于
         return f'{field_name} = %s', [value]
 
-    def _parse_number(self, value: str) -> Union[int, float]:
+    def _parse_number(self, value: str) -> int | float:
         """解析数值"""
         try:
             if '.' in value:
@@ -275,8 +275,8 @@ class QueryBuilder:
 
 def create_query_builder(
     table: str,
-    allowed_columns: Set[str],
-    numeric_fields: Set[str] = None
+    allowed_columns: set[str],
+    numeric_fields: set[str] = None
 ) -> QueryBuilder:
     """
     创建查询构建器的工厂函数

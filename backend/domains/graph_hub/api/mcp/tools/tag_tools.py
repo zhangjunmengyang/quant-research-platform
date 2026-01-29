@@ -4,10 +4,11 @@
 提供实体标签的添加、移除、查询功能，用于给币种、因子、策略等打标签。
 """
 
-from typing import Any, Dict
+from typing import Any
+
+from domains.graph_hub.core.models import NodeType
 
 from .base import BaseTool, ToolResult
-from domains.graph_hub.core.models import NodeType
 
 
 class AddTagTool(BaseTool):
@@ -48,7 +49,7 @@ class AddTagTool(BaseTool):
 - 一个实体可以有多个标签"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -142,7 +143,7 @@ class RemoveTagTool(BaseTool):
 - 只移除指定的标签，不影响其他标签"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -222,7 +223,7 @@ class GetEntityTagsTool(BaseTool):
 - count: 标签数量"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -298,7 +299,7 @@ class GetEntitiesByTagTool(BaseTool):
 - count: 实体数量"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -370,7 +371,7 @@ list_all_tags()
 返回按使用次数降序排列，便于发现最常用的标签。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {}

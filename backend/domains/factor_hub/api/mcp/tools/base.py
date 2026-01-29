@@ -7,9 +7,9 @@ MCP Tool 基类和工具注册器
 # 从 mcp_core 导入基类
 from domains.mcp_core import (
     DomainBaseTool,
-    ToolResult,
     ToolDefinition,
     ToolRegistry,
+    ToolResult,
     get_tool_registry,
     register_tool,
 )

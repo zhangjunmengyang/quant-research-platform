@@ -11,7 +11,6 @@ MCP Server - 研报知识库 MCP 服务器
 """
 
 import logging
-from typing import Optional
 
 from domains.mcp_core import (
     BaseMCPServer,
@@ -21,8 +20,8 @@ from domains.mcp_core import (
 )
 
 from .tools.report_tools import (
-    ListReportsTool,
     GetReportTool,
+    ListReportsTool,
 )
 from .tools.search_tools import RetrieveTool
 
@@ -61,7 +60,7 @@ def create_research_hub_config(
     port: int = 6793,
     log_level: str = "INFO",
     auth_enabled: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MCPConfig:
     """
     创建研报知识库 MCP 配置
@@ -90,7 +89,7 @@ def create_research_hub_config(
     )
 
 
-def create_mcp_server(config: Optional[MCPConfig] = None):
+def create_mcp_server(config: MCPConfig | None = None):
     """
     创建 MCP FastAPI 应用 (Streamable HTTP)
 

@@ -59,7 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_experiences_title_trgm ON experiences USING GIN (
 
 -- ============================================
 -- [已删除] experience_links 表已迁移至 Neo4j (graph-hub)
--- 参见: docs/architecture/tasks/graph-migration.md
+-- 参见: private/docs/architecture/tasks/graph-migration.md
 -- ============================================
 
 -- ============================================

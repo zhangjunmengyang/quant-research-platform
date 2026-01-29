@@ -4,21 +4,19 @@
 代理到 engine 服务层，确保与回测引擎使用完全相同的因子计算逻辑。
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Any
 
 import pandas as pd
-
-from ..core.models import FactorResult, FactorInfo
-from domains.core.exceptions import FactorNotFoundError, CalculationError
+from domains.core.exceptions import CalculationError, FactorNotFoundError
+from domains.engine.core.utils.factor_hub import FactorHub
 
 # 使用 engine 服务
 from domains.engine.services import (
-    FactorCalculatorService,
-    get_factor_calculator as get_engine_factor_calculator,
-    DataLoaderService,
     get_data_loader as get_engine_data_loader,
+    get_factor_calculator as get_engine_factor_calculator,
 )
-from domains.engine.core.utils.factor_hub import FactorHub
+
+from ..core.models import FactorInfo, FactorResult
 
 
 class FactorCalculator:
@@ -33,7 +31,7 @@ class FactorCalculator:
         self._engine_calculator = get_engine_factor_calculator()
         self._engine_loader = get_engine_data_loader()
 
-    def list_factors(self) -> List[str]:
+    def list_factors(self) -> list[str]:
         """
         列出所有可用因子
 
@@ -42,7 +40,7 @@ class FactorCalculator:
         """
         return FactorHub.get_all_names()
 
-    def list_section_factors(self) -> List[str]:
+    def list_section_factors(self) -> list[str]:
         """
         列出所有截面因子
 
@@ -84,8 +82,8 @@ class FactorCalculator:
         self,
         factor_name: str,
         kline_df: pd.DataFrame,
-        params: List[Any],
-    ) -> Dict[str, pd.Series]:
+        params: list[Any],
+    ) -> dict[str, pd.Series]:
         """
         计算单个因子
 
@@ -122,9 +120,9 @@ class FactorCalculator:
         self,
         factor_name: str,
         kline_df: pd.DataFrame,
-        params: List[Any],
+        params: list[Any],
         symbol: str,
-    ) -> List[FactorResult]:
+    ) -> list[FactorResult]:
         """
         为单个币种计算因子
 
@@ -152,9 +150,9 @@ class FactorCalculator:
 
     def calculate_batch(
         self,
-        factor_params: Dict[str, List[Any]],
+        factor_params: dict[str, list[Any]],
         kline_df: pd.DataFrame,
-    ) -> Dict[str, Dict[str, pd.Series]]:
+    ) -> dict[str, dict[str, pd.Series]]:
         """
         批量计算多个因子
 
@@ -182,7 +180,7 @@ class FactorCalculator:
     def add_factors_to_df(
         self,
         df: pd.DataFrame,
-        factor_params: Dict[str, List[Any]],
+        factor_params: dict[str, list[Any]],
     ) -> pd.DataFrame:
         """
         将因子计算结果添加到 DataFrame

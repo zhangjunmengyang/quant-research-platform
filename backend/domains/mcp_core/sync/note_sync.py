@@ -9,7 +9,7 @@ import logging
 import re
 import uuid as uuid_lib
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import BaseSyncService
 
@@ -69,7 +69,7 @@ class NoteSyncService(BaseSyncService):
         super().__init__(data_dir, store)
         self.notes_dir = data_dir / "notes"
 
-    def export_all(self, overwrite: bool = False) -> Dict[str, int]:
+    def export_all(self, overwrite: bool = False) -> dict[str, int]:
         """
         导出所有笔记到 Markdown 文件
 
@@ -133,7 +133,7 @@ class NoteSyncService(BaseSyncService):
         logger.info(f"notes_exported: {stats}")
         return stats
 
-    def import_all(self) -> Dict[str, int]:
+    def import_all(self) -> dict[str, int]:
         """
         从 Markdown 文件导入笔记
 
@@ -223,7 +223,7 @@ class NoteSyncService(BaseSyncService):
                 except Exception as e:
                     logger.warning(f"failed_to_clean_old_file: {old_file}, {e}")
 
-    def _note_to_markdown(self, note: Any) -> tuple[Dict[str, Any], str]:
+    def _note_to_markdown(self, note: Any) -> tuple[dict[str, Any], str]:
         """将笔记对象转换为 Markdown 格式"""
         metadata = {
             'uuid': note.uuid,  # UUID 放在最前面，作为主要标识
@@ -305,7 +305,7 @@ class NoteSyncService(BaseSyncService):
         self.store.add(note)
         return "created"
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取同步状态"""
         status = {
             "db_count": 0,
@@ -409,7 +409,7 @@ class NoteSyncService(BaseSyncService):
             logger.error(f"note_import_single_error: {note_id}, {e}")
             return False
 
-    def sync_deletions(self, archive_orphans: bool = True) -> Dict[str, int]:
+    def sync_deletions(self, archive_orphans: bool = True) -> dict[str, int]:
         """
         同步删除操作
 

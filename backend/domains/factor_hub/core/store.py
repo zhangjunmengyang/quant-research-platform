@@ -5,25 +5,23 @@
 继承 mcp_core.BaseStore，复用连接管理和通用 CRUD。
 """
 
-import uuid as uuid_lib
 import logging
 import math
+import uuid as uuid_lib
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Any
 
 import psycopg2
-
 from domains.mcp_core.base.store import (
     BaseStore,
-    get_database_url,
     get_store_instance,
     reset_store_instance,
 )
 from domains.mcp_core.database.query_builder import QueryBuilder
 
-from .models import Factor, FactorType
 from .config import get_config_loader
+from .models import Factor, FactorType
 
 logger = logging.getLogger(__name__)
 
@@ -76,11 +74,11 @@ class FactorStore(BaseStore[Factor]):
 
     REVERSE_MAPPING = {v: k for k, v in COLUMN_MAPPING.items()}
 
-    def _row_to_entity(self, row: Dict[str, Any]) -> Factor:
+    def _row_to_entity(self, row: dict[str, Any]) -> Factor:
         """将数据库行转换为 Factor 对象"""
         return self._row_to_factor(row)
 
-    def _row_to_factor(self, row: Dict[str, Any]) -> Factor:
+    def _row_to_factor(self, row: dict[str, Any]) -> Factor:
         """将数据库行转换为 Factor 对象"""
         # 处理 PostgreSQL 的整数字段
         if 'verification_status' in row:
@@ -102,7 +100,7 @@ class FactorStore(BaseStore[Factor]):
 
     # ==================== 基本 CRUD ====================
 
-    def get(self, filename: str, include_excluded: bool = False) -> Optional[Factor]:
+    def get(self, filename: str, include_excluded: bool = False) -> Factor | None:
         """获取单个因子"""
         with self._cursor() as cursor:
             if include_excluded:
@@ -120,7 +118,7 @@ class FactorStore(BaseStore[Factor]):
                 return self._row_to_factor(dict(row))
         return None
 
-    def get_all(self, include_excluded: bool = False) -> List[Factor]:
+    def get_all(self, include_excluded: bool = False) -> list[Factor]:
         """获取所有因子"""
         with self._cursor() as cursor:
             if include_excluded:
@@ -186,7 +184,7 @@ class FactorStore(BaseStore[Factor]):
             safe_fields['excluded'] = bool(safe_fields['excluded'])
         # verification_status 是整数 (0/1/2)，不需要特殊处理
 
-        set_clause = ', '.join(f'{k} = %s' for k in safe_fields.keys())
+        set_clause = ', '.join(f'{k} = %s' for k in safe_fields)
         values = list(safe_fields.values()) + [filename]
 
         with self._cursor() as cursor:
@@ -222,14 +220,13 @@ class FactorStore(BaseStore[Factor]):
             return cursor.rowcount > 0
 
     def _delete_factor_edges(self, filename: str) -> None:
-        """删除因子关联的所有边"""
+        """删除因子关联的所有边（Neo4j）"""
         try:
-            from domains.mcp_core.edge.store import get_edge_store
-            from domains.mcp_core.edge.models import EdgeEntityType
+            from domains.graph_hub.core import NodeType, get_graph_store
 
-            edge_store = get_edge_store()
-            deleted_count = edge_store.delete_edges_by_entity(
-                EdgeEntityType.FACTOR,
+            graph_store = get_graph_store()
+            deleted_count = graph_store.delete_edges_by_entity(
+                NodeType.FACTOR,
                 filename
             )
             if deleted_count > 0:
@@ -240,7 +237,7 @@ class FactorStore(BaseStore[Factor]):
 
     # ==================== 批量操作 ====================
 
-    def batch_add(self, factors: List[Factor]) -> Tuple[int, int]:
+    def batch_add(self, factors: list[Factor]) -> tuple[int, int]:
         """批量添加因子，返回 (成功数, 失败数)"""
         success, failed = 0, 0
         for factor in factors:
@@ -254,12 +251,12 @@ class FactorStore(BaseStore[Factor]):
 
     def query(
         self,
-        filter_condition: Optional[Dict[str, Any]] = None,
-        order_by: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
+        filter_condition: dict[str, Any] | None = None,
+        order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
         include_excluded: bool = False
-    ) -> List[Factor]:
+    ) -> list[Factor]:
         """
         条件查询因子
 
@@ -301,29 +298,29 @@ class FactorStore(BaseStore[Factor]):
             cursor.execute(sql, params)
             return [self._row_to_factor(dict(row)) for row in cursor.fetchall()]
 
-    def get_unscored(self) -> List[Factor]:
+    def get_unscored(self) -> list[Factor]:
         """获取未评分的因子"""
         return self.query({'llm_score': 'empty'})
 
-    def get_passed(self) -> List[Factor]:
+    def get_passed(self) -> list[Factor]:
         """获取验证通过的因子"""
         from .models import VerificationStatus
         return self.query({'verification_status': VerificationStatus.PASSED})
 
-    def get_failed(self) -> List[Factor]:
+    def get_failed(self) -> list[Factor]:
         """获取废弃（失败研究）的因子"""
         from .models import VerificationStatus
         return self.query({'verification_status': VerificationStatus.FAILED})
 
-    def get_low_score(self, threshold: float = 2.0) -> List[Factor]:
+    def get_low_score(self, threshold: float = 2.0) -> list[Factor]:
         """获取低分因子"""
         return self.query({'llm_score': f'<{threshold}'})
 
-    def count(self, filter_condition: Optional[Dict[str, Any]] = None) -> int:
+    def count(self, filter_condition: dict[str, Any] | None = None) -> int:
         """统计因子数量"""
         return len(self.query(filter_condition))
 
-    def get_styles(self) -> List[str]:
+    def get_styles(self) -> list[str]:
         """获取所有因子风格（去重）"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -337,7 +334,7 @@ class FactorStore(BaseStore[Factor]):
                         styles.add(s)
             return sorted(styles)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息
 
         优化版本：使用单次 SQL 查询获取所有基础统计，减少数据库往返
@@ -495,7 +492,7 @@ class FactorStore(BaseStore[Factor]):
 
     # ==================== 排除因子管理 ====================
 
-    def get_excluded_factors(self) -> Dict[str, str]:
+    def get_excluded_factors(self) -> dict[str, str]:
         """获取所有排除的因子，返回 {filename: reason}"""
         excluded = {}
         with self._cursor() as cursor:
@@ -516,7 +513,7 @@ class FactorStore(BaseStore[Factor]):
 
     # ==================== 代码同步 ====================
 
-    def sync_code_from_files(self) -> Dict[str, int]:
+    def sync_code_from_files(self) -> dict[str, int]:
         """从 factors/ 目录同步代码到数据库"""
         config = get_config_loader()
         stats = {"updated": 0, "created": 0, "unchanged": 0}
@@ -548,8 +545,8 @@ class FactorStore(BaseStore[Factor]):
         self,
         directory: Path,
         factor_type: str,
-        excluded: Dict[str, str],
-        stats: Dict[str, int]
+        excluded: dict[str, str],
+        stats: dict[str, int]
     ):
         """同步单个目录的因子文件"""
         for py_file in directory.glob("*.py"):
@@ -593,17 +590,17 @@ class FactorStore(BaseStore[Factor]):
                 else:
                     stats["unchanged"] += 1
 
-    def get_time_series_factors(self) -> List[Factor]:
+    def get_time_series_factors(self) -> list[Factor]:
         """获取所有时序因子"""
         return self.query({'factor_type': FactorType.TIME_SERIES})
 
-    def get_cross_section_factors(self) -> List[Factor]:
+    def get_cross_section_factors(self) -> list[Factor]:
         """获取所有截面因子"""
         return self.query({'factor_type': FactorType.CROSS_SECTION})
 
     # ==================== 导出功能 ====================
 
-    def export_to_markdown(self, output_path: Optional[str] = None) -> str:
+    def export_to_markdown(self, output_path: str | None = None) -> str:
         """导出为 Markdown 表格"""
         factors = self.get_all()
 
@@ -643,7 +640,7 @@ class FactorStore(BaseStore[Factor]):
 
 # ==================== 单例管理 ====================
 
-def get_factor_store(database_url: Optional[str] = None) -> FactorStore:
+def get_factor_store(database_url: str | None = None) -> FactorStore:
     """获取因子存储层单例"""
     return get_store_instance(FactorStore, "FactorStore", database_url=database_url)
 

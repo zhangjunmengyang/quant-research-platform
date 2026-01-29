@@ -51,23 +51,26 @@ def create_start_handler() -> Callable:
                 unchanged=sync_stats.get("unchanged", 0),
             )
 
-            # Sync private data from files (factors metadata, notes, strategies, experiences)
+            # Sync private data from files (factors metadata, notes, strategies, experiences, tags)
+            # 使用 full_sync=True 完全同步，以文件为准
             try:
                 from domains.mcp_core.sync import SyncManager
                 sync_manager = SyncManager()
 
-                # Only import if private-data directory exists
+                # Only restore if private-data directory exists
                 if sync_manager.data_dir.exists():
-                    import_stats = sync_manager.import_all()
-                    for data_type, stats in import_stats.items():
+                    restore_stats = sync_manager.restore(full_sync=True)
+                    for data_type, stats in restore_stats.items():
                         created = stats.get("created", 0)
                         updated = stats.get("updated", 0)
-                        if created > 0 or updated > 0:
+                        deleted = stats.get("deleted", 0)
+                        if created > 0 or updated > 0 or deleted > 0:
                             logger.info(
                                 f"{data_type}_synced",
                                 component="sync_manager",
                                 created=created,
                                 updated=updated,
+                                deleted=deleted,
                             )
             except Exception as e:
                 logger.warning("private_data_sync_skipped", component="sync_manager", error=str(e))

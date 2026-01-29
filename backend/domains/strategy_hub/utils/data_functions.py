@@ -9,7 +9,6 @@ import time
 from functools import reduce
 from itertools import combinations
 from pathlib import Path
-from typing import List, Union, Tuple, Dict, Any
 
 import numpy as np
 import pandas as pd
@@ -20,7 +19,7 @@ def _calculate_group_returns(
     factor_name: str,
     bins: int,
     method: str = 'val'
-) -> Tuple[List[str], pd.DataFrame]:
+) -> tuple[list[str], pd.DataFrame]:
     """
     分组收益计算内部函数
 
@@ -74,7 +73,7 @@ def group_analysis(
     factor_name: str,
     bins: int = 10,
     method: str = 'val'
-) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
     """
     因子分组分析
 
@@ -131,9 +130,9 @@ def group_analysis(
 
 
 def coins_difference_all_pairs(
-    root_path: Union[str, Path],
-    strategies_list: List[str]
-) -> List[Tuple[str, str, float]]:
+    root_path: str | Path,
+    strategies_list: list[str]
+) -> list[tuple[str, str, float]]:
     """
     计算所有策略两两之间的选币相似度
 
@@ -199,8 +198,8 @@ def coins_difference_all_pairs(
 
 
 def curve_difference_all_pairs(
-    root_path: Union[str, Path],
-    strategies_list: List[str]
+    root_path: str | Path,
+    strategies_list: list[str]
 ) -> pd.DataFrame:
     """
     获取所有策略资金曲线结果
@@ -232,7 +231,7 @@ def curve_difference_all_pairs(
 
 
 def process_equity_data(
-    root_path: Union[str, Path],
+    root_path: str | Path,
     backtest_name: str,
     start_time: str,
     end_time: str
@@ -305,7 +304,7 @@ def process_equity_data(
 
 
 def process_coin_selection_data(
-    root_path: Union[str, Path],
+    root_path: str | Path,
     backtest_name: str,
     start_time: str,
     end_time: str
@@ -427,11 +426,11 @@ def process_coin_selection_data(
 
 
 def process_backtest_trading_factors(
-    root_path: Union[str, Path],
-    factors_name_list: List[str],
+    root_path: str | Path,
+    factors_name_list: list[str],
     backtest_name: str,
     coin: str
-) -> Union[pd.DataFrame, bool]:
+) -> pd.DataFrame | bool:
     """
     处理回测和实盘因子值对比数据
 

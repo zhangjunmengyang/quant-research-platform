@@ -15,12 +15,12 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Optional
 
 import structlog
 
 if TYPE_CHECKING:
-    from .store import LogStore, LogEntry
+    from .store import LogStore
 
 
 class LogFormat(str, Enum):
@@ -58,9 +58,9 @@ class LogConfig:
 
 
 # 全局配置引用
-_current_config: Optional[LogConfig] = None
+_current_config: LogConfig | None = None
 _log_store: Optional["LogStore"] = None
-_event_loop: Optional[asyncio.AbstractEventLoop] = None
+_event_loop: asyncio.AbstractEventLoop | None = None
 
 
 class PostgreSQLHandler(logging.Handler):
@@ -196,7 +196,7 @@ class PostgreSQLHandler(logging.Handler):
             pass  # 日志写入失败不应影响主程序
 
 
-def configure_logging(config: Optional[LogConfig] = None, service_name: str = "quant-api"):
+def configure_logging(config: LogConfig | None = None, service_name: str = "quant-api"):
     """
     配置结构化日志
 
@@ -338,7 +338,7 @@ def get_log_store() -> Optional["LogStore"]:
     return _log_store
 
 
-def get_logger(name: Optional[str] = None) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """
     获取结构化日志器
 
@@ -359,7 +359,7 @@ def get_logger(name: Optional[str] = None) -> structlog.stdlib.BoundLogger:
 
 
 # 便捷函数：添加请求上下文
-def bind_request_context(request_id: str, user_id: Optional[str] = None):
+def bind_request_context(request_id: str, user_id: str | None = None):
     """
     绑定请求上下文到日志
 
@@ -380,7 +380,7 @@ def clear_request_context():
 
 def setup_task_logger(
     name: str,
-    log_dir: Optional[str] = None,
+    log_dir: str | None = None,
     level: int = logging.INFO,
 ) -> logging.Logger:
     """
@@ -401,6 +401,7 @@ def setup_task_logger(
         logger.info("开始审核因子...")
     """
     from pathlib import Path
+
     from ..paths import get_project_root
 
     # 确定日志目录

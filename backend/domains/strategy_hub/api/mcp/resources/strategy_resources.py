@@ -5,16 +5,13 @@
 基于 mcp_core.BaseResourceProvider 实现。
 """
 
-from typing import Any, Dict, List, Optional
-import logging
 import json
+import logging
 
 from domains.mcp_core import (
     BaseResourceProvider,
-    ResourceDefinition,
     ResourceContent,
 )
-
 from domains.strategy_hub.services import get_strategy_store
 
 logger = logging.getLogger(__name__)
@@ -99,7 +96,7 @@ class StrategyResourceProvider(BaseResourceProvider):
             text=json.dumps(data, ensure_ascii=False, indent=2),
         )
 
-    async def _read_strategy(self, strategy_id: str) -> Optional[ResourceContent]:
+    async def _read_strategy(self, strategy_id: str) -> ResourceContent | None:
         """读取策略详情"""
         try:
             strategy = self.store.get(strategy_id)

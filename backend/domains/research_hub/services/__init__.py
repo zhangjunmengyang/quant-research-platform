@@ -8,14 +8,14 @@ Research Hub 服务层
 - QueryProcessor: 查询重写和结果重排
 """
 
-from .report import ReportService, get_report_service
-from .retrieval import RetrievalService, get_retrieval_service
 from .llamaindex_rag import (
     LlamaIndexRAGService,
-    get_llamaindex_rag_service,
     get_initialized_rag_service,
+    get_llamaindex_rag_service,
 )
 from .query_processor import QueryProcessor, get_query_processor
+from .report import ReportService, get_report_service
+from .retrieval import RetrievalService, get_retrieval_service
 
 __all__ = [
     "ReportService",

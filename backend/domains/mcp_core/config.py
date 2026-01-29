@@ -4,14 +4,13 @@ MCP 配置管理
 提供配置加载、环境变量支持和 YAML 配置文件支持。
 """
 
+import logging
 import os
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
 from pathlib import Path
-import logging
+from typing import Any
 
 # 从统一路径模块导入
-from .paths import get_project_root, get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,7 @@ class MCPConfig:
 
     # 认证配置
     auth_enabled: bool = False
-    api_key: Optional[str] = None
+    api_key: str | None = None
 
     # 日志配置
     log_level: str = "INFO"
@@ -45,7 +44,7 @@ class MCPConfig:
     enable_prompts: bool = False
 
     # 工具分类
-    enabled_tool_categories: List[str] = field(
+    enabled_tool_categories: list[str] = field(
         default_factory=lambda: ["query", "mutation"]
     )
 
@@ -81,7 +80,7 @@ class MCPConfig:
             except ValueError:
                 return default
 
-        def get_list(key: str, default: List[str]) -> List[str]:
+        def get_list(key: str, default: list[str]) -> list[str]:
             value = get_env(key)
             if value is None:
                 return default
@@ -152,7 +151,7 @@ class MCPConfig:
             return cls()
 
     @classmethod
-    def load(cls, yaml_path: Optional[str] = None, env_prefix: str = "MCP") -> 'MCPConfig':
+    def load(cls, yaml_path: str | None = None, env_prefix: str = "MCP") -> 'MCPConfig':
         """
         加载配置
 
@@ -183,7 +182,7 @@ class MCPConfig:
 
         return config
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "host": self.host,
@@ -207,7 +206,7 @@ class MCPConfig:
 
 
 # 默认配置实例管理
-_configs: Dict[str, MCPConfig] = {}
+_configs: dict[str, MCPConfig] = {}
 
 
 def get_config(namespace: str = "default") -> MCPConfig:
@@ -236,7 +235,7 @@ def set_config(config: MCPConfig, namespace: str = "default") -> None:
     _configs[namespace] = config
 
 
-def reset_config(namespace: Optional[str] = None) -> None:
+def reset_config(namespace: str | None = None) -> None:
     """
     重置配置
 

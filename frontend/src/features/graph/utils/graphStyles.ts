@@ -3,13 +3,31 @@
  *
  * 提供现代化的节点和边样式，使用发光效果替代生硬边框。
  * 设计风格：Luminous Network（发光网络）
+ *
+ * 注意：本模块不依赖 ECharts 类型，使用自定义类型以确保类型兼容性。
  */
 
-import type { GraphSeriesOption } from 'echarts'
+/**
+ * 节点样式类型定义
+ * 支持径向渐变和发光效果
+ */
+interface RadialGradientColor {
+  type: 'radial'
+  x: number
+  y: number
+  r: number
+  colorStops: Array<{ offset: number; color: string }>
+}
 
-type ItemStyleOption = NonNullable<
-  NonNullable<GraphSeriesOption['data']>[number]['itemStyle']
->
+interface ItemStyleOption {
+  color?: string | RadialGradientColor
+  borderWidth?: number
+  borderColor?: string
+  shadowBlur?: number
+  shadowColor?: string
+  shadowOffsetX?: number
+  shadowOffsetY?: number
+}
 
 /**
  * 将 hex 颜色转换为 rgba
@@ -98,6 +116,15 @@ export function createNodeStyle(
 }
 
 /**
+ * 简单的边样式类型（color 只支持字符串）
+ */
+interface SimpleLinkStyle {
+  color?: string
+  width?: number
+  curveness?: number
+}
+
+/**
  * 创建连线样式
  *
  * 使用半透明柔和颜色，配合轻微弧度。
@@ -106,7 +133,7 @@ export function createLinkStyle(options?: {
   color?: string
   width?: number
   curveness?: number
-}): NonNullable<GraphSeriesOption['lineStyle']> {
+}): SimpleLinkStyle {
   return {
     color: options?.color ?? 'rgba(148, 163, 184, 0.45)',
     width: options?.width ?? 1.5,
@@ -114,46 +141,3 @@ export function createLinkStyle(options?: {
   }
 }
 
-/**
- * 创建 emphasis（悬停/高亮）样式
- */
-export function createEmphasisStyle(): NonNullable<GraphSeriesOption['emphasis']> {
-  return {
-    focus: 'adjacency',
-    itemStyle: {
-      shadowBlur: 25,
-      shadowColor: 'rgba(59, 130, 246, 0.5)',
-    },
-    lineStyle: {
-      width: 2.5,
-      color: 'rgba(59, 130, 246, 0.6)',
-    },
-    label: {
-      fontWeight: 600,
-    },
-  }
-}
-
-/**
- * 创建聚焦节点的高亮样式（用于 focusNodeId 场景）
- */
-export function createFocusedNodeStyle(baseColor: string): ItemStyleOption {
-  return {
-    color: {
-      type: 'radial',
-      x: 0.5,
-      y: 0.5,
-      r: 0.8,
-      colorStops: [
-        { offset: 0, color: adjustBrightness(baseColor, 35) },
-        { offset: 0.5, color: baseColor },
-        { offset: 1, color: adjustBrightness(baseColor, -10) },
-      ],
-    },
-    borderWidth: 0,
-    shadowBlur: 25,
-    shadowColor: hexToRgba(baseColor, 0.65),
-    shadowOffsetX: 0,
-    shadowOffsetY: 0,
-  }
-}

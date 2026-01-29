@@ -3,7 +3,6 @@ Experience Hub 配置管理
 """
 
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -42,7 +41,7 @@ class ExperienceHubSettings(BaseSettings):
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
 
     @classmethod
-    def from_yaml(cls, yaml_path: Optional[Path] = None) -> "ExperienceHubSettings":
+    def from_yaml(cls, yaml_path: Path | None = None) -> "ExperienceHubSettings":
         """从 YAML 文件加载配置"""
         if yaml_path is None:
             current = Path(__file__).resolve()
@@ -52,7 +51,7 @@ class ExperienceHubSettings(BaseSettings):
         if not yaml_path.exists():
             return cls()
 
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         embedding_data = data.get("embedding", {})
@@ -67,11 +66,11 @@ class ExperienceHubSettings(BaseSettings):
         )
 
 
-_settings: Optional[ExperienceHubSettings] = None
+_settings: ExperienceHubSettings | None = None
 
 
 def get_experience_hub_settings(
-    yaml_path: Optional[Path] = None
+    yaml_path: Path | None = None
 ) -> ExperienceHubSettings:
     """获取 Experience Hub 配置单例"""
     global _settings
@@ -80,7 +79,7 @@ def get_experience_hub_settings(
     return _settings
 
 
-def reload_settings(yaml_path: Optional[Path] = None) -> ExperienceHubSettings:
+def reload_settings(yaml_path: Path | None = None) -> ExperienceHubSettings:
     """重新加载配置"""
     global _settings
     _settings = ExperienceHubSettings.from_yaml(yaml_path)

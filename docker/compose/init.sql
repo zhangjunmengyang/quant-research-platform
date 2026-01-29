@@ -533,4 +533,4 @@ CREATE INDEX IF NOT EXISTS idx_rag_evaluations_created_at ON rag_evaluations(cre
 
 -- ============================================
 -- [已删除] knowledge_edges 表已迁移至 Neo4j (graph-hub)
--- 参见: docs/architecture/tasks/graph-migration.md
+-- 参见: private/docs/architecture/tasks/graph-migration.md

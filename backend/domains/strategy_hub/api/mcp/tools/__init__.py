@@ -4,19 +4,19 @@ MCP 工具模块
 提供策略查询和管理工具。
 """
 
-from .strategy_tools import (
-    ListStrategiesTool,
-    GetStrategyTool,
-    SearchStrategiesTool,
-    GetStrategyStatsTool,
-    UpdateStrategyTool,
-    DeleteStrategyTool,
-    RunBacktestTool,
-)
 from .analysis_tools import (
     CompareBacktestLiveTool,
-    CompareStrategyCoinsTool,
     CompareEquityCurvesTool,
+    CompareStrategyCoinsTool,
+)
+from .strategy_tools import (
+    DeleteStrategyTool,
+    GetStrategyStatsTool,
+    GetStrategyTool,
+    ListStrategiesTool,
+    RunBacktestTool,
+    SearchStrategiesTool,
+    UpdateStrategyTool,
 )
 
 __all__ = [

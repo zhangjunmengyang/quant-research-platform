@@ -7,7 +7,6 @@ MCP 配置管理（基于 pydantic-settings）
 - 配置校验
 """
 
-from typing import List, Optional
 from functools import lru_cache
 
 from pydantic import Field, field_validator
@@ -96,7 +95,7 @@ class MCPSettings(BaseSettings):
         )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> MCPSettings:
     """
     获取配置单例

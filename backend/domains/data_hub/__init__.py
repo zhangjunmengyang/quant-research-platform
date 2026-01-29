@@ -15,13 +15,13 @@ from domains.mcp_core.paths import setup_factor_paths
 
 setup_factor_paths()
 
-from .core.config import DataHubConfig, get_data_hub_config
-from .core.models import DataConfig, KlineData, FactorResult
 from domains.core.exceptions import DataHubError, DataNotFoundError, FactorNotFoundError
 
+from .core.config import DataHubConfig, get_data_hub_config
+from .core.models import DataConfig, FactorResult, KlineData
 from .services.data_loader import DataLoader
-from .services.factor_calculator import FactorCalculator
 from .services.data_slicer import DataSlicer
+from .services.factor_calculator import FactorCalculator
 
 __all__ = [
     # Config

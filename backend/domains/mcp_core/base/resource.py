@@ -7,13 +7,14 @@ MCP Resource 基类和资源提供者
 - 资源缓存
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Callable, Awaitable
-from dataclasses import dataclass, field
-import logging
 import json
-import time
+import logging
 import re
+import time
+from abc import ABC
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class ResourceDefinition:
     description: str
     mime_type: str = "application/json"
 
-    def to_mcp_format(self) -> Dict[str, Any]:
+    def to_mcp_format(self) -> dict[str, Any]:
         """转换为 MCP 协议格式"""
         return {
             "uri": self.uri,
@@ -41,10 +42,10 @@ class ResourceContent:
     """资源内容"""
     uri: str
     mime_type: str
-    text: Optional[str] = None
-    blob: Optional[bytes] = None
+    text: str | None = None
+    blob: bytes | None = None
 
-    def to_mcp_format(self) -> Dict[str, Any]:
+    def to_mcp_format(self) -> dict[str, Any]:
         """转换为 MCP 协议格式"""
         result = {
             "uri": self.uri,
@@ -128,10 +129,10 @@ class BaseResourceProvider(ABC):
         Args:
             default_cache_ttl: 默认缓存 TTL（秒），0 表示不缓存
         """
-        self._static_resources: Dict[str, ResourceDefinition] = {}
-        self._static_handlers: Dict[str, Callable[[], Awaitable[ResourceContent]]] = {}
-        self._dynamic_patterns: List[Dict[str, Any]] = []
-        self._cache: Dict[str, CacheEntry] = {}
+        self._static_resources: dict[str, ResourceDefinition] = {}
+        self._static_handlers: dict[str, Callable[[], Awaitable[ResourceContent]]] = {}
+        self._dynamic_patterns: list[dict[str, Any]] = []
+        self._cache: dict[str, CacheEntry] = {}
         self._default_cache_ttl = default_cache_ttl
 
     def register_static(
@@ -141,7 +142,7 @@ class BaseResourceProvider(ABC):
         description: str,
         handler: Callable[[], Awaitable[ResourceContent]],
         mime_type: str = "application/json",
-        cache_ttl: Optional[int] = None,
+        cache_ttl: int | None = None,
     ) -> None:
         """
         注册静态资源
@@ -168,7 +169,7 @@ class BaseResourceProvider(ABC):
         pattern: str,
         name: str,
         description: str,
-        handler: Callable[..., Awaitable[Optional[ResourceContent]]],
+        handler: Callable[..., Awaitable[ResourceContent | None]],
         mime_type: str = "application/json",
     ) -> None:
         """
@@ -201,7 +202,7 @@ class BaseResourceProvider(ABC):
         })
         logger.debug(f"注册动态资源: {pattern}")
 
-    def list_resources(self) -> List[ResourceDefinition]:
+    def list_resources(self) -> list[ResourceDefinition]:
         """列出所有可用资源"""
         resources = list(self._static_resources.values())
 
@@ -211,7 +212,7 @@ class BaseResourceProvider(ABC):
 
         return resources
 
-    async def read_resource(self, uri: str) -> Optional[ResourceContent]:
+    async def read_resource(self, uri: str) -> ResourceContent | None:
         """
         读取资源内容
 
@@ -253,7 +254,7 @@ class BaseResourceProvider(ABC):
         logger.warning(f"未知资源 URI: {uri}")
         return None
 
-    def _get_from_cache(self, uri: str) -> Optional[ResourceContent]:
+    def _get_from_cache(self, uri: str) -> ResourceContent | None:
         """从缓存获取"""
         if uri in self._cache:
             entry = self._cache[uri]
@@ -263,7 +264,7 @@ class BaseResourceProvider(ABC):
                 del self._cache[uri]
         return None
 
-    def _set_cache(self, uri: str, content: ResourceContent, ttl: Optional[int] = None) -> None:
+    def _set_cache(self, uri: str, content: ResourceContent, ttl: int | None = None) -> None:
         """设置缓存"""
         ttl = ttl if ttl is not None else self._default_cache_ttl
         if ttl > 0:
@@ -273,7 +274,7 @@ class BaseResourceProvider(ABC):
                 ttl=ttl,
             )
 
-    def clear_cache(self, uri: Optional[str] = None) -> None:
+    def clear_cache(self, uri: str | None = None) -> None:
         """清除缓存"""
         if uri:
             self._cache.pop(uri, None)
@@ -290,7 +291,7 @@ class SimpleResourceProvider(BaseResourceProvider):
 
     def __init__(
         self,
-        resources: Optional[Dict[str, Dict[str, Any]]] = None,
+        resources: dict[str, dict[str, Any]] | None = None,
         default_cache_ttl: int = 0,
     ):
         """
@@ -301,7 +302,7 @@ class SimpleResourceProvider(BaseResourceProvider):
             default_cache_ttl: 默认缓存 TTL
         """
         super().__init__(default_cache_ttl)
-        self._static_data: Dict[str, Any] = {}
+        self._static_data: dict[str, Any] = {}
 
         if resources:
             for uri, config in resources.items():

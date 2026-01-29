@@ -16,31 +16,28 @@ Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
 """
 
 import logging
-from typing import Optional
 
 from domains.mcp_core import (
     BaseMCPServer,
     MCPConfig,
-    create_mcp_app,
     create_streamable_http_app,
     run_streamable_http_server,
 )
-from domains.mcp_core.server.server import run_server as mcp_run_server
 
 from .tools.note_tools import (
-    # 基础 CRUD
-    CreateNoteTool,
-    UpdateNoteTool,
-    DeleteNoteTool,
-    SearchNotesTool,
-    GetNoteTool,
-    ListNotesTool,
     # 归档管理
     ArchiveNoteTool,
-    UnarchiveNoteTool,
+    # 基础 CRUD
+    CreateNoteTool,
+    DeleteNoteTool,
+    GetNoteTool,
+    ListNotesTool,
     # 提炼为经验
     PromoteToExperienceTool,
     # 注: 知识边关联工具已迁移至 graph-hub (端口 6795)
+    SearchNotesTool,
+    UnarchiveNoteTool,
+    UpdateNoteTool,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,7 +84,7 @@ def create_note_hub_config(
     port: int = 6792,
     log_level: str = "INFO",
     auth_enabled: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MCPConfig:
     """
     创建笔记知识库 MCP 配置
@@ -116,7 +113,7 @@ def create_note_hub_config(
     )
 
 
-def create_mcp_server(config: Optional[MCPConfig] = None):
+def create_mcp_server(config: MCPConfig | None = None):
     """
     创建 MCP FastAPI 应用 (Streamable HTTP)
 

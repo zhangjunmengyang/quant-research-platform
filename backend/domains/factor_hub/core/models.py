@@ -4,10 +4,10 @@
 定义因子知识库的核心数据结构。
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any, List
-import json
+from typing import Any
 
 
 class FactorType:
@@ -61,33 +61,33 @@ class Factor:
     analysis: str = ""
     code_path: str = ""
     code_content: str = ""
-    llm_score: Optional[float] = None
-    ic: Optional[float] = None
-    rank_ic: Optional[float] = None
+    llm_score: float | None = None
+    ic: float | None = None
+    rank_ic: float | None = None
     verification_status: int = VerificationStatus.UNVERIFIED  # 0=未验证, 1=通过, 2=废弃
     verify_note: str = ""
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     # 新增回测指标
-    backtest_sharpe: Optional[float] = None
-    backtest_ic: Optional[float] = None
-    backtest_ir: Optional[float] = None
-    turnover: Optional[float] = None
-    decay: Optional[int] = None  # IC半衰期（周期数）
+    backtest_sharpe: float | None = None
+    backtest_ic: float | None = None
+    backtest_ir: float | None = None
+    turnover: float | None = None
+    decay: int | None = None  # IC半衰期（周期数）
     # 新增分类标签
     market_regime: str = ""  # 牛市/熊市/震荡
-    best_holding_period: Optional[int] = None  # 最佳持仓周期（小时）
+    best_holding_period: int | None = None  # 最佳持仓周期（小时）
     tags: str = ""  # 逗号分隔的标签列表
     # 新增代码质量
-    code_complexity: Optional[float] = None  # 代码复杂度评分
-    last_backtest_date: Optional[str] = None  # 最后回测日期
+    code_complexity: float | None = None  # 代码复杂度评分
+    last_backtest_date: str | None = None  # 最后回测日期
     # 排除状态
     excluded: int = 0  # 是否被排除
     exclude_reason: str = ""  # 排除原因
     # 参数分析结果 (JSON 字符串)
     param_analysis: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'filename': self.filename,
@@ -125,7 +125,7 @@ class Factor:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Factor':
+    def from_dict(cls, data: dict[str, Any]) -> 'Factor':
         """从字典创建因子实例"""
         valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**valid_fields)
@@ -166,20 +166,20 @@ class Factor:
         return self.llm_score is not None
 
     @property
-    def styles_list(self) -> List[str]:
+    def styles_list(self) -> list[str]:
         """获取风格列表（逗号分隔的风格字符串转为列表）"""
         if not self.style:
             return []
         return [s.strip() for s in self.style.split(',') if s.strip()]
 
     @property
-    def tags_list(self) -> List[str]:
+    def tags_list(self) -> list[str]:
         """获取标签列表（逗号分隔的字符串转为列表）"""
         if not self.tags:
             return []
         return [t.strip() for t in self.tags.split(',') if t.strip()]
 
-    def set_tags(self, tags: List[str]):
+    def set_tags(self, tags: list[str]):
         """设置标签列表"""
         self.tags = ','.join(tags)
 
@@ -203,7 +203,7 @@ class Factor:
         return self.backtest_sharpe is not None or self.backtest_ic is not None
 
     @property
-    def icir(self) -> Optional[float]:
+    def icir(self) -> float | None:
         """计算ICIR（如果有数据）"""
         if self.backtest_ic and self.backtest_ir:
             return self.backtest_ir
@@ -214,7 +214,7 @@ class Factor:
         """是否有参数分析数据"""
         return bool(self.param_analysis)
 
-    def get_param_analysis(self) -> Optional[Dict[str, Any]]:
+    def get_param_analysis(self) -> dict[str, Any] | None:
         """获取参数分析数据（解析 JSON）"""
         if not self.param_analysis:
             return None
@@ -223,7 +223,7 @@ class Factor:
         except json.JSONDecodeError:
             return None
 
-    def set_param_analysis(self, data: Dict[str, Any]):
+    def set_param_analysis(self, data: dict[str, Any]):
         """设置参数分析数据"""
         self.param_analysis = json.dumps(data, ensure_ascii=False)
 
@@ -240,11 +240,11 @@ class FactorStats:
     unscored: int = 0
     passed: int = 0  # 验证通过数量
     failed: int = 0  # 废弃（失败研究）数量
-    score_distribution: Dict[str, int] = field(default_factory=dict)
-    style_distribution: Dict[str, int] = field(default_factory=dict)
-    input_field_distribution: Dict[str, int] = field(default_factory=dict)
-    score_stats: Dict[str, float] = field(default_factory=dict)
-    ic_stats: Dict[str, Any] = field(default_factory=dict)
-    rank_ic_stats: Dict[str, Any] = field(default_factory=dict)
-    time_distribution: Dict[str, int] = field(default_factory=dict)
-    score_histogram: List[float] = field(default_factory=list)
+    score_distribution: dict[str, int] = field(default_factory=dict)
+    style_distribution: dict[str, int] = field(default_factory=dict)
+    input_field_distribution: dict[str, int] = field(default_factory=dict)
+    score_stats: dict[str, float] = field(default_factory=dict)
+    ic_stats: dict[str, Any] = field(default_factory=dict)
+    rank_ic_stats: dict[str, Any] = field(default_factory=dict)
+    time_distribution: dict[str, int] = field(default_factory=dict)
+    score_histogram: list[float] = field(default_factory=list)

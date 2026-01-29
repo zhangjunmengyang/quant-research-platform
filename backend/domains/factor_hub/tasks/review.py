@@ -6,21 +6,20 @@
 
 import asyncio
 import json
-import logging
 import re
-from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 from domains.mcp_core.llm import get_llm_client
 from domains.mcp_core.logging import setup_task_logger
 
 logger = setup_task_logger("review")
 
-from ..services.prompt_engine import get_prompt_engine
 from ..core.progress import get_progress_reporter
-from ..core.store import get_factor_store, Factor
+from ..core.store import Factor, get_factor_store
 from ..services.field_filler import extract_pure_code
+from ..services.prompt_engine import get_prompt_engine
 
 
 @dataclass
@@ -48,8 +47,8 @@ class ReviewResult:
     should_delete: bool = False
     delete_reason: str = ""
     lessons_learned: str = ""
-    revisions: List[Revision] = field(default_factory=list)
-    code_issues: List[CodeIssue] = field(default_factory=list)
+    revisions: list[Revision] = field(default_factory=list)
+    code_issues: list[CodeIssue] = field(default_factory=list)
     error: str = ""
     raw_response: str = ""
 
@@ -57,7 +56,7 @@ class ReviewResult:
 @dataclass
 class ReviewSummary:
     """审核汇总结果"""
-    results: List[ReviewResult] = field(default_factory=list)
+    results: list[ReviewResult] = field(default_factory=list)
     success_count: int = 0
     fail_count: int = 0
     delete_count: int = 0
@@ -143,10 +142,10 @@ def parse_review_response(content: str, filename: str) -> ReviewResult:
 
 
 def build_review_prompt(
-    factor: Dict[str, Any],
+    factor: dict[str, Any],
     prompt_engine,
-    review_fields: Optional[List[str]] = None,
-) -> Tuple[str, str]:
+    review_fields: list[str] | None = None,
+) -> tuple[str, str]:
     """
     构建单个因子审核的 prompt
 
@@ -195,14 +194,14 @@ def build_review_prompt(
 
 
 async def _review_single_factor(
-    factor: Dict[str, Any],
+    factor: dict[str, Any],
     factor_index: int,
     total_factors: int,
     semaphore: asyncio.Semaphore,
     prompt_engine,
     delay: float = 0.0,
-    review_fields: Optional[List[str]] = None,
-    output_dir: Optional[Path] = None,
+    review_fields: list[str] | None = None,
+    output_dir: Path | None = None,
 ) -> ReviewResult:
     """
     审核单个因子
@@ -281,17 +280,17 @@ def _save_review_result(result: ReviewResult, factor_index: int, output_dir: Pat
         if result.error:
             f.write(f"## 错误\n\n{result.error}\n")
         elif result.should_delete:
-            f.write(f"## 建议删除\n\n")
+            f.write("## 建议删除\n\n")
             f.write(f"**理由**: {result.delete_reason}\n\n")
             if result.lessons_learned:
                 f.write(f"**经验教训**: {result.lessons_learned}\n\n")
         elif result.revisions:
-            f.write(f"## 需要修订\n\n")
+            f.write("## 需要修订\n\n")
             for rev in result.revisions:
                 f.write(f"- {rev.field}: {rev.new_value}\n")
             f.write("\n")
         else:
-            f.write(f"## 通过\n\n无需修改。\n")
+            f.write("## 通过\n\n无需修改。\n")
 
         if result.raw_response:
             f.write("\n## 原始响应\n\n")
@@ -299,13 +298,13 @@ def _save_review_result(result: ReviewResult, factor_index: int, output_dir: Pat
 
 
 async def run_review_async(
-    factors: List[Factor],
+    factors: list[Factor],
     concurrency: int = 1,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
     dry_run: bool = False,
     apply_revisions: bool = False,
     delay: float = 15.0,
-    review_fields: Optional[List[str]] = None,
+    review_fields: list[str] | None = None,
 ) -> ReviewSummary:
     """
     异步执行审核任务
@@ -441,12 +440,12 @@ async def run_review_async(
 
 def run_review(
     concurrency: int = 1,
-    output_dir: Optional[str] = None,
+    output_dir: str | None = None,
     dry_run: bool = False,
     apply_revisions: bool = False,
     delay: float = 15.0,
-    filter_condition: Optional[Dict[str, Any]] = None,
-    review_fields: Optional[List[str]] = None,
+    filter_condition: dict[str, Any] | None = None,
+    review_fields: list[str] | None = None,
 ) -> ReviewSummary:
     """
     执行审核任务（同步入口）

@@ -6,45 +6,43 @@ MCP Server - 数据模块 MCP 服务器
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any
 
 from domains.mcp_core import (
     BaseMCPServer,
     MCPConfig,
-    create_mcp_app,
     create_streamable_http_app,
     run_streamable_http_server,
 )
-from domains.mcp_core.server.server import run_server as mcp_run_server
 
+# 注: tag_tools 已迁移至 graph-hub (端口 6795)
+from .resources.data_resources import DataResourceProvider
 from .tools.data_tools import (
-    ListSymbolsTool,
-    GetSymbolInfoTool,
     GetCoinMetadataTool,
+    GetSymbolInfoTool,
+    ListSymbolsTool,
 )
 from .tools.factor_tools import (
-    ListFactorsTool,
     CalculateFactorTool,
-    GetSymbolRankAtTool,
     GetFactorRankingTool,
+    GetSymbolRankAtTool,
+    ListFactorsTool,
 )
 from .tools.market_tools import (
-    GetMarketOverviewTool,
     DetectKlinePatternsTool,
+    GetMarketOverviewTool,
 )
 from .tools.research_tools import (
-    CalculateReturnsTool,
     CalculateDrawdownTool,
-    FindPeaksTroughsTool,
+    CalculateReturnsTool,
     CalculateStageStatsTool,
+    FindPeaksTroughsTool,
 )
 from .tools.signal_tools import (
     DetectSymbolEventsTool,
     ScreenMarketTool,
     SimulateHoldingStrategyTool,
 )
-# 注: tag_tools 已迁移至 graph-hub (端口 6795)
-from .resources.data_resources import DataResourceProvider
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +96,7 @@ class DataHubMCPServer(BaseMCPServer):
         self.set_resource_provider(DataResourceProvider())
         logger.info("注册了数据资源提供者")
 
-    def _get_extended_health_status(self) -> Optional[Dict[str, Any]]:
+    def _get_extended_health_status(self) -> dict[str, Any] | None:
         """
         添加数据缓存状态到健康检查
 
@@ -132,7 +130,7 @@ def create_data_hub_config(
     port: int = 6790,
     log_level: str = "INFO",
     auth_enabled: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MCPConfig:
     """
     创建数据模块 MCP 配置
@@ -161,7 +159,7 @@ def create_data_hub_config(
     )
 
 
-def create_mcp_server(config: Optional[MCPConfig] = None):
+def create_mcp_server(config: MCPConfig | None = None):
     """
     创建 MCP FastAPI 应用 (Streamable HTTP)
 

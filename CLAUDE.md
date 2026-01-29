@@ -53,11 +53,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 变更类型 | 需要更新的文档 |
 |---------|---------------|
-| 新增/删除业务域 | `CLAUDE.md` (业务域表), `docs/architecture/reference.md`, `docs/architecture/tasks/add-domain.md` |
-| 新增/修改 API 端点 | `docs/architecture/tasks/add-api-endpoint.md` (如果引入新模式) |
-| 新增/修改 MCP 工具 | `docs/architecture/tasks/add-mcp-tool.md` (如果引入新模式) |
+| 新增/删除业务域 | `CLAUDE.md` (业务域表), `private/docs/architecture/reference.md`, `private/docs/architecture/tasks/add-domain.md` |
+| 新增/修改 API 端点 | `private/docs/architecture/tasks/add-api-endpoint.md` (如果引入新模式) |
+| 新增/修改 MCP 工具 | `private/docs/architecture/tasks/add-mcp-tool.md` (如果引入新模式) |
 | 修改服务端口 | `CLAUDE.md` (服务端口表) |
-| 修改目录结构 | `CLAUDE.md` (核心架构), `docs/architecture/reference.md` |
+| 修改目录结构 | `CLAUDE.md` (核心架构), `private/docs/architecture/reference.md` |
 | 新增开发约定 | `CLAUDE.md` (关键约定) |
 | 修改部署配置 | `Makefile` 或 `docker/` 目录下的 README |
 
@@ -125,7 +125,7 @@ frontend/src/features/*/    -> 前端模块
 | experience_hub | domains/experience_hub/ | 经验知识库 (长期记忆) | Wisdom |
 | graph_hub | domains/graph_hub/ | 知识图谱 (Neo4j) | Meta |
 
-**知识层级说明**: Data -> Artifact -> Knowledge -> Wisdom，详见 `docs/architecture/knowledge-experience-system.md`
+**知识层级说明**: Data -> Artifact -> Knowledge -> Wisdom，详见 `private/docs/architecture/knowledge-experience-system.md`
 
 **依赖方向**: routes -> services -> core，业务域互不依赖
 
@@ -145,15 +145,15 @@ frontend/src/features/*/    -> 前端模块
 
 | 任务 | 文档路径 |
 |------|---------|
-| 添加 API | `docs/architecture/tasks/add-api-endpoint.md` |
-| 添加 MCP 工具 | `docs/architecture/tasks/add-mcp-tool.md` |
-| 添加异步任务 | `docs/architecture/tasks/add-async-task.md` |
-| 添加业务域 | `docs/architecture/tasks/add-domain.md` |
-| 添加前端功能 | `docs/architecture/tasks/add-frontend-feature.md` |
+| 添加 API | `private/docs/architecture/tasks/add-api-endpoint.md` |
+| 添加 MCP 工具 | `private/docs/architecture/tasks/add-mcp-tool.md` |
+| 添加异步任务 | `private/docs/architecture/tasks/add-async-task.md` |
+| 添加业务域 | `private/docs/architecture/tasks/add-domain.md` |
+| 添加前端功能 | `private/docs/architecture/tasks/add-frontend-feature.md` |
 
-深入了解架构: `docs/architecture/reference.md`
+深入了解架构: `private/docs/architecture/reference.md`
 
-知识与经验体系: `docs/architecture/knowledge-experience-system.md`
+知识与经验体系: `private/docs/architecture/knowledge-experience-system.md`
 
 ## 研究任务
 

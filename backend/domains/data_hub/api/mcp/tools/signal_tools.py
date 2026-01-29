@@ -4,12 +4,13 @@
 提供信号检测、市场筛选、信号表现分析等能力。
 """
 
-from typing import Any, Dict, List
+from typing import Any
+
 import numpy as np
 import pandas as pd
+from domains.mcp_core.base.tool import ExecutionMode
 
 from .base import BaseTool, ToolResult
-from domains.mcp_core.base.tool import ExecutionMode
 
 
 class DetectSymbolEventsTool(BaseTool):
@@ -39,7 +40,7 @@ class DetectSymbolEventsTool(BaseTool):
 返回满足条件的信号事件列表，包含时间、因子值和收盘价。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -194,7 +195,7 @@ class ScreenMarketTool(BaseTool):
 返回满足条件的币种列表，按因子值排序。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -341,7 +342,7 @@ class SimulateHoldingStrategyTool(BaseTool):
 返回每笔交易详情和汇总统计。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

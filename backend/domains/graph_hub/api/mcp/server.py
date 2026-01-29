@@ -31,9 +31,9 @@ class GraphHubMCPServer(BaseMCPServer):
 
         # 查询工具
         from .tools.query_tools import (
+            FindPathTool,
             GetEdgesTool,
             TraceLineageTool,
-            FindPathTool,
         )
         self.register_tool(GetEdgesTool(), "query")
         self.register_tool(TraceLineageTool(), "query")
@@ -42,10 +42,10 @@ class GraphHubMCPServer(BaseMCPServer):
         # 标签管理
         from .tools.tag_tools import (
             AddTagTool,
-            RemoveTagTool,
-            GetEntityTagsTool,
             GetEntitiesByTagTool,
+            GetEntityTagsTool,
             ListAllTagsTool,
+            RemoveTagTool,
         )
         self.register_tool(AddTagTool(), "mutation")
         self.register_tool(RemoveTagTool(), "mutation")

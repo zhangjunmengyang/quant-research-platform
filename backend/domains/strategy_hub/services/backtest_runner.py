@@ -8,23 +8,22 @@
 - 回测任务是 CPU 密集型，设置为核心数的一半（1-8 之间）
 """
 
-import os
-import uuid
 import json
 import logging
+import os
 import threading
-import re
-from concurrent.futures import ThreadPoolExecutor, Future
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+import uuid
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
-from .models import Strategy, TaskStatus, TaskInfo
-from .strategy_store import StrategyStore, get_strategy_store
-from .cache_isolation import isolated_cache, cleanup_task_cache
-from .task_store import BacktestTaskStore, get_task_store
 from domains.mcp_core.paths import get_data_dir, setup_factor_paths
+
+from .cache_isolation import cleanup_task_cache, isolated_cache
+from .models import Strategy, TaskInfo, TaskStatus
+from .strategy_store import StrategyStore, get_strategy_store
+from .task_store import BacktestTaskStore, get_task_store
 
 logger = logging.getLogger(__name__)
 
@@ -63,11 +62,11 @@ class BacktestRequest:
     完整暴露 config/backtest_config.py 的全部可配置项。
     """
     name: str  # 策略/回测名称
-    strategy_list: List[Dict[str, Any]]  # 策略配置列表（兼容回测引擎格式）
+    strategy_list: list[dict[str, Any]]  # 策略配置列表（兼容回测引擎格式）
 
     # 时间配置
-    start_date: Optional[str] = None  # 回测开始日期
-    end_date: Optional[str] = None  # 回测结束日期
+    start_date: str | None = None  # 回测开始日期
+    end_date: str | None = None  # 回测结束日期
 
     # 账户配置
     account_type: str = "统一账户"  # '统一账户' 或 '普通账户'
@@ -88,18 +87,18 @@ class BacktestRequest:
 
     # 币种过滤
     min_kline_num: int = 0  # 最少上市K线数
-    black_list: List[str] = field(default_factory=list)  # 黑名单
-    white_list: List[str] = field(default_factory=list)  # 白名单
+    black_list: list[str] = field(default_factory=list)  # 黑名单
+    white_list: list[str] = field(default_factory=list)  # 白名单
 
     # 元数据（不影响回测）
     trade_type: str = "swap"  # 交易类型标记: swap / spot
-    description: Optional[str] = None  # 描述
-    tags: Optional[List[str]] = None  # 标签
+    description: str | None = None  # 描述
+    tags: list[str] | None = None  # 标签
 
     # 任务执行记录关联（用于任务管理系统）
-    execution_id: Optional[str] = None  # 关联的执行记录ID
+    execution_id: str | None = None  # 关联的执行记录ID
 
-    def get_factor_list(self) -> List[str]:
+    def get_factor_list(self) -> list[str]:
         """从策略配置中提取因子列表"""
         factors = []
         for stg in self.strategy_list:
@@ -111,7 +110,7 @@ class BacktestRequest:
                         factors.append(str(factor))
         return list(set(factors))
 
-    def get_factor_params(self) -> Dict[str, Any]:
+    def get_factor_params(self) -> dict[str, Any]:
         """从策略配置中提取因子参数"""
         params = {}
         for stg in self.strategy_list:
@@ -139,9 +138,9 @@ class BacktestRunner:
 
     def __init__(
         self,
-        store: Optional[StrategyStore] = None,
-        task_store: Optional[BacktestTaskStore] = None,
-        max_workers: Optional[int] = None,
+        store: StrategyStore | None = None,
+        task_store: BacktestTaskStore | None = None,
+        max_workers: int | None = None,
     ):
         """
         初始化回测执行器
@@ -161,11 +160,11 @@ class BacktestRunner:
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
 
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
-        self._running_tasks: Dict[str, TaskInfo] = {}
-        self._futures: Dict[str, Future] = {}
+        self._running_tasks: dict[str, TaskInfo] = {}
+        self._futures: dict[str, Future] = {}
         self._lock = threading.Lock()
         # 任务ID到执行记录ID的映射
-        self._execution_mapping: Dict[str, str] = {}
+        self._execution_mapping: dict[str, str] = {}
         self._max_workers = max_workers
 
         cpu_count = os.cpu_count() or 2
@@ -361,7 +360,7 @@ class BacktestRunner:
         logger.info(f"提交回测任务: {task_id} - {request.name}, execution_id: {request.execution_id}")
         return task_id
 
-    async def run_and_wait(self, request: BacktestRequest) -> Optional[Strategy]:
+    async def run_and_wait(self, request: BacktestRequest) -> Strategy | None:
         """
         提交回测任务并等待完成
 
@@ -401,7 +400,7 @@ class BacktestRunner:
 
         return strategy
 
-    def get_status(self, task_id: str) -> Optional[TaskInfo]:
+    def get_status(self, task_id: str) -> TaskInfo | None:
         """
         获取任务状态
 
@@ -426,7 +425,7 @@ class BacktestRunner:
             )
         return None
 
-    def get_result(self, task_id: str) -> Optional[Strategy]:
+    def get_result(self, task_id: str) -> Strategy | None:
         """
         获取任务结果
 
@@ -486,7 +485,7 @@ class BacktestRunner:
 
         return cleanup_task_cache(task_id, self.tasks_dir)
 
-    def list_running_tasks(self) -> List[TaskInfo]:
+    def list_running_tasks(self) -> list[TaskInfo]:
         """列出正在运行的任务"""
         with self._lock:
             return list(self._running_tasks.values())
@@ -528,7 +527,7 @@ class BacktestRunner:
         self,
         task_id: str,
         request: BacktestRequest,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         执行实际的回测
 
@@ -544,8 +543,8 @@ class BacktestRunner:
             _setup_backtest_engine_paths()
 
             # 动态导入回测引擎（使用 engine 模块）
-            from domains.engine.core.model.backtest_config import BacktestConfig
             from domains.engine.core.backtest import run_backtest
+            from domains.engine.core.model.backtest_config import BacktestConfig
 
             logger.info(f"任务 {task_id}: 开始构建回测配置")
 
@@ -604,7 +603,7 @@ class BacktestRunner:
         self,
         task_id: str,
         request: BacktestRequest,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         模拟回测（用于开发测试）
 
@@ -649,7 +648,7 @@ class BacktestRunner:
             "return_std": round(random.uniform(0.01, 0.05), 4),
         }
 
-    def _parse_backtest_result(self, conf) -> Dict[str, Any]:
+    def _parse_backtest_result(self, conf) -> dict[str, Any]:
         """
         解析回测引擎返回的结果
 
@@ -783,7 +782,7 @@ class BacktestRunner:
 
         return result
 
-    def _parse_and_save_result(self, task_id: str, result: Dict[str, Any]):
+    def _parse_and_save_result(self, task_id: str, result: dict[str, Any]):
         """
         解析回测结果并保存
 
@@ -841,7 +840,7 @@ class BacktestRunner:
         if execution_id:
             self._update_execution_result(execution_id, result)
 
-    def _update_execution_result(self, execution_id: str, result: Dict[str, Any]):
+    def _update_execution_result(self, execution_id: str, result: dict[str, Any]):
         """更新执行记录的回测结果"""
         try:
             execution = self.task_store.get_execution(execution_id)
@@ -915,7 +914,7 @@ class BacktestRunner:
         execution_id: str,
         status: TaskStatus,
         timestamp: datetime,
-        error_message: Optional[str] = None,
+        error_message: str | None = None,
     ):
         """更新执行记录状态"""
         try:
@@ -966,8 +965,8 @@ class BacktestRunner:
 
     def _convert_strategy_list(
         self,
-        strategy_list: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        strategy_list: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """
         转换策略配置格式 (MCP 格式 -> 引擎格式)
 
@@ -1076,7 +1075,7 @@ class BacktestRunner:
 
 
 # 单例实例
-_backtest_runner: Optional[BacktestRunner] = None
+_backtest_runner: BacktestRunner | None = None
 
 
 def get_backtest_runner() -> BacktestRunner:

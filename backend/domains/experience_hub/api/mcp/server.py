@@ -6,24 +6,21 @@ MCP Server - 经验知识库 MCP 服务器
 """
 
 import logging
-from typing import Optional
 
 from domains.mcp_core import (
     BaseMCPServer,
     MCPConfig,
-    create_mcp_app,
     create_streamable_http_app,
     run_streamable_http_server,
 )
-from domains.mcp_core.server.server import run_server as mcp_run_server
 
 from .tools.experience_tools import (
-    StoreExperienceTool,
-    QueryExperiencesTool,
-    GetExperienceTool,
-    ListExperiencesTool,
     GetAllTagsTool,
     # 注: LinkExperienceTool 已迁移至 graph-hub (端口 6795)
+    GetExperienceTool,
+    ListExperiencesTool,
+    QueryExperiencesTool,
+    StoreExperienceTool,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,7 +57,7 @@ def create_experience_hub_config(
     port: int = 6794,
     log_level: str = "INFO",
     auth_enabled: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MCPConfig:
     """
     创建经验知识库 MCP 配置
@@ -89,7 +86,7 @@ def create_experience_hub_config(
     )
 
 
-def create_mcp_server(config: Optional[MCPConfig] = None):
+def create_mcp_server(config: MCPConfig | None = None):
     """
     创建 MCP FastAPI 应用 (Streamable HTTP)
 

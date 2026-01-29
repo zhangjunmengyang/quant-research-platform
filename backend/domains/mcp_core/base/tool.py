@@ -9,14 +9,15 @@ MCP Tool 基类和工具注册器
 - 执行模式调度（Fast/Compute/Heavy）
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Type, Union
-from dataclasses import dataclass, field
-from enum import Enum
 import asyncio
-import logging
-import inspect
 import functools
+import inspect
+import logging
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,9 @@ class ToolResult:
     """工具执行结果"""
     success: bool
     data: Any = None
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         if self.success:
             return {"success": True, "data": self.data}
         return {"success": False, "error": self.error}
@@ -66,10 +67,10 @@ class ToolDefinition:
     """MCP 工具定义"""
     name: str
     description: str
-    input_schema: Dict[str, Any]
+    input_schema: dict[str, Any]
     category: str = "default"
 
-    def to_mcp_format(self) -> Dict[str, Any]:
+    def to_mcp_format(self) -> dict[str, Any]:
         """转换为 MCP 协议格式"""
         return {
             "name": self.name,
@@ -125,13 +126,13 @@ class BaseTool(ABC):
     execution_mode: ExecutionMode = ExecutionMode.FAST
 
     # 执行超时时间（秒），None 使用默认值
-    execution_timeout: Optional[float] = None
+    execution_timeout: float | None = None
 
     # 是否需要认证，子类可覆盖
     require_auth: bool = False
 
     # 所需权限范围，子类可覆盖
-    required_scopes: List[str] = []
+    required_scopes: list[str] = []
 
     def __init__(self, **services):
         """
@@ -160,7 +161,7 @@ class BaseTool(ABC):
 
     @property
     @abstractmethod
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         """
         输入参数的 JSON Schema
 
@@ -191,7 +192,7 @@ class BaseTool(ABC):
             category=self.category,
         )
 
-    def coerce_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def coerce_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """
         根据 schema 类型定义转换参数类型
 
@@ -228,7 +229,7 @@ class BaseTool(ABC):
 
         return coerced
 
-    def validate_params(self, params: Dict[str, Any]) -> Optional[str]:
+    def validate_params(self, params: dict[str, Any]) -> str | None:
         """
         验证参数
 
@@ -276,15 +277,15 @@ class ToolRegistry:
     """
 
     def __init__(self):
-        self._tools: Dict[str, BaseTool] = {}
-        self._categories: Dict[str, List[str]] = {}
-        self._services: Dict[str, Any] = {}
+        self._tools: dict[str, BaseTool] = {}
+        self._categories: dict[str, list[str]] = {}
+        self._services: dict[str, Any] = {}
 
     def set_service(self, name: str, service: Any) -> None:
         """设置服务实例，用于依赖注入"""
         self._services[name] = service
 
-    def register(self, tool: BaseTool, category: Optional[str] = None) -> None:
+    def register(self, tool: BaseTool, category: str | None = None) -> None:
         """
         注册工具实例
 
@@ -309,8 +310,8 @@ class ToolRegistry:
 
     def register_class(
         self,
-        tool_class: Type[BaseTool],
-        category: Optional[str] = None,
+        tool_class: type[BaseTool],
+        category: str | None = None,
         **kwargs
     ) -> BaseTool:
         """
@@ -352,28 +353,28 @@ class ToolRegistry:
         logger.debug(f"注销工具: {name}")
         return True
 
-    def get(self, name: str) -> Optional[BaseTool]:
+    def get(self, name: str) -> BaseTool | None:
         """获取工具"""
         return self._tools.get(name)
 
-    def get_all(self) -> Dict[str, BaseTool]:
+    def get_all(self) -> dict[str, BaseTool]:
         """获取所有工具"""
         return self._tools.copy()
 
-    def get_by_category(self, category: str) -> List[BaseTool]:
+    def get_by_category(self, category: str) -> list[BaseTool]:
         """获取指定分类的工具"""
         tool_names = self._categories.get(category, [])
         return [self._tools[name] for name in tool_names if name in self._tools]
 
-    def get_definitions(self) -> List[ToolDefinition]:
+    def get_definitions(self) -> list[ToolDefinition]:
         """获取所有工具定义"""
         return [tool.get_definition() for tool in self._tools.values()]
 
-    def get_mcp_tools(self) -> List[Dict[str, Any]]:
+    def get_mcp_tools(self) -> list[dict[str, Any]]:
         """获取 MCP 格式的工具列表"""
         return [defn.to_mcp_format() for defn in self.get_definitions()]
 
-    async def execute(self, name: str, params: Dict[str, Any]) -> ToolResult:
+    async def execute(self, name: str, params: dict[str, Any]) -> ToolResult:
         """
         执行工具（带超时控制、日志记录和执行模式调度）
 
@@ -418,7 +419,7 @@ class ToolRegistry:
                 timeout=timeout
             )
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"工具 {name} 执行超时（{timeout}秒）")
             return ToolResult.fail(f"执行超时: 工具 {name} 超过 {timeout} 秒未响应")
         except Exception as e:
@@ -426,7 +427,7 @@ class ToolRegistry:
             return ToolResult.fail(f"执行失败: {str(e)}")
 
     @property
-    def categories(self) -> List[str]:
+    def categories(self) -> list[str]:
         """获取所有分类"""
         return list(self._categories.keys())
 
@@ -438,7 +439,7 @@ class ToolRegistry:
 
 
 # 全局工具注册器实例管理
-_registries: Dict[str, ToolRegistry] = {}
+_registries: dict[str, ToolRegistry] = {}
 
 
 def get_tool_registry(namespace: str = "default") -> ToolRegistry:
@@ -472,7 +473,7 @@ def register_tool(
         class UpdateTool(BaseTool):
             ...
     """
-    def decorator(cls: Type[BaseTool]):
+    def decorator(cls: type[BaseTool]):
         # 设置类的 category 属性
         cls.category = category
 
@@ -495,7 +496,7 @@ def register_tool(
     return decorator
 
 
-def auto_schema(func: Callable) -> Dict[str, Any]:
+def auto_schema(func: Callable) -> dict[str, Any]:
     """
     从函数签名自动生成 JSON Schema
 
@@ -579,16 +580,16 @@ class DomainBaseTool(BaseTool):
     """
 
     # 单服务配置（向后兼容）
-    service_path: Optional[str] = None
+    service_path: str | None = None
     service_attr: str = "service"
 
     # 多服务配置：{属性名: "module:getter_or_class"}
-    service_configs: Dict[str, str] = {}
+    service_configs: dict[str, str] = {}
 
     def __init__(self, **services):
         super().__init__(**services)
-        self._lazy_services: Dict[str, Any] = {}
-        self._service_loaded: Dict[str, bool] = {}
+        self._lazy_services: dict[str, Any] = {}
+        self._service_loaded: dict[str, bool] = {}
 
     def _load_service(self, attr_name: str, path: str) -> Any:
         """加载单个服务"""

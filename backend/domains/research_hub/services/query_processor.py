@@ -5,7 +5,7 @@
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from domains.mcp_core.llm import get_llm_client
 
@@ -59,7 +59,7 @@ class QueryProcessor:
     - 结果重排: 使用 LLM 对检索结果进行重新排序
     """
 
-    def __init__(self, model_key: Optional[str] = None):
+    def __init__(self, model_key: str | None = None):
         """
         初始化查询处理器
 
@@ -116,9 +116,9 @@ class QueryProcessor:
     async def rerank(
         self,
         query: str,
-        results: List[Dict[str, Any]],
-        top_k: Optional[int] = None,
-    ) -> List[Dict[str, Any]]:
+        results: list[dict[str, Any]],
+        top_k: int | None = None,
+    ) -> list[dict[str, Any]]:
         """
         重排检索结果
 
@@ -182,7 +182,7 @@ class QueryProcessor:
                 return results[:top_k]
             return results
 
-    def _parse_rerank_response(self, response: str, total: int) -> List[int]:
+    def _parse_rerank_response(self, response: str, total: int) -> list[int]:
         """
         解析重排响应
 
@@ -221,10 +221,10 @@ class QueryProcessor:
 
 
 # 单例管理
-_query_processor: Optional[QueryProcessor] = None
+_query_processor: QueryProcessor | None = None
 
 
-def get_query_processor(model_key: Optional[str] = None) -> QueryProcessor:
+def get_query_processor(model_key: str | None = None) -> QueryProcessor:
     """获取查询处理器单例"""
     global _query_processor
     if _query_processor is None:

@@ -15,7 +15,7 @@ import uuid as uuid_lib
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 
 class NoteType(str, Enum):
@@ -39,7 +39,7 @@ class Note:
 
     作为研究过程中的临时记录，支持：
     - 分类管理：observation/hypothesis/verification
-    - 关联关系：通过 Edge 系统 (mcp_core/edge) 管理实体间关系
+    - 关联关系：通过 Graph 系统 (graph_hub) 管理实体间关系
     - 提炼为经验：从笔记中提取正式经验
 
     Attributes:
@@ -61,22 +61,22 @@ class Note:
         - get_note_edges(note_id)
         - trace_note_lineage(note_id)
     """
-    id: Optional[int] = None
+    id: int | None = None
     uuid: str = field(default_factory=lambda: str(uuid_lib.uuid4()))
     title: str = ""
     content: str = ""
     tags: str = ""
-    source: Optional[str] = None  # 来源类型（如 factor, strategy）
-    source_ref: Optional[str] = None  # 来源引用（如因子名、策略ID）
+    source: str | None = None  # 来源类型（如 factor, strategy）
+    source_ref: str | None = None  # 来源引用（如因子名、策略ID）
 
     note_type: str = field(default=NoteType.OBSERVATION.value)
-    promoted_to_experience_id: Optional[int] = None
+    promoted_to_experience_id: int | None = None
     is_archived: bool = False
 
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'id': self.id,
@@ -94,19 +94,19 @@ class Note:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Note':
+    def from_dict(cls, data: dict[str, Any]) -> 'Note':
         """从字典创建笔记实例"""
         valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**valid_fields)
 
     @property
-    def tags_list(self) -> List[str]:
+    def tags_list(self) -> list[str]:
         """获取标签列表（逗号分隔的字符串转为列表）"""
         if not self.tags:
             return []
         return [t.strip() for t in self.tags.split(',') if t.strip()]
 
-    def set_tags(self, tags: List[str]):
+    def set_tags(self, tags: list[str]):
         """设置标签列表"""
         self.tags = ','.join(tags)
 

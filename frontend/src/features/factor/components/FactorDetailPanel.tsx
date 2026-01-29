@@ -195,29 +195,23 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
     setIsEditing(false)
   }
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setSaving(true)
-    try {
-      // 使用 mutation 更新，它会自动 invalidate queries
-      updateFactor.mutate(
-        { filename: displayFactor.filename, update: formData },
-        {
-          onSuccess: (data) => {
-            setFullFactor(data)
-            setIsEditing(false)
-          },
-          onError: (error) => {
-            console.error('Failed to save factor:', error)
-          },
-          onSettled: () => {
-            setSaving(false)
-          }
-        }
-      )
-    } catch (error) {
-      console.error('Failed to save factor:', error)
-      setSaving(false)
-    }
+    updateFactor.mutate(
+      { filename: displayFactor.filename, update: formData },
+      {
+        onSuccess: (data) => {
+          setFullFactor(data)
+          setIsEditing(false)
+        },
+        onError: (error) => {
+          console.error('Failed to save factor:', error)
+        },
+        onSettled: () => {
+          setSaving(false)
+        },
+      }
+    )
   }
 
   const handleFormChange = (field: keyof FactorUpdate, value: string | number | undefined) => {

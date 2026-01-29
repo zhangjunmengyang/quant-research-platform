@@ -10,7 +10,6 @@ import os
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ class FileLock:
         """
         self.lock_file = lock_file
         self.timeout = timeout
-        self._fd: Optional[int] = None
+        self._fd: int | None = None
 
     def acquire(self, blocking: bool = True) -> bool:
         """
@@ -124,7 +123,7 @@ def sync_lock(data_dir: Path, resource_type: str, timeout: float = 10.0):
             lock.release()
 
 
-def try_sync_lock(data_dir: Path, resource_type: str) -> Optional[FileLock]:
+def try_sync_lock(data_dir: Path, resource_type: str) -> FileLock | None:
     """
     尝试获取同步锁（非阻塞）
 

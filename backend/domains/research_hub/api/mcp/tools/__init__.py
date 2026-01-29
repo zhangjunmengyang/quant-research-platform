@@ -6,8 +6,8 @@ Research Hub MCP Tools
 
 from .base import BaseTool, ToolResult
 from .report_tools import (
-    ListReportsTool,
     GetReportTool,
+    ListReportsTool,
 )
 from .search_tools import RetrieveTool
 

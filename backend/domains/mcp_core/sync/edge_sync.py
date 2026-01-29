@@ -35,7 +35,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import BaseSyncService
 
@@ -114,7 +114,7 @@ class EdgeSyncService(BaseSyncService):
 
     # ==================== 导出功能 ====================
 
-    def export_all(self, overwrite: bool = False) -> Dict[str, int]:
+    def export_all(self, overwrite: bool = False) -> dict[str, int]:
         """
         导出所有知识边数据（标签 + 关系）
 
@@ -145,7 +145,7 @@ class EdgeSyncService(BaseSyncService):
         logger.info(f"edges_exported: {stats}")
         return stats
 
-    def _export_all_tags(self, overwrite: bool) -> Dict[str, int]:
+    def _export_all_tags(self, overwrite: bool) -> dict[str, int]:
         """导出所有标签"""
         stats = {"exported": 0, "skipped": 0, "errors": 0}
 
@@ -161,7 +161,7 @@ class EdgeSyncService(BaseSyncService):
 
         return stats
 
-    def _export_entity_type_tags(self, entity_type: str, overwrite: bool) -> Dict[str, int]:
+    def _export_entity_type_tags(self, entity_type: str, overwrite: bool) -> dict[str, int]:
         """导出某个实体类型的所有标签"""
         stats = {"exported": 0, "skipped": 0, "errors": 0}
 
@@ -196,7 +196,7 @@ class EdgeSyncService(BaseSyncService):
 
         return stats
 
-    def _get_all_entity_tags_by_type(self, entity_type) -> Dict[str, List[str]]:
+    def _get_all_entity_tags_by_type(self, entity_type) -> dict[str, list[str]]:
         """从 Neo4j 获取指定类型所有实体的标签映射"""
         result = {}
         if self.graph_store is None:
@@ -226,7 +226,7 @@ class EdgeSyncService(BaseSyncService):
         self,
         entity_type: str,
         entity_id: str,
-        tags: List[str],
+        tags: list[str],
         overwrite: bool
     ) -> str:
         """导出单个实体的标签到文件"""
@@ -242,7 +242,7 @@ class EdgeSyncService(BaseSyncService):
         self.write_yaml_atomic(filepath, data)
         return "exported"
 
-    def _export_all_relations(self, overwrite: bool) -> Dict[str, int]:
+    def _export_all_relations(self, overwrite: bool) -> dict[str, int]:
         """导出所有关系（非标签）"""
         stats = {"exported": 0, "skipped": 0, "errors": 0}
 
@@ -302,7 +302,7 @@ class EdgeSyncService(BaseSyncService):
 
     # ==================== 导入功能 ====================
 
-    def import_all(self, full_sync: bool = False) -> Dict[str, int]:
+    def import_all(self, full_sync: bool = False) -> dict[str, int]:
         """
         从文件导入所有知识边数据到 Neo4j
 
@@ -337,7 +337,7 @@ class EdgeSyncService(BaseSyncService):
         logger.info(f"edges_imported: {stats}")
         return stats
 
-    def _import_all_tags(self, full_sync: bool = False) -> Dict[str, int]:
+    def _import_all_tags(self, full_sync: bool = False) -> dict[str, int]:
         """导入所有标签"""
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
@@ -362,7 +362,7 @@ class EdgeSyncService(BaseSyncService):
 
         return stats
 
-    def _import_entity_type_tags(self, entity_type: str, full_sync: bool = False) -> Dict[str, int]:
+    def _import_entity_type_tags(self, entity_type: str, full_sync: bool = False) -> dict[str, int]:
         """导入某个实体类型的所有标签"""
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
@@ -434,7 +434,7 @@ class EdgeSyncService(BaseSyncService):
 
         return stats
 
-    def _import_all_relations(self, full_sync: bool = False) -> Dict[str, int]:
+    def _import_all_relations(self, full_sync: bool = False) -> dict[str, int]:
         """导入所有关系（非标签）"""
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
@@ -455,13 +455,13 @@ class EdgeSyncService(BaseSyncService):
 
         return stats
 
-    def _import_relation_type(self, relation: str, full_sync: bool = False) -> Dict[str, int]:
+    def _import_relation_type(self, relation: str, full_sync: bool = False) -> dict[str, int]:
         """导入某种关系类型的所有边"""
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
         filepath = self._get_relation_file(relation)
 
-        from domains.graph_hub.core import RelationType, GraphEdge
+        from domains.graph_hub.core import GraphEdge, RelationType
         rtype = RelationType(relation)
         db_edges = self.graph_store.get_edges_by_relation(rtype, limit=10000)
 
@@ -628,7 +628,7 @@ class EdgeSyncService(BaseSyncService):
 
     # ==================== 状态查询 ====================
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取同步状态"""
         status = {
             "tags": {
@@ -682,6 +682,6 @@ class EdgeSyncService(BaseSyncService):
 
         return status
 
-    def restore_from_file(self) -> Dict[str, int]:
+    def restore_from_file(self) -> dict[str, int]:
         """从文件完全恢复数据到 Neo4j"""
         return self.import_all(full_sync=True)

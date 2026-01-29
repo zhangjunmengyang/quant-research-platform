@@ -6,10 +6,10 @@
 
 import json
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from domains.mcp_core.paths import get_data_dir
 
@@ -25,7 +25,7 @@ class BacktestTemplate:
     category: str = "custom"  # 模板分类: preset(预设) / custom(自定义)
 
     # 策略配置
-    strategy_list: List[Dict[str, Any]] = field(default_factory=list)
+    strategy_list: list[dict[str, Any]] = field(default_factory=list)
 
     # 回测参数
     leverage: float = 1.0  # 杠杆倍数
@@ -34,22 +34,22 @@ class BacktestTemplate:
     initial_usdt: float = 10000  # 初始资金
 
     # 过滤配置
-    black_list: List[str] = field(default_factory=list)  # 黑名单
-    white_list: List[str] = field(default_factory=list)  # 白名单
+    black_list: list[str] = field(default_factory=list)  # 黑名单
+    white_list: list[str] = field(default_factory=list)  # 白名单
     min_kline_num: int = 168  # 最少K线数
 
     # 元数据
-    tags: List[str] = field(default_factory=list)  # 标签
+    tags: list[str] = field(default_factory=list)  # 标签
     created_at: str = ""  # 创建时间
     updated_at: str = ""  # 更新时间
     author: str = ""  # 创建者
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BacktestTemplate":
+    def from_dict(cls, data: dict[str, Any]) -> "BacktestTemplate":
         """从字典创建"""
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
@@ -61,7 +61,7 @@ class BacktestTemplateService:
     提供模板的CRUD操作和预设模板。
     """
 
-    def __init__(self, templates_dir: Optional[Path] = None):
+    def __init__(self, templates_dir: Path | None = None):
         """
         初始化模板服务
 
@@ -72,7 +72,7 @@ class BacktestTemplateService:
         self.templates_dir.mkdir(parents=True, exist_ok=True)
 
         # 预设模板
-        self._preset_templates: Dict[str, BacktestTemplate] = {}
+        self._preset_templates: dict[str, BacktestTemplate] = {}
         self._init_preset_templates()
 
         logger.info(f"BacktestTemplateService 初始化，模板目录: {self.templates_dir}")
@@ -294,7 +294,7 @@ class BacktestTemplateService:
             author="system",
         )
 
-    def get(self, template_id: str) -> Optional[BacktestTemplate]:
+    def get(self, template_id: str) -> BacktestTemplate | None:
         """
         获取模板
 
@@ -312,7 +312,7 @@ class BacktestTemplateService:
         template_file = self.templates_dir / f"{template_id}.json"
         if template_file.exists():
             try:
-                with open(template_file, "r", encoding="utf-8") as f:
+                with open(template_file, encoding="utf-8") as f:
                     data = json.load(f)
                 return BacktestTemplate.from_dict(data)
             except Exception as e:
@@ -321,9 +321,9 @@ class BacktestTemplateService:
 
     def list_all(
         self,
-        category: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-    ) -> List[BacktestTemplate]:
+        category: str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[BacktestTemplate]:
         """
         列出所有模板
 
@@ -347,7 +347,7 @@ class BacktestTemplateService:
         # 添加自定义模板
         for template_file in self.templates_dir.glob("*.json"):
             try:
-                with open(template_file, "r", encoding="utf-8") as f:
+                with open(template_file, encoding="utf-8") as f:
                     data = json.load(f)
                 template = BacktestTemplate.from_dict(data)
                 if category and template.category != category:
@@ -446,7 +446,7 @@ class BacktestTemplateService:
             logger.error(f"删除模板失败 {template_id}: {e}")
             return False
 
-    def clone(self, source_id: str, new_id: str, new_name: str) -> Optional[BacktestTemplate]:
+    def clone(self, source_id: str, new_id: str, new_name: str) -> BacktestTemplate | None:
         """
         克隆模板
 
@@ -484,26 +484,26 @@ class BacktestTemplateService:
             return new_template
         return None
 
-    def get_by_tag(self, tag: str) -> List[BacktestTemplate]:
+    def get_by_tag(self, tag: str) -> list[BacktestTemplate]:
         """按标签获取模板"""
         return self.list_all(tags=[tag])
 
-    def get_preset_templates(self) -> List[BacktestTemplate]:
+    def get_preset_templates(self) -> list[BacktestTemplate]:
         """获取所有预设模板"""
         return list(self._preset_templates.values())
 
-    def get_custom_templates(self) -> List[BacktestTemplate]:
+    def get_custom_templates(self) -> list[BacktestTemplate]:
         """获取所有自定义模板"""
         return self.list_all(category="custom")
 
-    def get_categories(self) -> List[str]:
+    def get_categories(self) -> list[str]:
         """获取所有分类"""
         categories = {"preset", "custom"}
         for template in self.list_all():
             categories.add(template.category)
         return sorted(list(categories))
 
-    def get_all_tags(self) -> List[str]:
+    def get_all_tags(self) -> list[str]:
         """获取所有标签"""
         tags = set()
         for template in self.list_all():
@@ -512,7 +512,7 @@ class BacktestTemplateService:
 
 
 # 单例实例
-_template_service: Optional[BacktestTemplateService] = None
+_template_service: BacktestTemplateService | None = None
 
 
 def get_backtest_template_service() -> BacktestTemplateService:

@@ -4,9 +4,9 @@
 
 import sys
 import time
-from datetime import datetime
-from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -16,9 +16,9 @@ class StageStats:
     total: int = 0
     completed: int = 0
     failed: int = 0
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    start_time: float | None = None
+    end_time: float | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
     @property
     def duration(self) -> float:
@@ -49,9 +49,9 @@ class ProgressReporter:
         """
         self.output = output or sys.stdout
         self.bar_width = bar_width
-        self.stages: List[StageStats] = []
-        self.current_stage: Optional[StageStats] = None
-        self.start_time: Optional[float] = None
+        self.stages: list[StageStats] = []
+        self.current_stage: StageStats | None = None
+        self.start_time: float | None = None
 
     def start_pipeline(self):
         """开始 Pipeline"""
@@ -115,7 +115,7 @@ class ProgressReporter:
         self.current_stage.failed += 1
         self._print_progress(message, is_error=True)
 
-    def finish_stage(self, summary: Optional[Dict[str, Any]] = None):
+    def finish_stage(self, summary: dict[str, Any] | None = None):
         """
         完成当前阶段
 
@@ -264,7 +264,7 @@ class ProgressReporter:
 
 
 # 单例实例
-_progress_reporter: Optional[ProgressReporter] = None
+_progress_reporter: ProgressReporter | None = None
 
 
 def get_progress_reporter() -> ProgressReporter:

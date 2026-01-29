@@ -568,7 +568,7 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
             draggable={true}
             repulsion={600}
             gravity={0.05}
-            edgeLength={[100, 300]}
+            edgeLength={GRAPH_EDGE_LENGTH}
             onNodeClick={handleNodeClick}
             onNodeDblClick={handleNodeDblClick}
             focusNodeId={

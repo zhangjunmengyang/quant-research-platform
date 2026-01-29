@@ -4,11 +4,11 @@ Prompt 模板引擎 - 变量注入和渲染
 支持模板变量替换和条件渲染。
 """
 
-import re
 import json
-from typing import Dict, Any, Optional, List
+import re
+from typing import Any
 
-from ..core.config import get_config_loader, ConfigLoader
+from ..core.config import ConfigLoader, get_config_loader
 
 
 class PromptEngine:
@@ -20,7 +20,7 @@ class PromptEngine:
     - {% if condition %}...{% endif %} - 条件渲染
     """
 
-    def __init__(self, config_loader: Optional[ConfigLoader] = None):
+    def __init__(self, config_loader: ConfigLoader | None = None):
         """
         初始化 Prompt 引擎
 
@@ -28,10 +28,10 @@ class PromptEngine:
             config_loader: 配置加载器实例
         """
         self.config = config_loader or get_config_loader()
-        self._user_vars: Optional[Dict[str, Any]] = None
+        self._user_vars: dict[str, Any] | None = None
 
     @property
-    def user_vars(self) -> Dict[str, Any]:
+    def user_vars(self) -> dict[str, Any]:
         """获取用户变量"""
         if self._user_vars is None:
             self._user_vars = self.config.load_user_vars()
@@ -44,9 +44,9 @@ class PromptEngine:
     def render(
         self,
         task_name: str,
-        input_vars: Optional[Dict[str, Any]] = None,
-        extra_vars: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, str]:
+        input_vars: dict[str, Any] | None = None,
+        extra_vars: dict[str, Any] | None = None
+    ) -> dict[str, str]:
         """
         渲染 Prompt 模板
 
@@ -81,9 +81,9 @@ class PromptEngine:
     def render_field(
         self,
         field_name: str,
-        input_vars: Optional[Dict[str, Any]] = None,
-        extra_vars: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, str]:
+        input_vars: dict[str, Any] | None = None,
+        extra_vars: dict[str, Any] | None = None
+    ) -> dict[str, str]:
         """
         渲染字段填充的 Prompt
 
@@ -114,7 +114,7 @@ class PromptEngine:
             'output_format': prompt_config.get('output', {}).get('format', 'text'),
         }
 
-    def _render_template(self, template: str, variables: Dict[str, Any]) -> str:
+    def _render_template(self, template: str, variables: dict[str, Any]) -> str:
         """渲染模板字符串"""
         if not template:
             return ''
@@ -124,7 +124,7 @@ class PromptEngine:
         result = self._substitute_variables(result, variables)
         return result
 
-    def _process_conditionals(self, template: str, variables: Dict[str, Any]) -> str:
+    def _process_conditionals(self, template: str, variables: dict[str, Any]) -> str:
         """处理条件渲染块"""
         pattern = r'\{%\s*if\s+(\w+)\s*%\}(.*?)\{%\s*endif\s*%\}'
 
@@ -136,7 +136,7 @@ class PromptEngine:
 
         return re.sub(pattern, replace_conditional, template, flags=re.DOTALL)
 
-    def _substitute_variables(self, template: str, variables: Dict[str, Any]) -> str:
+    def _substitute_variables(self, template: str, variables: dict[str, Any]) -> str:
         """替换变量占位符"""
         pattern = r'\{(\w+)\}'
 
@@ -151,7 +151,7 @@ class PromptEngine:
 
         return re.sub(pattern, replace_var, template)
 
-    def validate_prompt(self, task_name: str) -> List[str]:
+    def validate_prompt(self, task_name: str) -> list[str]:
         """验证 Prompt 配置，返回错误列表"""
         errors = []
 
@@ -172,19 +172,19 @@ class PromptEngine:
 
         return errors
 
-    def get_input_vars(self, task_name: str) -> List[str]:
+    def get_input_vars(self, task_name: str) -> list[str]:
         """获取任务所需的输入变量列表"""
         prompt_config = self.config.load_prompt(task_name)
         return prompt_config.get('input_vars', [])
 
-    def get_output_schema(self, task_name: str) -> Dict[str, Any]:
+    def get_output_schema(self, task_name: str) -> dict[str, Any]:
         """获取任务的输出 schema"""
         prompt_config = self.config.load_prompt(task_name)
         return prompt_config.get('output', {}).get('schema', {})
 
 
 # 单例
-_prompt_engine: Optional[PromptEngine] = None
+_prompt_engine: PromptEngine | None = None
 
 
 def get_prompt_engine() -> PromptEngine:

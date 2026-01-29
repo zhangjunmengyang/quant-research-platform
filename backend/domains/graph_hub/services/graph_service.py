@@ -4,7 +4,7 @@
 提供统一的图谱管理 API，使用 Neo4j 图数据库。
 """
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..core import (
     GraphEdge,
@@ -22,7 +22,7 @@ class GraphService:
 
     def __init__(self):
         """初始化服务"""
-        self._store: Optional[GraphStore] = None
+        self._store: GraphStore | None = None
 
     @property
     def store(self) -> GraphStore:
@@ -41,8 +41,8 @@ class GraphService:
         target_id: str,
         relation: str = "related",
         is_bidirectional: bool = False,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[bool, str]:
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[bool, str]:
         """
         创建关联
 
@@ -87,7 +87,7 @@ class GraphService:
         target_type: str,
         target_id: str,
         relation: str = "related",
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """删除关联"""
         try:
             src_type = NodeType(source_type)
@@ -106,7 +106,7 @@ class GraphService:
         entity_type: str,
         entity_id: str,
         include_bidirectional: bool = True,
-    ) -> Tuple[bool, str, List[Dict]]:
+    ) -> tuple[bool, str, list[dict]]:
         """
         获取实体的所有关联
 
@@ -129,7 +129,7 @@ class GraphService:
         entity_id: str,
         direction: str = "backward",
         max_depth: int = 5,
-    ) -> Tuple[bool, str, Optional[Dict]]:
+    ) -> tuple[bool, str, dict | None]:
         """
         追溯知识链路
 
@@ -157,7 +157,7 @@ class GraphService:
         target_type: str,
         target_id: str,
         max_depth: int = 5,
-    ) -> Tuple[bool, str, Optional[Dict]]:
+    ) -> tuple[bool, str, dict | None]:
         """
         查找两实体间路径
 
@@ -180,7 +180,7 @@ class GraphService:
         entity_type: str,
         entity_id: str,
         tag: str,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """添加标签"""
         try:
             etype = NodeType(entity_type)
@@ -197,7 +197,7 @@ class GraphService:
         entity_type: str,
         entity_id: str,
         tag: str,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """移除标签"""
         try:
             etype = NodeType(entity_type)
@@ -213,7 +213,7 @@ class GraphService:
         self,
         entity_type: str,
         entity_id: str,
-    ) -> Tuple[bool, str, List[str]]:
+    ) -> tuple[bool, str, list[str]]:
         """获取实体标签"""
         try:
             etype = NodeType(entity_type)
@@ -226,8 +226,8 @@ class GraphService:
     def get_entities_by_tag(
         self,
         tag: str,
-        entity_type: Optional[str] = None,
-    ) -> Tuple[bool, str, List[Dict]]:
+        entity_type: str | None = None,
+    ) -> tuple[bool, str, list[dict]]:
         """按标签获取实体"""
         etype = None
         if entity_type:
@@ -239,7 +239,7 @@ class GraphService:
         entities = self.store.get_entities_by_tag(tag, etype)
         return True, f"找到 {len(entities)} 个实体", entities
 
-    def list_all_tags(self) -> Tuple[bool, str, List[Dict]]:
+    def list_all_tags(self) -> tuple[bool, str, list[dict]]:
         """列出所有标签"""
         tags = self.store.list_all_tags()
         return True, f"共 {len(tags)} 个标签", tags
@@ -250,7 +250,7 @@ class GraphService:
         self,
         node_limit: int = 500,
         edge_limit: int = 1000,
-    ) -> Tuple[bool, str, Optional[Dict]]:
+    ) -> tuple[bool, str, dict | None]:
         """
         获取图谱概览 (全量数据带限制)
 
@@ -277,7 +277,7 @@ class GraphService:
 
 
 # 单例
-_graph_service: Optional[GraphService] = None
+_graph_service: GraphService | None = None
 
 
 def get_graph_service() -> GraphService:

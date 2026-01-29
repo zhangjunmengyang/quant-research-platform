@@ -7,7 +7,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import BaseSyncService
 
@@ -57,7 +57,7 @@ class FactorSyncService(BaseSyncService):
         super().__init__(data_dir, store)
         self.metadata_dir = data_dir / "metadata"
 
-    def export_all(self, overwrite: bool = False) -> Dict[str, int]:
+    def export_all(self, overwrite: bool = False) -> dict[str, int]:
         """
         导出所有因子元数据到 YAML 文件
 
@@ -106,7 +106,7 @@ class FactorSyncService(BaseSyncService):
         logger.info(f"factor_metadata_exported: {stats}")
         return stats
 
-    def import_all(self) -> Dict[str, int]:
+    def import_all(self) -> dict[str, int]:
         """
         从 YAML 文件导入因子元数据
 
@@ -164,7 +164,7 @@ class FactorSyncService(BaseSyncService):
         logger.info(f"factor_metadata_imported: {stats}")
         return stats
 
-    def _factor_to_yaml_data(self, factor: Any) -> Dict[str, Any]:
+    def _factor_to_yaml_data(self, factor: Any) -> dict[str, Any]:
         """将因子对象转换为 YAML 数据"""
         data = {}
 
@@ -189,7 +189,7 @@ class FactorSyncService(BaseSyncService):
 
         return data
 
-    def _yaml_data_to_update_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _yaml_data_to_update_dict(self, data: dict[str, Any]) -> dict[str, Any]:
         """将 YAML 数据转换为数据库更新字典"""
         update = {}
 
@@ -272,7 +272,7 @@ class FactorSyncService(BaseSyncService):
             logger.error(f"factor_import_single_error: {filename}, {e}")
             return False
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """
         获取同步状态
 

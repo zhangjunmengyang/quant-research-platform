@@ -4,7 +4,7 @@
 提供经验的存储、检索和管理功能。
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseTool, ToolResult
 
@@ -35,7 +35,7 @@ class StoreExperienceTool(BaseTool):
 - 积累交易逻辑的洞察"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -131,7 +131,7 @@ class QueryExperiencesTool(BaseTool):
 - 寻找特定场景下的最佳实践"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -219,7 +219,7 @@ class GetExperienceTool(BaseTool):
 通过经验 ID 获取完整的经验详情，包括 PARL 内容、上下文等。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -289,7 +289,7 @@ class ListExperiencesTool(BaseTool):
 - 时间范围筛选（创建时间/更新时间）"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -437,7 +437,7 @@ class GetAllTagsTool(BaseTool):
 用于了解现有的标签分类体系。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {}

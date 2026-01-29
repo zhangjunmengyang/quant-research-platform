@@ -7,8 +7,8 @@
 
 import logging
 import math
-from typing import Any, Dict, List, Optional, Set
 from datetime import datetime
+from typing import Any
 
 from domains.mcp_core.base import (
     BaseStore,
@@ -31,7 +31,7 @@ class StrategyStore(BaseStore[Strategy]):
     # BaseStore 配置
     table_name = "strategies"
 
-    allowed_columns: Set[str] = {
+    allowed_columns: set[str] = {
         # 基础信息
         'id', 'name', 'description',
         # 因子配置
@@ -70,7 +70,7 @@ class StrategyStore(BaseStore[Strategy]):
         'task_id', 'task_status', 'error_message',
     }
 
-    numeric_fields: Set[str] = {
+    numeric_fields: set[str] = {
         'leverage', 'select_coin_num',
         'long_select_coin_num', 'short_select_coin_num',
         'long_cap_weight', 'short_cap_weight',
@@ -92,7 +92,7 @@ class StrategyStore(BaseStore[Strategy]):
         "sharpe_ratio", "win_rate", "cumulative_return", "leverage",
     }
 
-    def __init__(self, database_url: Optional[str] = None):
+    def __init__(self, database_url: str | None = None):
         """
         初始化存储层
 
@@ -221,11 +221,11 @@ class StrategyStore(BaseStore[Strategy]):
 
             logger.info("策略数据库初始化完成")
 
-    def _row_to_entity(self, row: Dict[str, Any]) -> Strategy:
+    def _row_to_entity(self, row: dict[str, Any]) -> Strategy:
         """将数据库行转换为 Strategy 对象（BaseStore 抽象方法实现）"""
         return self._row_to_strategy(row)
 
-    def _row_to_strategy(self, row: Dict[str, Any]) -> Strategy:
+    def _row_to_strategy(self, row: dict[str, Any]) -> Strategy:
         """将数据库行转换为 Strategy 对象"""
         def get_col(name, default=None):
             return row.get(name) if row.get(name) is not None else default
@@ -384,7 +384,7 @@ class StrategyStore(BaseStore[Strategy]):
     # 向后兼容别名
     create = add
 
-    def get(self, strategy_id: str) -> Optional[Strategy]:
+    def get(self, strategy_id: str) -> Strategy | None:
         """获取策略"""
         with self._cursor() as cursor:
             cursor.execute("SELECT * FROM strategies WHERE id = %s", (strategy_id,))
@@ -393,7 +393,7 @@ class StrategyStore(BaseStore[Strategy]):
                 return self._row_to_strategy(dict(row))
             return None
 
-    def get_by_name(self, name: str) -> Optional[Strategy]:
+    def get_by_name(self, name: str) -> Strategy | None:
         """按名称获取策略"""
         with self._cursor() as cursor:
             cursor.execute("SELECT * FROM strategies WHERE name = %s", (name,))
@@ -491,14 +491,13 @@ class StrategyStore(BaseStore[Strategy]):
             return deleted
 
     def _delete_strategy_edges(self, strategy_id: str) -> None:
-        """删除策略关联的所有边"""
+        """删除策略关联的所有边（使用 Neo4j 图存储）"""
         try:
-            from domains.mcp_core.edge.store import get_edge_store
-            from domains.mcp_core.edge.models import EdgeEntityType
+            from domains.graph_hub.core import NodeType, get_graph_store
 
-            edge_store = get_edge_store()
-            deleted_count = edge_store.delete_edges_by_entity(
-                EdgeEntityType.STRATEGY,
+            graph_store = get_graph_store()
+            deleted_count = graph_store.delete_edges_by_entity(
+                NodeType.STRATEGY,
                 strategy_id
             )
             if deleted_count > 0:
@@ -511,14 +510,14 @@ class StrategyStore(BaseStore[Strategy]):
 
     def list_all(
         self,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         order_by: str = "created_at",
         order_desc: bool = True,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
-        page: Optional[int] = None,
-        page_size: Optional[int] = None,
-    ) -> tuple[List[Strategy], int]:
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> tuple[list[Strategy], int]:
         """
         列出所有策略
 
@@ -582,7 +581,7 @@ class StrategyStore(BaseStore[Strategy]):
 
             return strategies, total
 
-    def search(self, query: str) -> List[Strategy]:
+    def search(self, query: str) -> list[Strategy]:
         """搜索策略（按名称和描述）"""
         search_pattern = f"%{query}%"
         with self._cursor() as cursor:
@@ -593,7 +592,7 @@ class StrategyStore(BaseStore[Strategy]):
             """, (search_pattern, search_pattern, search_pattern))
             return [self._row_to_strategy(dict(row)) for row in cursor.fetchall()]
 
-    def get_by_factor(self, factor_name: str) -> List[Strategy]:
+    def get_by_factor(self, factor_name: str) -> list[Strategy]:
         """获取使用指定因子的策略"""
         search_pattern = f'%"{factor_name}"%'
         with self._cursor() as cursor:
@@ -604,14 +603,14 @@ class StrategyStore(BaseStore[Strategy]):
             """, (search_pattern,))
             return [self._row_to_strategy(dict(row)) for row in cursor.fetchall()]
 
-    def get_verified(self) -> List[Strategy]:
+    def get_verified(self) -> list[Strategy]:
         """获取已验证的策略"""
         strategies, _ = self.list_all(filters={"verified": True})
         return strategies
 
     # ===== 统计操作 =====
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息"""
         with self._cursor() as cursor:
             cursor.execute("SELECT COUNT(*) as count FROM strategies")
@@ -665,8 +664,8 @@ class StrategyStore(BaseStore[Strategy]):
         self,
         metric: str = "annual_return",
         n: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Strategy]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Strategy]:
         """
         获取绩效最佳的策略
 
@@ -683,7 +682,7 @@ class StrategyStore(BaseStore[Strategy]):
         )
         return strategies
 
-    def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
+    def count(self, filters: dict[str, Any] | None = None) -> int:
         """计数"""
         query = "SELECT COUNT(*) as count FROM strategies"
         params = []

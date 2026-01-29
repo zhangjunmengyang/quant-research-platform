@@ -4,15 +4,15 @@
 
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { noteApi } from './api'
-import type {
-  NoteCreate,
-  NoteUpdate,
-  NoteListParams,
-  ObservationCreate,
-  HypothesisCreate,
-  VerificationCreate,
-  PromoteRequest,
+import {
   NoteType,
+  type NoteCreate,
+  type NoteUpdate,
+  type NoteListParams,
+  type ObservationCreate,
+  type HypothesisCreate,
+  type VerificationCreate,
+  type PromoteRequest,
 } from './types'
 
 // Query Keys
@@ -184,11 +184,11 @@ export function useRecordNoteByType(noteType: NoteType) {
   const { recordObservation, recordHypothesis, recordVerification } = useRecordNote()
 
   switch (noteType) {
-    case 'observation':
+    case NoteType.OBSERVATION:
       return recordObservation
-    case 'hypothesis':
+    case NoteType.HYPOTHESIS:
       return recordHypothesis
-    case 'verification':
+    case NoteType.VERIFICATION:
       return recordVerification
     default:
       return recordObservation

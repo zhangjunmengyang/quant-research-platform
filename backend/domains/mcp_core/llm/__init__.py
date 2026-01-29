@@ -28,16 +28,16 @@ Example:
     )
 """
 
+from .client import (
+    LLMClient,
+    get_llm_client,
+    reset_llm_client,
+)
 from .config import (
     LLMSettings,
     ModelConfig,
     get_llm_settings,
     reload_llm_settings,
-)
-from .client import (
-    LLMClient,
-    get_llm_client,
-    reset_llm_client,
 )
 
 __all__ = [

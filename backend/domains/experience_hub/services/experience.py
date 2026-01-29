@@ -8,14 +8,14 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ..core.models import (
+    EntityType,
     Experience,
     ExperienceContent,
     ExperienceContext,
     ExperienceLink,
-    EntityType,
 )
 from ..core.store import ExperienceStore, get_experience_store
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class ExperienceService:
     """经验服务层"""
 
-    def __init__(self, store: Optional[ExperienceStore] = None):
+    def __init__(self, store: ExperienceStore | None = None):
         self._store = store
 
     @property
@@ -40,11 +40,11 @@ class ExperienceService:
     def store_experience(
         self,
         title: str,
-        content: Dict[str, str],
-        context: Optional[Dict[str, Any]] = None,
+        content: dict[str, str],
+        context: dict[str, Any] | None = None,
         source_type: str = "manual",
         source_ref: str = "",
-    ) -> Tuple[bool, str, Optional[int]]:
+    ) -> tuple[bool, str, int | None]:
         """
         存储新经验
 
@@ -95,29 +95,29 @@ class ExperienceService:
 
     # ==================== 查询经验 ====================
 
-    def get_experience(self, experience_id: int) -> Optional[Experience]:
+    def get_experience(self, experience_id: int) -> Experience | None:
         """获取经验详情（通过 ID）"""
         return self.store.get(experience_id)
 
-    def get_experience_by_uuid(self, uuid: str) -> Optional[Experience]:
+    def get_experience_by_uuid(self, uuid: str) -> Experience | None:
         """获取经验详情（通过 UUID）"""
         return self.store.get_by_uuid(uuid)
 
     def list_experiences(
         self,
-        tags: Optional[List[str]] = None,
+        tags: list[str] | None = None,
         source_type: str = "",
         market_regime: str = "",
-        factor_styles: Optional[List[str]] = None,
-        created_after: Optional[datetime] = None,
-        created_before: Optional[datetime] = None,
-        updated_after: Optional[datetime] = None,
-        updated_before: Optional[datetime] = None,
+        factor_styles: list[str] | None = None,
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
+        updated_after: datetime | None = None,
+        updated_before: datetime | None = None,
         order_by: str = "updated_at",
         order_desc: bool = True,
         page: int = 1,
         page_size: int = 20
-    ) -> Tuple[List[Experience], int]:
+    ) -> tuple[list[Experience], int]:
         """查询经验列表"""
         sort_direction = "DESC" if order_desc else "ASC"
         order_by_str = f"{order_by} {sort_direction}"
@@ -137,18 +137,18 @@ class ExperienceService:
             offset=offset
         )
 
-    def search_experiences(self, keyword: str, limit: int = 20) -> List[Experience]:
+    def search_experiences(self, keyword: str, limit: int = 20) -> list[Experience]:
         """搜索经验"""
         return self.store.search(keyword, limit)
 
     def query_experiences(
         self,
         query: str,
-        tags: Optional[List[str]] = None,
-        market_regime: Optional[str] = None,
-        factor_styles: Optional[List[str]] = None,
+        tags: list[str] | None = None,
+        market_regime: str | None = None,
+        factor_styles: list[str] | None = None,
         top_k: int = 5,
-    ) -> List[Experience]:
+    ) -> list[Experience]:
         """语义检索经验（当前降级为关键词搜索）"""
         experiences, _ = self.store.query(
             search=query,
@@ -159,7 +159,7 @@ class ExperienceService:
         )
         return experiences
 
-    def get_all_tags(self) -> List[str]:
+    def get_all_tags(self) -> list[str]:
         """获取所有标签"""
         return self.store.get_all_tags()
 
@@ -171,7 +171,7 @@ class ExperienceService:
         entity_type: str,
         entity_id: str,
         relation: str = "related",
-    ) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    ) -> tuple[bool, str, dict[str, Any] | None]:
         """关联经验与其他实体"""
         experience = self.store.get(experience_id)
         if experience is None:
@@ -200,7 +200,7 @@ class ExperienceService:
         else:
             return False, "关联失败", None
 
-    def get_experience_links(self, experience_id: int) -> List[ExperienceLink]:
+    def get_experience_links(self, experience_id: int) -> list[ExperienceLink]:
         """获取经验的所有关联"""
         return self.store.get_links(experience_id)
 
@@ -208,7 +208,7 @@ class ExperienceService:
         self,
         entity_type: str,
         entity_id: str
-    ) -> List[Experience]:
+    ) -> list[Experience]:
         """根据关联实体获取经验"""
         return self.store.get_experiences_by_entity(entity_type, entity_id)
 
@@ -233,7 +233,7 @@ class ExperienceService:
 
     # ==================== 统计 ====================
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息"""
         total = self.store.count()
         tags = self.store.get_all_tags()
@@ -245,7 +245,7 @@ class ExperienceService:
         }
 
 
-_experience_service: Optional[ExperienceService] = None
+_experience_service: ExperienceService | None = None
 
 
 def get_experience_service() -> ExperienceService:

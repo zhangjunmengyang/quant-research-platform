@@ -4,13 +4,14 @@
 提供因子分析能力的 MCP 工具封装。
 """
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime
-import logging
 import json
+import logging
+from datetime import datetime
+from typing import Any
+
+from domains.mcp_core.base.tool import ExecutionMode
 
 from .base import BaseTool, ToolResult
-from domains.mcp_core.base.tool import ExecutionMode
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class GetFactorICTool(BaseTool):
         return "快速获取因子的IC统计信息，包括IC均值、ICIR、RankIC等"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -82,7 +83,7 @@ class CompareFactorsTool(BaseTool):
         return "对比多个因子的分析指标，包括IC、收益、稳定性等维度"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -148,7 +149,7 @@ class GetFactorCorrelationTool(BaseTool):
 注意: 此工具尚未完全实现，当前仅返回服务就绪状态。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -208,7 +209,7 @@ class MultiFactorAnalyzeTool(BaseTool):
 注意: 此工具尚未完全实现，当前仅返回服务就绪状态。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -278,7 +279,7 @@ class AnalyzeFactorGroupsTool(BaseTool):
 支持分位数分箱和等宽分箱两种方法，生成分组净值曲线和柱状图。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -309,7 +310,7 @@ class AnalyzeFactorGroupsTool(BaseTool):
 
     async def execute(
         self,
-        factor_dict: Dict[str, List[Any]],
+        factor_dict: dict[str, list[Any]],
         data_type: str = "swap",
         bins: int = 5,
         method: str = "pct",
@@ -424,7 +425,7 @@ class RunFactorParamAnalysisTool(BaseTool):
 // filter_list: 保留涨幅排名前80%（false=降序，涨幅大排名高，pct:<0.8保留前80%）"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -538,16 +539,17 @@ class RunFactorParamAnalysisTool(BaseTool):
     async def execute(
         self,
         name: str,
-        strategy_list: List[Dict[str, Any]],
-        param_grid: Dict[str, List[Any]],
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        strategy_list: list[dict[str, Any]],
+        param_grid: dict[str, list[Any]],
+        start_date: str | None = None,
+        end_date: str | None = None,
         leverage: float = 1.0,
         indicator: str = "annual_return",
     ) -> ToolResult:
         try:
             import copy
             import itertools
+
             from domains.strategy_hub.services.backtest_runner import (
                 BacktestRequest,
                 get_backtest_runner,
@@ -730,7 +732,7 @@ class RunFactorParamAnalysisTool(BaseTool):
     def _substitute_variables(
         self,
         obj: Any,
-        variables: Dict[str, Any],
+        variables: dict[str, Any],
     ) -> None:
         """递归替换对象中的变量占位符
 
@@ -759,8 +761,8 @@ class RunFactorParamAnalysisTool(BaseTool):
                     self._substitute_variables(item, variables)
 
     def _extract_factor_filename(
-        self, strategy_list: List[Dict[str, Any]]
-    ) -> Optional[str]:
+        self, strategy_list: list[dict[str, Any]]
+    ) -> str | None:
         """从 strategy_list 中提取第一个因子的文件名"""
         if not strategy_list:
             return None
@@ -777,11 +779,11 @@ class RunFactorParamAnalysisTool(BaseTool):
 
     def _generate_bar_chart(
         self,
-        results: List[Dict[str, Any]],
+        results: list[dict[str, Any]],
         x_key: str,
-        x_values: List[Any],
+        x_values: list[Any],
         indicator: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """生成 ECharts 柱状图（参数平原图）配置"""
         # 构建值映射
         value_map = {}
@@ -872,13 +874,13 @@ class RunFactorParamAnalysisTool(BaseTool):
 
     def _generate_heatmap_chart(
         self,
-        results: List[Dict[str, Any]],
+        results: list[dict[str, Any]],
         x_key: str,
-        x_values: List[Any],
+        x_values: list[Any],
         y_key: str,
-        y_values: List[Any],
+        y_values: list[Any],
         indicator: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """生成 ECharts 热力图配置"""
         # 构建值映射
         value_map = {}

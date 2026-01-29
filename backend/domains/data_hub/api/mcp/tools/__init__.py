@@ -4,32 +4,32 @@ MCP 工具模块
 提供数据查询和因子计算工具。
 """
 
-from .base import BaseTool, ToolResult, ToolDefinition, ToolRegistry, get_tool_registry
+from .base import BaseTool, ToolDefinition, ToolRegistry, ToolResult, get_tool_registry
 from .data_tools import (
-    ListSymbolsTool,
-    GetSymbolInfoTool,
     GetCoinMetadataTool,
+    GetSymbolInfoTool,
+    ListSymbolsTool,
 )
 from .factor_tools import (
-    ListFactorsTool,
     CalculateFactorTool,
-    GetSymbolRankAtTool,
     GetFactorRankingTool,
+    GetSymbolRankAtTool,
+    ListFactorsTool,
 )
 from .market_tools import (
-    GetMarketOverviewTool,
     DetectKlinePatternsTool,
+    GetMarketOverviewTool,
+)
+from .research_tools import (
+    CalculateDrawdownTool,
+    CalculateReturnsTool,
+    CalculateStageStatsTool,
+    FindPeaksTroughsTool,
 )
 from .signal_tools import (
     DetectSymbolEventsTool,
     ScreenMarketTool,
     SimulateHoldingStrategyTool,
-)
-from .research_tools import (
-    CalculateReturnsTool,
-    CalculateDrawdownTool,
-    FindPeaksTroughsTool,
-    CalculateStageStatsTool,
 )
 
 __all__ = [

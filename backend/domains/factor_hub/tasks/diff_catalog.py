@@ -2,32 +2,30 @@
 发现任务 - 检测未入库因子
 """
 
-import os
-from pathlib import Path
-from typing import Dict, Set, List, Optional
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from domains.mcp_core.paths import get_factors_dir, get_sections_dir
+
 from ..core.config import get_config_loader
-from ..core.store import get_factor_store, FactorStore
-from ..core.models import FactorType
+from ..core.store import FactorStore, get_factor_store
 
 
 @dataclass
 class DiscoverResult:
     """发现结果"""
-    cataloged: Set[str]      # 已入库
-    pending: Set[str]        # 待入库（新发现）
-    excluded: Set[str]       # 已排除
-    missing_files: Set[str]  # 在 catalog 中但文件已删除
+    cataloged: set[str]      # 已入库
+    pending: set[str]        # 待入库（新发现）
+    excluded: set[str]       # 已排除
+    missing_files: set[str]  # 在 catalog 中但文件已删除
     # 按类型分类的待入库因子
-    pending_time_series: Set[str] = field(default_factory=set)
-    pending_cross_section: Set[str] = field(default_factory=set)
+    pending_time_series: set[str] = field(default_factory=set)
+    pending_cross_section: set[str] = field(default_factory=set)
 
 
 def discover_factors(
-    factor_dir: Optional[str] = None,
-    store: Optional[FactorStore] = None
+    factor_dir: str | None = None,
+    store: FactorStore | None = None
 ) -> DiscoverResult:
     """
     发现未入库因子（同时扫描 factors/ 和 sections/ 目录）
@@ -146,7 +144,7 @@ def format_discover_report(result: DiscoverResult, verbose: bool = False) -> str
     return "\n".join(lines)
 
 
-def save_pending_list(result: DiscoverResult, output_path: Optional[str] = None) -> str:
+def save_pending_list(result: DiscoverResult, output_path: str | None = None) -> str:
     """
     保存待入库因子列表到文件
 
@@ -176,7 +174,7 @@ def save_pending_list(result: DiscoverResult, output_path: Optional[str] = None)
 
 
 def run_discover(
-    factor_dir: Optional[str] = None,
+    factor_dir: str | None = None,
     verbose: bool = False,
     save: bool = False
 ) -> DiscoverResult:

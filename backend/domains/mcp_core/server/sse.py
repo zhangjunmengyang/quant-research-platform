@@ -14,10 +14,11 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, AsyncGenerator, Dict, List, Optional, Set
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -44,16 +45,16 @@ class TaskProgress:
     status: TaskStatus
     progress: float = 0.0  # 0-100
     message: str = ""
-    current_step: Optional[str] = None
-    total_steps: Optional[int] = None
-    current_step_num: Optional[int] = None
-    data: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    current_step: str | None = None
+    total_steps: int | None = None
+    current_step_num: int | None = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     _created_timestamp: float = field(default_factory=time.time)  # 用于清理判断
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "status": self.status.value,
@@ -108,10 +109,10 @@ class TaskProgressManager:
         return cls._instance
 
     def __init__(self):
-        self._tasks: Dict[str, TaskProgress] = {}
-        self._subscribers: Dict[str, Set[asyncio.Queue]] = {}
+        self._tasks: dict[str, TaskProgress] = {}
+        self._subscribers: dict[str, set[asyncio.Queue]] = {}
         self._lock = asyncio.Lock()
-        self._cleanup_task: Optional[asyncio.Task] = None
+        self._cleanup_task: asyncio.Task | None = None
         self._running = False
 
     async def start(self):
@@ -174,7 +175,7 @@ class TaskProgressManager:
         if expired_tasks:
             logger.info(f"[SSE] 清理了 {len(expired_tasks)} 个过期任务，剩余 {len(self._tasks)} 个")
 
-    def create_task(self, task_id: Optional[str] = None) -> str:
+    def create_task(self, task_id: str | None = None) -> str:
         """创建新任务，返回任务ID"""
         if task_id is None:
             task_id = str(uuid.uuid4())
@@ -222,21 +223,21 @@ class TaskProgressManager:
             self.cleanup_task(oldest[0])
             logger.warning(f"[SSE] 强制清理最旧任务: {oldest[0]}")
 
-    def get_task(self, task_id: str) -> Optional[TaskProgress]:
+    def get_task(self, task_id: str) -> TaskProgress | None:
         """获取任务进度"""
         return self._tasks.get(task_id)
 
     async def update_progress(
         self,
         task_id: str,
-        status: Optional[TaskStatus] = None,
-        progress: Optional[float] = None,
-        message: Optional[str] = None,
-        current_step: Optional[str] = None,
-        total_steps: Optional[int] = None,
-        current_step_num: Optional[int] = None,
-        data: Optional[Dict[str, Any]] = None,
-        error: Optional[str] = None,
+        status: TaskStatus | None = None,
+        progress: float | None = None,
+        message: str | None = None,
+        current_step: str | None = None,
+        total_steps: int | None = None,
+        current_step_num: int | None = None,
+        data: dict[str, Any] | None = None,
+        error: str | None = None,
     ) -> None:
         """
         更新任务进度并通知所有订阅者
@@ -348,7 +349,7 @@ class TaskProgressManager:
                     ):
                         break
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # 发送心跳
                     yield ": heartbeat\n\n"
 
@@ -367,7 +368,7 @@ class TaskProgressManager:
     async def complete_task(
         self,
         task_id: str,
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
     ) -> None:
         """标记任务完成"""
         await self.update_progress(
@@ -404,7 +405,7 @@ class TaskProgressManager:
         self._tasks.pop(task_id, None)
         self._subscribers.pop(task_id, None)
 
-    def list_tasks(self) -> List[TaskProgress]:
+    def list_tasks(self) -> list[TaskProgress]:
         """列出所有任务"""
         return list(self._tasks.values())
 

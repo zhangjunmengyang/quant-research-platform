@@ -4,11 +4,11 @@
 提供因子列表、因子计算、因子排名等能力。
 """
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime
+from typing import Any
+
+from domains.mcp_core.base.tool import ExecutionMode
 
 from .base import BaseTool, ToolResult
-from domains.mcp_core.base.tool import ExecutionMode
 
 
 class ListFactorsTool(BaseTool):
@@ -26,7 +26,7 @@ class ListFactorsTool(BaseTool):
 这些因子可以用于 calculate_factor 和 get_factor_ranking 工具。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {}
@@ -79,7 +79,7 @@ class CalculateFactorTool(BaseTool):
 返回计算后的因子值序列。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -254,7 +254,7 @@ class GetSymbolRankAtTool(BaseTool):
 返回该币种在所有币种中的排名位置和百分位。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -383,7 +383,7 @@ class GetFactorRankingTool(BaseTool):
 返回币种排名列表。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

@@ -8,12 +8,13 @@
 - 重试支持
 """
 
-import traceback
-from enum import Enum
-from typing import Any, Dict, Optional, Type, Callable
-from dataclasses import dataclass, field
-from functools import wraps
 import logging
+import traceback
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
+from functools import wraps
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +50,13 @@ class MCPError(Exception):
     """
     code: ErrorCode
     message: str
-    data: Optional[Dict[str, Any]] = None
-    cause: Optional[Exception] = None
+    data: dict[str, Any] | None = None
+    cause: Exception | None = None
 
     def __str__(self) -> str:
         return f"[{self.code.name}] {self.message}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为 JSON-RPC 错误格式"""
         result = {
             "code": self.code.value,
@@ -69,19 +70,19 @@ class MCPError(Exception):
 # 预定义错误类型
 class ParseError(MCPError):
     """解析错误"""
-    def __init__(self, message: str = "Parse error", data: Optional[Dict] = None):
+    def __init__(self, message: str = "Parse error", data: dict | None = None):
         super().__init__(ErrorCode.PARSE_ERROR, message, data)
 
 
 class InvalidRequestError(MCPError):
     """无效请求"""
-    def __init__(self, message: str = "Invalid request", data: Optional[Dict] = None):
+    def __init__(self, message: str = "Invalid request", data: dict | None = None):
         super().__init__(ErrorCode.INVALID_REQUEST, message, data)
 
 
 class MethodNotFoundError(MCPError):
     """方法未找到"""
-    def __init__(self, method: str, data: Optional[Dict] = None):
+    def __init__(self, method: str, data: dict | None = None):
         super().__init__(
             ErrorCode.METHOD_NOT_FOUND,
             f"Method not found: {method}",
@@ -91,13 +92,13 @@ class MethodNotFoundError(MCPError):
 
 class InvalidParamsError(MCPError):
     """参数无效"""
-    def __init__(self, message: str = "Invalid params", data: Optional[Dict] = None):
+    def __init__(self, message: str = "Invalid params", data: dict | None = None):
         super().__init__(ErrorCode.INVALID_PARAMS, message, data)
 
 
 class ToolNotFoundError(MCPError):
     """工具未找到"""
-    def __init__(self, tool_name: str, data: Optional[Dict] = None):
+    def __init__(self, tool_name: str, data: dict | None = None):
         super().__init__(
             ErrorCode.TOOL_NOT_FOUND,
             f"Tool not found: {tool_name}",
@@ -111,8 +112,8 @@ class ToolExecutionError(MCPError):
         self,
         tool_name: str,
         message: str,
-        cause: Optional[Exception] = None,
-        data: Optional[Dict] = None
+        cause: Exception | None = None,
+        data: dict | None = None
     ):
         error_data = data or {}
         error_data["tool_name"] = tool_name
@@ -126,7 +127,7 @@ class ToolExecutionError(MCPError):
 
 class ResourceNotFoundError(MCPError):
     """资源未找到"""
-    def __init__(self, uri: str, data: Optional[Dict] = None):
+    def __init__(self, uri: str, data: dict | None = None):
         super().__init__(
             ErrorCode.RESOURCE_NOT_FOUND,
             f"Resource not found: {uri}",
@@ -136,7 +137,7 @@ class ResourceNotFoundError(MCPError):
 
 class AuthenticationError(MCPError):
     """认证错误"""
-    def __init__(self, message: str = "Authentication failed", data: Optional[Dict] = None):
+    def __init__(self, message: str = "Authentication failed", data: dict | None = None):
         super().__init__(ErrorCode.AUTHENTICATION_ERROR, message, data)
 
 
@@ -145,8 +146,8 @@ class RateLimitError(MCPError):
     def __init__(
         self,
         message: str = "Rate limit exceeded",
-        retry_after: Optional[int] = None,
-        data: Optional[Dict] = None
+        retry_after: int | None = None,
+        data: dict | None = None
     ):
         error_data = data or {}
         if retry_after:
@@ -156,7 +157,7 @@ class RateLimitError(MCPError):
 
 class ValidationError(MCPError):
     """验证错误"""
-    def __init__(self, message: str, errors: Optional[list] = None, data: Optional[Dict] = None):
+    def __init__(self, message: str, errors: list | None = None, data: dict | None = None):
         error_data = data or {}
         if errors:
             error_data["validation_errors"] = errors
@@ -165,23 +166,23 @@ class ValidationError(MCPError):
 
 class TimeoutError(MCPError):
     """超时错误"""
-    def __init__(self, message: str = "Request timeout", data: Optional[Dict] = None):
+    def __init__(self, message: str = "Request timeout", data: dict | None = None):
         super().__init__(ErrorCode.TIMEOUT_ERROR, message, data)
 
 
 class ServiceUnavailableError(MCPError):
     """服务不可用"""
-    def __init__(self, message: str = "Service unavailable", data: Optional[Dict] = None):
+    def __init__(self, message: str = "Service unavailable", data: dict | None = None):
         super().__init__(ErrorCode.SERVICE_UNAVAILABLE, message, data)
 
 
 # 异常映射表
-_EXCEPTION_MAP: Dict[Type[Exception], Type[MCPError]] = {}
+_EXCEPTION_MAP: dict[type[Exception], type[MCPError]] = {}
 
 
 def register_exception_handler(
-    exc_type: Type[Exception],
-    mcp_error_type: Type[MCPError]
+    exc_type: type[Exception],
+    mcp_error_type: type[MCPError]
 ) -> None:
     """注册异常到 MCP 错误的映射"""
     _EXCEPTION_MAP[exc_type] = mcp_error_type
@@ -237,7 +238,7 @@ class ErrorHandler:
         self.log_stack_traces = log_stack_traces
         self.include_stack_in_response = include_stack_in_response
 
-    def handle(self, exc: Exception, context: Optional[Dict] = None) -> MCPError:
+    def handle(self, exc: Exception, context: dict | None = None) -> MCPError:
         """
         处理异常
 
@@ -291,7 +292,7 @@ class ErrorHandler:
 
 
 def error_boundary(
-    handler: Optional[ErrorHandler] = None,
+    handler: ErrorHandler | None = None,
     reraise: bool = False,
     default_return: Any = None,
 ):

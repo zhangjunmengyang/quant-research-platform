@@ -4,10 +4,9 @@ MCP JSON-RPC 2.0 协议处理
 定义请求、响应和错误格式。
 """
 
-from typing import Any, Dict, Optional, Union
 from dataclasses import dataclass
 from enum import IntEnum
-
+from typing import Any
 
 # MCP 协议版本
 MCP_PROTOCOL_VERSION = "2024-11-05"
@@ -27,9 +26,9 @@ class JSONRPCError:
     """JSON-RPC 错误"""
     code: int
     message: str
-    data: Optional[Any] = None
+    data: Any | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "code": self.code,
             "message": self.message,
@@ -64,8 +63,8 @@ class JSONRPCRequest:
     """JSON-RPC 2.0 请求"""
     jsonrpc: str
     method: str
-    id: Optional[Union[str, int]] = None
-    params: Optional[Dict[str, Any]] = None
+    id: str | int | None = None
+    params: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> 'JSONRPCRequest':
@@ -77,7 +76,7 @@ class JSONRPCRequest:
             params=data.get("params"),
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         result = {
             "jsonrpc": self.jsonrpc,
@@ -99,11 +98,11 @@ class JSONRPCRequest:
 class JSONRPCResponse:
     """JSON-RPC 2.0 响应"""
     jsonrpc: str = "2.0"
-    id: Optional[Union[str, int]] = None
-    result: Optional[Any] = None
-    error: Optional[JSONRPCError] = None
+    id: str | int | None = None
+    result: Any | None = None
+    error: JSONRPCError | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         d = {"jsonrpc": self.jsonrpc}
 
@@ -124,16 +123,16 @@ class JSONRPCResponse:
         return d
 
     @classmethod
-    def success(cls, id: Optional[Union[str, int]], result: Any) -> 'JSONRPCResponse':
+    def success(cls, id: str | int | None, result: Any) -> 'JSONRPCResponse':
         """创建成功响应"""
         return cls(id=id, result=result)
 
     @classmethod
-    def make_error(cls, id: Optional[Union[str, int]], error: JSONRPCError) -> 'JSONRPCResponse':
+    def make_error(cls, id: str | int | None, error: JSONRPCError) -> 'JSONRPCResponse':
         """创建错误响应"""
         return cls(id=id, error=error)
 
     @classmethod
-    def from_exception(cls, id: Optional[Union[str, int]], e: Exception) -> 'JSONRPCResponse':
+    def from_exception(cls, id: str | int | None, e: Exception) -> 'JSONRPCResponse':
         """从异常创建错误响应"""
         return cls(id=id, error=JSONRPCError.internal_error(str(e)))

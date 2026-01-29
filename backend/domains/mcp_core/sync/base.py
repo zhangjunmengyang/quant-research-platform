@@ -10,9 +10,9 @@ import os
 import shutil
 import tempfile
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 
@@ -39,7 +39,7 @@ class BaseSyncService(ABC):
         self.store = store
 
     @abstractmethod
-    def export_all(self, overwrite: bool = False) -> Dict[str, int]:
+    def export_all(self, overwrite: bool = False) -> dict[str, int]:
         """
         导出所有数据到文件
 
@@ -52,7 +52,7 @@ class BaseSyncService(ABC):
         pass
 
     @abstractmethod
-    def import_all(self) -> Dict[str, int]:
+    def import_all(self) -> dict[str, int]:
         """
         从文件导入所有数据
 
@@ -61,7 +61,7 @@ class BaseSyncService(ABC):
         """
         pass
 
-    def sync(self, direction: str = "file_to_db") -> Dict[str, int]:
+    def sync(self, direction: str = "file_to_db") -> dict[str, int]:
         """
         同步数据
 
@@ -95,15 +95,15 @@ class BaseSyncService(ABC):
         """确保目录存在"""
         path.mkdir(parents=True, exist_ok=True)
 
-    def get_file_mtime(self, filepath: Path) -> Optional[datetime]:
+    def get_file_mtime(self, filepath: Path) -> datetime | None:
         """获取文件修改时间（UTC）"""
         if not filepath.exists():
             return None
         # 转换为 UTC 时区，确保时间比较一致性
         ts = filepath.stat().st_mtime
-        return datetime.fromtimestamp(ts, tz=timezone.utc)
+        return datetime.fromtimestamp(ts, tz=UTC)
 
-    def get_db_mtime(self, entity: Any) -> Optional[datetime]:
+    def get_db_mtime(self, entity: Any) -> datetime | None:
         """获取数据库记录更新时间（UTC）"""
         if hasattr(entity, 'updated_at'):
             mtime = entity.updated_at
@@ -111,17 +111,17 @@ class BaseSyncService(ABC):
                 # 如果没有时区信息，假设是本地时间，转换为 UTC
                 if mtime.tzinfo is None:
                     # 数据库存储的时间通常是本地时间
-                    return mtime.replace(tzinfo=timezone.utc)
-                return mtime.astimezone(timezone.utc)
+                    return mtime.replace(tzinfo=UTC)
+                return mtime.astimezone(UTC)
             if isinstance(mtime, str):
                 try:
                     dt = datetime.fromisoformat(mtime.replace('Z', '+00:00'))
-                    return dt.astimezone(timezone.utc)
+                    return dt.astimezone(UTC)
                 except (ValueError, AttributeError):
                     pass
         return None
 
-    def should_update_db(self, file_mtime: Optional[datetime], db_mtime: Optional[datetime]) -> bool:
+    def should_update_db(self, file_mtime: datetime | None, db_mtime: datetime | None) -> bool:
         """
         判断是否应该更新数据库
 
@@ -135,7 +135,7 @@ class BaseSyncService(ABC):
         # 添加 1 秒容差
         return file_mtime > db_mtime + timedelta(seconds=1)
 
-    def should_update_file(self, file_mtime: Optional[datetime], db_mtime: Optional[datetime]) -> bool:
+    def should_update_file(self, file_mtime: datetime | None, db_mtime: datetime | None) -> bool:
         """
         判断是否应该更新文件
 
@@ -151,12 +151,12 @@ class BaseSyncService(ABC):
 
     # ===== YAML 工具 =====
 
-    def read_yaml(self, filepath: Path) -> Dict[str, Any]:
+    def read_yaml(self, filepath: Path) -> dict[str, Any]:
         """读取 YAML 文件"""
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, encoding='utf-8') as f:
             return yaml.safe_load(f) or {}
 
-    def write_yaml(self, filepath: Path, data: Dict[str, Any]) -> None:
+    def write_yaml(self, filepath: Path, data: dict[str, Any]) -> None:
         """写入 YAML 文件"""
         self.ensure_dir(filepath.parent)
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -172,7 +172,7 @@ class BaseSyncService(ABC):
 
     def read_json(self, filepath: Path) -> Any:
         """读取 JSON 文件"""
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, encoding='utf-8') as f:
             return json.load(f)
 
     def write_json(self, filepath: Path, data: Any) -> None:
@@ -183,14 +183,14 @@ class BaseSyncService(ABC):
 
     # ===== Markdown 工具 =====
 
-    def read_markdown_with_frontmatter(self, filepath: Path) -> tuple[Dict[str, Any], str]:
+    def read_markdown_with_frontmatter(self, filepath: Path) -> tuple[dict[str, Any], str]:
         """
         读取带 YAML Front Matter 的 Markdown 文件
 
         Returns:
             (metadata, content) 元组
         """
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, encoding='utf-8') as f:
             text = f.read()
 
         if not text.startswith('---'):
@@ -214,7 +214,7 @@ class BaseSyncService(ABC):
     def write_markdown_with_frontmatter(
         self,
         filepath: Path,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         content: str
     ) -> None:
         """
@@ -237,13 +237,13 @@ class BaseSyncService(ABC):
 
     # ===== 时间戳工具 =====
 
-    def datetime_to_iso(self, dt: Optional[datetime]) -> Optional[str]:
+    def datetime_to_iso(self, dt: datetime | None) -> str | None:
         """datetime 转 ISO 格式字符串"""
         if dt is None:
             return None
         return dt.isoformat()
 
-    def iso_to_datetime(self, iso_str: Optional[str]) -> Optional[datetime]:
+    def iso_to_datetime(self, iso_str: str | None) -> datetime | None:
         """ISO 格式字符串转 datetime"""
         if not iso_str:
             return None
@@ -254,7 +254,7 @@ class BaseSyncService(ABC):
 
     # ===== JSON 字段处理 =====
 
-    def parse_json_field(self, value: Optional[str]) -> Any:
+    def parse_json_field(self, value: str | None) -> Any:
         """解析 JSON 字段"""
         if not value:
             return None
@@ -263,7 +263,7 @@ class BaseSyncService(ABC):
         except (json.JSONDecodeError, TypeError):
             return value
 
-    def serialize_json_field(self, value: Any) -> Optional[str]:
+    def serialize_json_field(self, value: Any) -> str | None:
         """序列化为 JSON 字段"""
         if value is None:
             return None
@@ -278,7 +278,7 @@ class BaseSyncService(ABC):
 
     # ===== 原子写入工具 =====
 
-    def write_yaml_atomic(self, filepath: Path, data: Dict[str, Any]) -> None:
+    def write_yaml_atomic(self, filepath: Path, data: dict[str, Any]) -> None:
         """
         原子写入 YAML 文件
 
@@ -312,7 +312,7 @@ class BaseSyncService(ABC):
     def write_markdown_with_frontmatter_atomic(
         self,
         filepath: Path,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         content: str
     ) -> None:
         """

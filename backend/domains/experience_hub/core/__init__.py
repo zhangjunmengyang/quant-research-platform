@@ -3,12 +3,12 @@
 """
 
 from .models import (
+    EntityType,
     Experience,
     ExperienceContent,
     ExperienceContext,
     ExperienceLink,
     SourceType,
-    EntityType,
 )
 from .store import ExperienceStore, get_experience_store
 

@@ -17,8 +17,8 @@ import json
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Any
 
 import asyncpg
 
@@ -83,7 +83,7 @@ class LogStore:
 
     def __init__(
         self,
-        database_url: Optional[str] = None,
+        database_url: str | None = None,
         batch_size: int = 100,
         flush_interval: float = 1.0,
     ):
@@ -102,10 +102,10 @@ class LogStore:
         self.batch_size = batch_size
         self.flush_interval = flush_interval
 
-        self._pool: Optional[asyncpg.Pool] = None
+        self._pool: asyncpg.Pool | None = None
         self._buffer: list[LogEntry] = []
         self._buffer_lock = asyncio.Lock()
-        self._flush_task: Optional[asyncio.Task] = None
+        self._flush_task: asyncio.Task | None = None
         self._topic_cache: dict[str, int] = {}  # name -> id
         self._running = False
 
@@ -128,7 +128,7 @@ class LogStore:
             # 启动后台刷新任务
             self._flush_task = asyncio.create_task(self._flush_loop())
             logger.info("log_store_started", database_url=self.database_url[:50] + "...")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("log_store_start_timeout")
             raise
         except Exception as e:
@@ -156,7 +156,7 @@ class LogStore:
             rows = await conn.fetch("SELECT id, name FROM log_topics")
             self._topic_cache = {row["name"]: row["id"] for row in rows}
 
-    async def _get_topic_id(self, topic_name: str) -> Optional[int]:
+    async def _get_topic_id(self, topic_name: str) -> int | None:
         """获取主题 ID，如果不存在则创建"""
         if topic_name in self._topic_cache:
             return self._topic_cache[topic_name]
@@ -232,7 +232,7 @@ class LogStore:
                 try:
                     # 添加超时保护，防止 flush 操作阻塞事件循环
                     await asyncio.wait_for(self._flush(), timeout=FLUSH_TIMEOUT)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     logger.error("log_flush_timeout", buffer_size=len(self._buffer))
                 except Exception as e:
                     logger.error("log_flush_loop_error", error=str(e))
@@ -287,7 +287,7 @@ class LogStore:
             finally:
                 await self._pool.release(conn)
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("log_flush_acquire_timeout", count=len(entries))
         except Exception as e:
             logger.error("log_flush_failed", error=str(e), count=len(entries))
@@ -320,16 +320,16 @@ class LogStore:
 
     async def query(
         self,
-        topic: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        level: Optional[str] = None,
-        service: Optional[str] = None,
-        trace_id: Optional[str] = None,
-        filters: Optional[dict[str, Any]] = None,
-        advanced_filters: Optional[list[dict[str, Any]]] = None,
-        search: Optional[str] = None,
-        sql: Optional[str] = None,
+        topic: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        level: str | None = None,
+        service: str | None = None,
+        trace_id: str | None = None,
+        filters: dict[str, Any] | None = None,
+        advanced_filters: list[dict[str, Any]] | None = None,
+        search: str | None = None,
+        sql: str | None = None,
         limit: int = 100,
         offset: int = 0,
         order_desc: bool = True,
@@ -377,15 +377,15 @@ class LogStore:
 
     async def _query_simple(
         self,
-        topic: Optional[str],
-        start_time: Optional[datetime],
-        end_time: Optional[datetime],
-        level: Optional[str],
-        service: Optional[str],
-        trace_id: Optional[str],
-        filters: Optional[dict[str, Any]],
-        advanced_filters: Optional[list[dict[str, Any]]],
-        search: Optional[str],
+        topic: str | None,
+        start_time: datetime | None,
+        end_time: datetime | None,
+        level: str | None,
+        service: str | None,
+        trace_id: str | None,
+        filters: dict[str, Any] | None,
+        advanced_filters: list[dict[str, Any]] | None,
+        search: str | None,
         limit: int,
         offset: int,
         order_desc: bool,
@@ -596,7 +596,7 @@ class LogStore:
             # 转换时间戳到北京时间 (UTC+8)
             ts = row["timestamp"]
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
             ts_beijing = ts.astimezone(BEIJING_TZ)
 
             logs.append({
@@ -657,7 +657,7 @@ class LogStore:
                 if isinstance(value, datetime):
                     # 转换时间戳到北京时间 (UTC+8)
                     if value.tzinfo is None:
-                        value = value.replace(tzinfo=timezone.utc)
+                        value = value.replace(tzinfo=UTC)
                     value_beijing = value.astimezone(BEIJING_TZ)
                     record[key] = value_beijing.strftime("%Y-%m-%d %H:%M:%S")
                 elif isinstance(value, (dict, list)):
@@ -677,7 +677,7 @@ class LogStore:
 
     async def get_field_values(
         self,
-        topic: Optional[str],
+        topic: str | None,
         field_name: str,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
@@ -744,9 +744,9 @@ class LogStore:
 
     async def get_stats(
         self,
-        topic: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        topic: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> dict:
         """
         获取日志统计信息
@@ -830,7 +830,7 @@ class LogStore:
             if ts is None:
                 return None
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
             return ts.astimezone(BEIJING_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
         return {

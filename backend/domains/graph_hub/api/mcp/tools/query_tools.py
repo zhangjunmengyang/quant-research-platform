@@ -4,10 +4,11 @@
 提供实体关联查询、链路追溯和路径查找功能。
 """
 
-from typing import Any, Dict
+from typing import Any
+
+from domains.graph_hub.core.models import NodeType
 
 from .base import BaseTool, ToolResult
-from domains.graph_hub.core.models import NodeType
 
 
 class GetEdgesTool(BaseTool):
@@ -44,7 +45,7 @@ class GetEdgesTool(BaseTool):
    包含作为目标的双向边"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -142,7 +143,7 @@ class TraceLineageTool(BaseTool):
   - relation: 与前一节点的关系"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -244,7 +245,7 @@ class FindPathTool(BaseTool):
 - max_depth 影响搜索范围，越大越可能找到间接路径"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

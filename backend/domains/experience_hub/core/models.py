@@ -10,7 +10,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class SourceType(str, Enum):
@@ -47,7 +47,7 @@ class ExperienceContent:
     result: str = ""
     lesson: str = ""
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         """转换为字典"""
         return {
             'problem': self.problem,
@@ -57,7 +57,7 @@ class ExperienceContent:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ExperienceContent':
+    def from_dict(cls, data: dict[str, Any]) -> 'ExperienceContent':
         """从字典创建"""
         return cls(
             problem=data.get('problem', ''),
@@ -100,13 +100,13 @@ class ExperienceContext:
         time_horizon: 适用的时间范围（短期/中期/长期）
         asset_class: 资产类别（BTC/ETH/山寨币/全市场）
     """
-    tags: List[str] = field(default_factory=list)
-    factor_styles: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    factor_styles: list[str] = field(default_factory=list)
     market_regime: str = ""
     time_horizon: str = ""
     asset_class: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'tags': self.tags,
@@ -117,7 +117,7 @@ class ExperienceContext:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ExperienceContext':
+    def from_dict(cls, data: dict[str, Any]) -> 'ExperienceContext':
         """从字典创建"""
         return cls(
             tags=data.get('tags', []),
@@ -158,7 +158,7 @@ class Experience:
     存储结构化的研究经验，通过标签进行分类管理。
     """
     # === 基础信息 ===
-    id: Optional[int] = None
+    id: int | None = None
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     title: str = ""
 
@@ -173,10 +173,10 @@ class Experience:
     source_ref: str = ""
 
     # === 时间戳 ===
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'id': self.id,
@@ -191,7 +191,7 @@ class Experience:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Experience':
+    def from_dict(cls, data: dict[str, Any]) -> 'Experience':
         """从字典创建经验实例"""
         content = data.get('content')
         if isinstance(content, str):
@@ -222,7 +222,7 @@ class Experience:
         )
 
     @property
-    def tags(self) -> List[str]:
+    def tags(self) -> list[str]:
         """获取标签列表"""
         return self.context.tags
 
@@ -252,15 +252,15 @@ class ExperienceLink:
 
     建立经验与其他实体（因子、策略、笔记、研报）的关联关系。
     """
-    id: Optional[int] = None
-    experience_id: Optional[int] = None
+    id: int | None = None
+    experience_id: int | None = None
     experience_uuid: str = ""
     entity_type: str = ""
     entity_id: str = ""
     relation: str = "related"
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'id': self.id,
@@ -273,7 +273,7 @@ class ExperienceLink:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ExperienceLink':
+    def from_dict(cls, data: dict[str, Any]) -> 'ExperienceLink':
         """从字典创建"""
         return cls(
             id=data.get('id'),

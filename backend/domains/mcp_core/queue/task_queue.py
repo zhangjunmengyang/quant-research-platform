@@ -13,10 +13,11 @@ import json
 import logging
 import os
 import uuid
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Callable, Awaitable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +36,15 @@ class TaskResult:
     """任务结果"""
     task_id: str
     status: TaskStatus
-    result: Optional[Any] = None
-    error: Optional[str] = None
-    task_type: Optional[str] = None
-    created_at: Optional[datetime] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    runtime_seconds: Optional[float] = None
+    result: Any | None = None
+    error: str | None = None
+    task_type: str | None = None
+    created_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    runtime_seconds: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "task_id": self.task_id,
@@ -78,7 +79,7 @@ class TaskQueue:
         result = await queue.get_result(task_id)
     """
 
-    def __init__(self, redis_url: Optional[str] = None):
+    def __init__(self, redis_url: str | None = None):
         """
         初始化任务队列
 
@@ -87,7 +88,7 @@ class TaskQueue:
         """
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
         self._redis = None
-        self._handlers: Dict[str, Callable[..., Awaitable]] = {}
+        self._handlers: dict[str, Callable[..., Awaitable]] = {}
 
     async def connect(self):
         """连接 Redis"""
@@ -125,7 +126,7 @@ class TaskQueue:
     async def submit(
         self,
         task_type: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         priority: int = 0,
     ) -> str:
         """
@@ -169,7 +170,7 @@ class TaskQueue:
         logger.info(f"任务已提交: {task_type} ({task_id})")
         return task_id
 
-    async def _execute_task(self, task_id: str, task_type: str, params: Dict):
+    async def _execute_task(self, task_id: str, task_type: str, params: dict):
         """执行任务（内存模式）"""
         handler = self._handlers.get(task_type)
         if not handler:
@@ -313,8 +314,8 @@ class TaskQueue:
 
     async def list_tasks(
         self,
-        status: Optional[TaskStatus] = None,
-        task_type: Optional[str] = None,
+        status: TaskStatus | None = None,
+        task_type: str | None = None,
         limit: int = 50,
     ) -> list[TaskResult]:
         """
@@ -369,7 +370,7 @@ class TaskQueue:
 
 
 # 全局任务队列
-_task_queue: Optional[TaskQueue] = None
+_task_queue: TaskQueue | None = None
 _task_queue_lock = asyncio.Lock()
 
 

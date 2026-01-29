@@ -4,12 +4,12 @@
 定义 Strategy 数据类和相关枚举。
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-from enum import Enum
-from datetime import datetime
-import uuid
 import json
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class TaskStatus(Enum):
@@ -32,7 +32,7 @@ class BacktestTask:
     # 基本信息
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
-    description: Optional[str] = None
+    description: str | None = None
 
     # 完整回测配置 (JSON 字符串)
     config: str = "{}"  # JSON: BacktestRequest 格式
@@ -42,36 +42,36 @@ class BacktestTask:
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # 标签和备注
-    tags: Optional[str] = None  # JSON: List[str]
-    notes: Optional[str] = None
+    tags: str | None = None  # JSON: List[str]
+    notes: str | None = None
 
     # 统计信息
     execution_count: int = 0  # 执行次数
-    last_execution_at: Optional[str] = None  # 最后执行时间
+    last_execution_at: str | None = None  # 最后执行时间
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """获取配置"""
         try:
             return json.loads(self.config) if self.config else {}
         except json.JSONDecodeError:
             return {}
 
-    def set_config(self, config: Dict[str, Any]) -> None:
+    def set_config(self, config: dict[str, Any]) -> None:
         """设置配置"""
         self.config = json.dumps(config, ensure_ascii=False)
 
-    def get_tags(self) -> List[str]:
+    def get_tags(self) -> list[str]:
         """获取标签列表"""
         try:
             return json.loads(self.tags) if self.tags else []
         except json.JSONDecodeError:
             return []
 
-    def set_tags(self, tags: List[str]) -> None:
+    def set_tags(self, tags: list[str]) -> None:
         """设置标签列表"""
         self.tags = json.dumps(tags, ensure_ascii=False)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "id": self.id,
@@ -87,7 +87,7 @@ class BacktestTask:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "BacktestTask":
+    def from_dict(cls, data: dict[str, Any]) -> "BacktestTask":
         """从字典创建实例"""
         task = cls()
         fields = [
@@ -118,12 +118,12 @@ class TaskExecution:
 
     # 执行时间
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    started_at: str | None = None
+    completed_at: str | None = None
 
     # 执行进度
     progress: float = 0.0
-    message: Optional[str] = None
+    message: str | None = None
 
     # 因子信息（从config中提取，便于展示）
     factor_list: str = "[]"  # JSON: List[str]
@@ -145,11 +145,11 @@ class TaskExecution:
     cumulative_return: float = 0.0
     annual_return: float = 0.0
     max_drawdown: float = 0.0
-    max_drawdown_start: Optional[str] = None
-    max_drawdown_end: Optional[str] = None
+    max_drawdown_start: str | None = None
+    max_drawdown_end: str | None = None
     sharpe_ratio: float = 0.0
     recovery_rate: float = 0.0
-    recovery_time: Optional[str] = None
+    recovery_time: str | None = None
 
     # 交易统计
     win_periods: int = 0
@@ -164,20 +164,20 @@ class TaskExecution:
     return_std: float = 0.0
 
     # 周期收益 (JSON 存储)
-    year_return: Optional[str] = None
-    quarter_return: Optional[str] = None
-    month_return: Optional[str] = None
+    year_return: str | None = None
+    quarter_return: str | None = None
+    month_return: str | None = None
 
     # 资金曲线数据 (JSON 存储)
-    equity_curve: Optional[str] = None
+    equity_curve: str | None = None
 
     # 错误信息
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # 策略库关联（导出后的ID）
-    strategy_id: Optional[str] = None
+    strategy_id: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "id": self.id,
@@ -225,7 +225,7 @@ class TaskExecution:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TaskExecution":
+    def from_dict(cls, data: dict[str, Any]) -> "TaskExecution":
         """从字典创建实例"""
         execution = cls()
         for field_name in [
@@ -254,12 +254,12 @@ class TaskInfo:
     task_id: str
     status: TaskStatus
     created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
     progress: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "task_id": self.task_id,
             "status": self.status.value,
@@ -282,14 +282,14 @@ class Strategy:
     # 基础信息
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str = ""
-    description: Optional[str] = None
+    description: str | None = None
 
     # 因子配置 (JSON 字符串存储)
     factor_list: str = "[]"  # JSON: List[str]
     factor_params: str = "{}"  # JSON: Dict[str, Any]
 
     # 完整策略配置 (JSON 字符串存储)
-    strategy_config: Optional[str] = None  # JSON: 完整的 strategy_list 配置
+    strategy_config: str | None = None  # JSON: 完整的 strategy_list 配置
 
     # 回测配置
     start_date: str = ""
@@ -310,7 +310,7 @@ class Strategy:
     market: str = "swap_swap"  # 选币市场范围
 
     # 排序方向 (JSON 字符串存储)
-    sort_directions: Optional[str] = None  # JSON: Dict[str, bool] 因子名 -> is_sort_asc
+    sort_directions: str | None = None  # JSON: Dict[str, bool] 因子名 -> is_sort_asc
 
     # 账户配置
     account_type: str = "统一账户"  # 账户类型
@@ -330,18 +330,18 @@ class Strategy:
 
     # 币种过滤
     min_kline_num: int = 0  # 最少上市K线数
-    black_list: Optional[str] = None  # JSON: List[str]
-    white_list: Optional[str] = None  # JSON: List[str]
+    black_list: str | None = None  # JSON: List[str]
+    white_list: str | None = None  # JSON: List[str]
 
     # 核心绩效指标 (来自 strategy_evaluate)
     cumulative_return: float = 0.0  # 累积净值
     annual_return: float = 0.0  # 年化收益
     max_drawdown: float = 0.0  # 最大回撤
-    max_drawdown_start: Optional[str] = None  # 最大回撤开始时间
-    max_drawdown_end: Optional[str] = None  # 最大回撤结束时间
+    max_drawdown_start: str | None = None  # 最大回撤开始时间
+    max_drawdown_end: str | None = None  # 最大回撤结束时间
     sharpe_ratio: float = 0.0  # 年化收益/回撤比
     recovery_rate: float = 0.0  # 修复涨幅
-    recovery_time: Optional[str] = None  # 修复时间
+    recovery_time: str | None = None  # 修复时间
 
     # 交易统计
     win_periods: int = 0  # 盈利周期数
@@ -356,105 +356,105 @@ class Strategy:
     return_std: float = 0.0  # 收益率标准差
 
     # 周期收益 (JSON 存储)
-    year_return: Optional[str] = None  # 年度收益 JSON
-    quarter_return: Optional[str] = None  # 季度收益 JSON
-    month_return: Optional[str] = None  # 月度收益 JSON
+    year_return: str | None = None  # 年度收益 JSON
+    quarter_return: str | None = None  # 季度收益 JSON
+    month_return: str | None = None  # 月度收益 JSON
 
     # 资金曲线数据 (JSON 存储)
-    equity_curve: Optional[str] = None  # 资金曲线 JSON
+    equity_curve: str | None = None  # 资金曲线 JSON
 
     # 元数据
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     verified: bool = False
-    tags: Optional[str] = None  # JSON: List[str]
-    notes: Optional[str] = None
+    tags: str | None = None  # JSON: List[str]
+    notes: str | None = None
 
     # 任务信息
     task_id: str = ""
     task_status: str = "pending"  # pending/running/completed/failed
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # ===== 便捷方法 =====
 
-    def get_factor_list(self) -> List[str]:
+    def get_factor_list(self) -> list[str]:
         """获取因子列表"""
         try:
             return json.loads(self.factor_list) if self.factor_list else []
         except json.JSONDecodeError:
             return []
 
-    def set_factor_list(self, factors: List[str]) -> None:
+    def set_factor_list(self, factors: list[str]) -> None:
         """设置因子列表"""
         self.factor_list = json.dumps(factors, ensure_ascii=False)
 
-    def get_factor_params(self) -> Dict[str, Any]:
+    def get_factor_params(self) -> dict[str, Any]:
         """获取因子参数"""
         try:
             return json.loads(self.factor_params) if self.factor_params else {}
         except json.JSONDecodeError:
             return {}
 
-    def set_factor_params(self, params: Dict[str, Any]) -> None:
+    def set_factor_params(self, params: dict[str, Any]) -> None:
         """设置因子参数"""
         self.factor_params = json.dumps(params, ensure_ascii=False)
 
-    def get_tags(self) -> List[str]:
+    def get_tags(self) -> list[str]:
         """获取标签列表"""
         try:
             return json.loads(self.tags) if self.tags else []
         except json.JSONDecodeError:
             return []
 
-    def set_tags(self, tags: List[str]) -> None:
+    def set_tags(self, tags: list[str]) -> None:
         """设置标签列表"""
         self.tags = json.dumps(tags, ensure_ascii=False)
 
-    def get_sort_directions(self) -> Dict[str, bool]:
+    def get_sort_directions(self) -> dict[str, bool]:
         """获取排序方向"""
         try:
             return json.loads(self.sort_directions) if self.sort_directions else {}
         except json.JSONDecodeError:
             return {}
 
-    def set_sort_directions(self, directions: Dict[str, bool]) -> None:
+    def set_sort_directions(self, directions: dict[str, bool]) -> None:
         """设置排序方向"""
         self.sort_directions = json.dumps(directions, ensure_ascii=False)
 
-    def get_strategy_config(self) -> List[Dict[str, Any]]:
+    def get_strategy_config(self) -> list[dict[str, Any]]:
         """获取完整策略配置"""
         try:
             return json.loads(self.strategy_config) if self.strategy_config else []
         except json.JSONDecodeError:
             return []
 
-    def set_strategy_config(self, config: List[Dict[str, Any]]) -> None:
+    def set_strategy_config(self, config: list[dict[str, Any]]) -> None:
         """设置完整策略配置"""
         self.strategy_config = json.dumps(config, ensure_ascii=False)
 
-    def get_black_list(self) -> List[str]:
+    def get_black_list(self) -> list[str]:
         """获取黑名单"""
         try:
             return json.loads(self.black_list) if self.black_list else []
         except json.JSONDecodeError:
             return []
 
-    def set_black_list(self, coins: List[str]) -> None:
+    def set_black_list(self, coins: list[str]) -> None:
         """设置黑名单"""
         self.black_list = json.dumps(coins, ensure_ascii=False)
 
-    def get_white_list(self) -> List[str]:
+    def get_white_list(self) -> list[str]:
         """获取白名单"""
         try:
             return json.loads(self.white_list) if self.white_list else []
         except json.JSONDecodeError:
             return []
 
-    def set_white_list(self, coins: List[str]) -> None:
+    def set_white_list(self, coins: list[str]) -> None:
         """设置白名单"""
         self.white_list = json.dumps(coins, ensure_ascii=False)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典
 
         返回完整的策略数据，供内部存储和前端使用。
@@ -537,7 +537,7 @@ class Strategy:
             "error_message": self.error_message,
         }
 
-    def to_result_dict(self) -> Dict[str, Any]:
+    def to_result_dict(self) -> dict[str, Any]:
         """转换为结果字典
 
         只返回绩效结果，供 MCP 工具返回使用。
@@ -574,7 +574,7 @@ class Strategy:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Strategy":
+    def from_dict(cls, data: dict[str, Any]) -> "Strategy":
         """从字典创建实例"""
         strategy = cls()
 

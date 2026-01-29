@@ -8,13 +8,13 @@
 - SQL 安全验证
 """
 
-import os
 import logging
+import os
 import threading
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, TypeVar, Generic
 from contextlib import contextmanager
+from datetime import datetime
+from typing import Any, Generic, TypeVar
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -46,7 +46,7 @@ class ThreadSafeConnectionMixin:
                 # ... 其他初始化
     """
 
-    def _init_connection(self, database_url: Optional[str] = None):
+    def _init_connection(self, database_url: str | None = None):
         """初始化连接管理"""
         self.database_url = database_url or get_database_url()
         self._local = threading.local()
@@ -99,12 +99,12 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
 
     # 子类必须定义
     table_name: str = ""
-    allowed_columns: Set[str] = set()
+    allowed_columns: set[str] = set()
 
     # 数值类型字段（用于 empty/not_empty 查询时区分 NULL 检查逻辑）
-    numeric_fields: Set[str] = set()
+    numeric_fields: set[str] = set()
 
-    def __init__(self, database_url: Optional[str] = None):
+    def __init__(self, database_url: str | None = None):
         """
         初始化存储层
 
@@ -122,7 +122,7 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
     # ==================== 抽象方法 ====================
 
     @abstractmethod
-    def _row_to_entity(self, row: Dict[str, Any]) -> T:
+    def _row_to_entity(self, row: dict[str, Any]) -> T:
         """
         将数据库行转换为实体对象
 
@@ -136,7 +136,7 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
 
     # ==================== 通用 CRUD ====================
 
-    def get_by_id(self, id_field: str, id_value: Any) -> Optional[T]:
+    def get_by_id(self, id_field: str, id_value: Any) -> T | None:
         """
         通过 ID 获取单个实体
 
@@ -163,10 +163,10 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
 
     def get_all(
         self,
-        order_by: Optional[str] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None
-    ) -> List[T]:
+        order_by: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None
+    ) -> list[T]:
         """
         获取所有实体
 
@@ -248,7 +248,7 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
         if 'updated_at' in self.allowed_columns:
             safe_fields['updated_at'] = datetime.now()
 
-        set_clause = ', '.join(f'{k} = %s' for k in safe_fields.keys())
+        set_clause = ', '.join(f'{k} = %s' for k in safe_fields)
         values = list(safe_fields.values()) + [id_value]
 
         with self._cursor() as cursor:
@@ -258,7 +258,7 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
             )
             return cursor.rowcount > 0
 
-    def count(self, where_clause: str = "", params: List[Any] = None) -> int:
+    def count(self, where_clause: str = "", params: list[Any] = None) -> int:
         """
         统计实体数量
 
@@ -279,7 +279,7 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
 
     # ==================== 安全验证 ====================
 
-    def _validate_order_by(self, order_by: str) -> Optional[str]:
+    def _validate_order_by(self, order_by: str) -> str | None:
         """
         验证并返回安全的 ORDER BY 子句
 
@@ -306,7 +306,7 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
 
         return f'{column} {direction}'
 
-    def _validate_columns(self, columns: Dict[str, Any]) -> Dict[str, Any]:
+    def _validate_columns(self, columns: dict[str, Any]) -> dict[str, Any]:
         """
         验证并过滤有效的列
 
@@ -325,7 +325,7 @@ class BaseStore(ThreadSafeConnectionMixin, ABC, Generic[T]):
 
 # ==================== 单例工厂 ====================
 
-_store_instances: Dict[str, Any] = {}
+_store_instances: dict[str, Any] = {}
 
 
 def get_store_instance(store_class: type, key: str = None, **kwargs) -> Any:

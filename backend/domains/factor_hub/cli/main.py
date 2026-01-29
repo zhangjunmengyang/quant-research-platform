@@ -16,11 +16,9 @@ Factor Pipeline CLI - 统一的因子库管理入口
 
 import argparse
 import sys
-from pathlib import Path
 
 from domains.mcp_core.paths import get_project_root
 from dotenv import load_dotenv
-
 
 # 加载项目根目录的 .env 文件
 load_dotenv(get_project_root() / '.env')
@@ -42,7 +40,7 @@ def cmd_ingest(args):
 
     factor_files = None
     if args.factors:
-        with open(args.factors, 'r', encoding='utf-8') as f:
+        with open(args.factors, encoding='utf-8') as f:
             factor_files = [line.strip() for line in f if line.strip()]
 
     fields = None
@@ -147,7 +145,7 @@ def cmd_verify(args):
     store = get_factor_store()
 
     if args.factors:
-        with open(args.factors, 'r', encoding='utf-8') as f:
+        with open(args.factors, encoding='utf-8') as f:
             filenames = [line.strip() for line in f if line.strip()]
     else:
         filenames = [args.filename]
@@ -225,8 +223,9 @@ def cmd_status(args):
 
 def cmd_export_md(args):
     """导出 Markdown"""
-    from ..core.store import get_factor_store
     from domains.mcp_core.paths import get_project_root as get_root
+
+    from ..core.store import get_factor_store
 
     store = get_factor_store()
     output_path = args.output or str(get_root() / "output" / "factor_catalog_export.md")

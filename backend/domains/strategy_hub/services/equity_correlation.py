@@ -8,14 +8,13 @@ import logging
 from dataclasses import dataclass, field
 from itertools import combinations
 from pathlib import Path
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
-
 from domains.mcp_core.paths import get_data_dir
-from ..utils.plot_functions import draw_params_heatmap_plotly, merge_html_flexible
+
 from ..utils.data_functions import curve_difference_all_pairs
+from ..utils.plot_functions import draw_params_heatmap_plotly, merge_html_flexible
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +22,10 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EquityCorrelationResult:
     """资金曲线相关性分析结果"""
-    strategies: List[str] = field(default_factory=list)
-    correlation_matrix: Optional[pd.DataFrame] = None
-    html_path: Optional[str] = None
-    error: Optional[str] = None
+    strategies: list[str] = field(default_factory=list)
+    correlation_matrix: pd.DataFrame | None = None
+    html_path: str | None = None
+    error: str | None = None
 
 
 class EquityCorrelationService:
@@ -36,7 +35,7 @@ class EquityCorrelationService:
     计算多策略资金曲线涨跌幅之间的相关性。
     """
 
-    def __init__(self, data_path: Optional[Path] = None):
+    def __init__(self, data_path: Path | None = None):
         """
         初始化服务
 
@@ -47,7 +46,7 @@ class EquityCorrelationService:
         self.output_path = self.data_path / "analysis_results" / "equity_correlation"
         self.output_path.mkdir(parents=True, exist_ok=True)
 
-    def analyze(self, strategy_list: List[str]) -> EquityCorrelationResult:
+    def analyze(self, strategy_list: list[str]) -> EquityCorrelationResult:
         """
         分析多策略资金曲线相关性
 
@@ -100,7 +99,7 @@ class EquityCorrelationService:
 
 
 # 单例模式
-_equity_correlation_service: Optional[EquityCorrelationService] = None
+_equity_correlation_service: EquityCorrelationService | None = None
 
 
 def get_equity_correlation_service() -> EquityCorrelationService:

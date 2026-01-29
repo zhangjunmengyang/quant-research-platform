@@ -7,18 +7,18 @@
 import itertools
 import logging
 import operator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import reduce
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Literal
+from typing import Any
 
 import pandas as pd
-
 from domains.mcp_core.paths import get_data_dir
+
 from ..utils.plot_functions import (
+    draw_bar_plotly,
     draw_params_bar_plotly,
     draw_params_heatmap_plotly,
-    draw_bar_plotly,
     merge_html_flexible,
 )
 
@@ -31,8 +31,8 @@ class ParamAnalysisResult:
     name: str
     analysis_type: str  # 'single' or 'double'
     indicator: str
-    html_path: Optional[str] = None
-    error: Optional[str] = None
+    html_path: str | None = None
+    error: str | None = None
 
 
 class ParamAnalysisService:
@@ -59,7 +59,7 @@ class ParamAnalysisService:
         "return_std",
     ]
 
-    def __init__(self, data_path: Optional[Path] = None):
+    def __init__(self, data_path: Path | None = None):
         """
         初始化服务
 
@@ -72,7 +72,7 @@ class ParamAnalysisService:
         self.output_path.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def _generate_param_combinations(batch_params: Dict[str, List[Any]]) -> pd.DataFrame:
+    def _generate_param_combinations(batch_params: dict[str, list[Any]]) -> pd.DataFrame:
         """
         生成参数组合DataFrame
 
@@ -92,7 +92,7 @@ class ParamAnalysisService:
     @staticmethod
     def _filter_dataframe(
         df: pd.DataFrame,
-        filter_dict: Dict[str, List[Any]]
+        filter_dict: dict[str, list[Any]]
     ) -> pd.DataFrame:
         """
         按条件过滤DataFrame
@@ -114,7 +114,7 @@ class ParamAnalysisService:
         df: pd.DataFrame,
         result_dir: Path,
         indicator: str
-    ) -> Optional[List[str]]:
+    ) -> list[str] | None:
         """
         加载策略评价数据
 
@@ -170,9 +170,9 @@ class ParamAnalysisService:
     def analyze_single_param(
         self,
         trav_name: str,
-        batch_params: Dict[str, List[Any]],
+        batch_params: dict[str, list[Any]],
         param_x: str,
-        limit_dict: Optional[Dict[str, List[Any]]] = None,
+        limit_dict: dict[str, list[Any]] | None = None,
         indicator: str = "annual_return"
     ) -> ParamAnalysisResult:
         """
@@ -238,10 +238,10 @@ class ParamAnalysisService:
     def analyze_double_params(
         self,
         trav_name: str,
-        batch_params: Dict[str, List[Any]],
+        batch_params: dict[str, list[Any]],
         param_x: str,
         param_y: str,
-        limit_dict: Optional[Dict[str, List[Any]]] = None,
+        limit_dict: dict[str, list[Any]] | None = None,
         indicator: str = "annual_return"
     ) -> ParamAnalysisResult:
         """
@@ -306,10 +306,10 @@ class ParamAnalysisService:
     def analyze(
         self,
         trav_name: str,
-        batch_params: Dict[str, List[Any]],
+        batch_params: dict[str, list[Any]],
         param_x: str,
-        param_y: Optional[str] = None,
-        limit_dict: Optional[Dict[str, List[Any]]] = None,
+        param_y: str | None = None,
+        limit_dict: dict[str, list[Any]] | None = None,
         indicator: str = "annual_return"
     ) -> ParamAnalysisResult:
         """
@@ -337,7 +337,7 @@ class ParamAnalysisService:
 
 
 # 单例模式
-_param_analysis_service: Optional[ParamAnalysisService] = None
+_param_analysis_service: ParamAnalysisService | None = None
 
 
 def get_param_analysis_service() -> ParamAnalysisService:

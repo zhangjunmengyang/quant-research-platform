@@ -4,20 +4,20 @@ NOTE: 所有同步服务调用都使用 run_sync 包装，避免阻塞 event loo
 """
 
 import math
-from typing import Optional, List, Dict, Any
+from typing import Any
 
+from domains.graph_hub.core import NodeType, get_graph_store
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.schemas.common import ApiResponse
-from app.core.deps import get_data_loader, get_factor_calculator
 from app.core.async_utils import run_sync
-from domains.mcp_core.edge import get_edge_store, EdgeEntityType
+from app.core.deps import get_data_loader, get_factor_calculator
+from app.schemas.common import ApiResponse
 
 router = APIRouter()
 
 
-def _safe_float(val, default: Optional[float] = None) -> Optional[float]:
+def _safe_float(val, default: float | None = None) -> float | None:
     """安全获取浮点值，处理 NaN 和无效值"""
     if val is None or (hasattr(val, '__iter__') and not isinstance(val, str)):
         return default
@@ -30,7 +30,7 @@ def _safe_float(val, default: Optional[float] = None) -> Optional[float]:
         return default
 
 
-def _safe_int(val) -> Optional[int]:
+def _safe_int(val) -> int | None:
     """安全获取整数值，处理 NaN 和无效值"""
     if val is None:
         return None
@@ -47,9 +47,9 @@ class SymbolInfo(BaseModel):
     symbol: str
     has_spot: bool = True
     has_swap: bool = True
-    first_candle_time: Optional[str] = None
-    last_candle_time: Optional[str] = None
-    kline_count: Optional[int] = None
+    first_candle_time: str | None = None
+    last_candle_time: str | None = None
+    kline_count: int | None = None
 
 
 class SymbolListItem(BaseModel):
@@ -68,9 +68,9 @@ class SymbolListItem(BaseModel):
     has_spot: bool = False  # 是否有现货数据
     has_swap: bool = False  # 是否有合约数据
     # 以下字段为主要数据类型的统计（优先使用 swap）
-    first_candle_time: Optional[str] = None
-    last_candle_time: Optional[str] = None
-    kline_count: Optional[int] = None
+    first_candle_time: str | None = None
+    last_candle_time: str | None = None
+    kline_count: int | None = None
 
 
 class KlineDataItem(BaseModel):
@@ -82,13 +82,13 @@ class KlineDataItem(BaseModel):
     low: float
     close: float
     volume: float  # 成交量（基础货币）
-    quote_volume: Optional[float] = None  # 成交额（计价货币）
-    trade_num: Optional[int] = None  # 成交笔数
-    taker_buy_base_asset_volume: Optional[float] = None  # 主动买入成交量
-    taker_buy_quote_asset_volume: Optional[float] = None  # 主动买入成交额
-    funding_fee: Optional[float] = None  # 资金费率（仅合约）
-    avg_price_1m: Optional[float] = None  # 1分钟均价
-    avg_price_5m: Optional[float] = None  # 5分钟均价
+    quote_volume: float | None = None  # 成交额（计价货币）
+    trade_num: int | None = None  # 成交笔数
+    taker_buy_base_asset_volume: float | None = None  # 主动买入成交量
+    taker_buy_quote_asset_volume: float | None = None  # 主动买入成交额
+    funding_fee: float | None = None  # 资金费率（仅合约）
+    avg_price_1m: float | None = None  # 1分钟均价
+    avg_price_5m: float | None = None  # 5分钟均价
 
 
 class DataTypeStats(BaseModel):
@@ -97,8 +97,8 @@ class DataTypeStats(BaseModel):
     total_symbols: int = 0
     active_symbols: int = 0
     total_records: int = 0
-    data_start_date: Optional[str] = None
-    data_end_date: Optional[str] = None
+    data_start_date: str | None = None
+    data_end_date: str | None = None
 
 
 class DataOverview(BaseModel):
@@ -107,8 +107,8 @@ class DataOverview(BaseModel):
     total_symbols: int  # 所有币种总数（去重）
     spot: DataTypeStats  # 现货数据统计
     swap: DataTypeStats  # 合约数据统计
-    last_updated: Optional[str] = None
-    available_factors: List[str] = []
+    last_updated: str | None = None
+    available_factors: list[str] = []
 
 
 class FactorCalculateRequest(BaseModel):
@@ -116,24 +116,24 @@ class FactorCalculateRequest(BaseModel):
 
     factor_name: str
     symbol: str
-    params: List[int] = [5, 10, 20]  # 因子参数（整数）
+    params: list[int] = [5, 10, 20]  # 因子参数（整数）
     data_type: str = "swap"  # spot 或 swap
-    start_date: Optional[str] = None  # 起始日期 (YYYY-MM-DD)
-    end_date: Optional[str] = None  # 结束日期 (YYYY-MM-DD)
+    start_date: str | None = None  # 起始日期 (YYYY-MM-DD)
+    end_date: str | None = None  # 结束日期 (YYYY-MM-DD)
     limit: int = 1000  # 返回数据点数量限制
 
 
 class FactorValueItem(BaseModel):
     """单个因子值数据点"""
     time: str
-    value: Optional[float] = None
+    value: float | None = None
 
 
 class FactorParamResult(BaseModel):
     """单个参数的因子计算结果"""
     param: float
-    data: List[FactorValueItem]
-    stats: Dict[str, Optional[float]]
+    data: list[FactorValueItem]
+    stats: dict[str, float | None]
 
 
 class FactorCalculateResult(BaseModel):
@@ -142,7 +142,7 @@ class FactorCalculateResult(BaseModel):
     factor_name: str
     symbol: str
     data_type: str
-    results: List[FactorParamResult]
+    results: list[FactorParamResult]
 
 
 # ==================== 标签相关模型 ====================
@@ -171,7 +171,7 @@ class EntityByTag(BaseModel):
     id: str
 
 
-@router.get("/symbols", response_model=ApiResponse[List[SymbolListItem]])
+@router.get("/symbols", response_model=ApiResponse[list[SymbolListItem]])
 async def list_symbols(loader=Depends(get_data_loader)):
     """获取可用币种列表（去重，包含现货/合约可用性标记）
 
@@ -254,12 +254,12 @@ async def get_overview(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/kline/{symbol}", response_model=ApiResponse[List[KlineDataItem]])
+@router.get("/kline/{symbol}", response_model=ApiResponse[list[KlineDataItem]])
 async def get_kline(
     symbol: str,
     data_type: str = Query("swap", description="数据类型: spot 或 swap"),
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
     limit: int = Query(5000, ge=1, le=10000),
     loader=Depends(get_data_loader),
 ):
@@ -348,7 +348,7 @@ async def get_symbol_info(symbol: str, loader=Depends(get_data_loader)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/factors", response_model=ApiResponse[List[str]])
+@router.get("/factors", response_model=ApiResponse[list[str]])
 async def list_available_factors(calculator=Depends(get_factor_calculator)):
     """获取可用因子列表"""
     try:
@@ -460,64 +460,76 @@ async def calculate_factor(
 
 # ==================== 标签 API ====================
 
-@router.get("/tags", response_model=ApiResponse[List[TagInfo]])
+@router.get("/tags", response_model=ApiResponse[list[TagInfo]])
 async def list_all_tags():
     """获取所有标签及统计"""
     try:
-        edge_store = get_edge_store()
-        tags = edge_store.list_all_tags()
+        graph_store = get_graph_store()
+        tags = graph_store.list_all_tags()
         return ApiResponse(data=[TagInfo(**t) for t in tags])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tags/all-symbols", response_model=ApiResponse[Dict[str, List[str]]])
+@router.get("/tags/all-symbols", response_model=ApiResponse[dict[str, list[str]]])
 async def get_all_symbol_tags():
     """获取所有币种的标签映射"""
     try:
-        edge_store = get_edge_store()
-        tags_map = edge_store.get_all_entity_tags_by_type(EdgeEntityType.DATA)
+        graph_store = get_graph_store()
+        tags_map: dict[str, list[str]] = {}
+        # 使用 get_edges_by_relation 获取所有 HAS_TAG 关系
+        from domains.graph_hub.core import RelationType
+        edges = graph_store.get_edges_by_relation(RelationType.HAS_TAG, limit=10000)
+        for edge in edges:
+            if edge.source_type == NodeType.DATA:
+                entity_id = edge.source_id
+                tag = edge.target_id
+                if entity_id not in tags_map:
+                    tags_map[entity_id] = []
+                if tag not in tags_map[entity_id]:
+                    tags_map[entity_id].append(tag)
         return ApiResponse(data=tags_map)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tags/{tag}/symbols", response_model=ApiResponse[List[str]])
+@router.get("/tags/{tag}/symbols", response_model=ApiResponse[list[str]])
 async def get_symbols_by_tag(tag: str):
     """获取指定标签的所有币种"""
     try:
-        edge_store = get_edge_store()
-        entities = edge_store.get_entities_by_tag(tag, EdgeEntityType.DATA)
+        graph_store = get_graph_store()
+        entities = graph_store.get_entities_by_tag(tag, NodeType.DATA)
         symbols = [e["id"] for e in entities]
         return ApiResponse(data=symbols)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/symbol/{symbol}/tags", response_model=ApiResponse[List[str]])
+@router.get("/symbol/{symbol}/tags", response_model=ApiResponse[list[str]])
 async def get_symbol_tags(symbol: str):
     """获取币种的所有标签"""
     try:
-        edge_store = get_edge_store()
-        tags = edge_store.get_entity_tags(EdgeEntityType.DATA, symbol)
+        graph_store = get_graph_store()
+        tags = graph_store.get_entity_tags(NodeType.DATA, symbol)
         return ApiResponse(data=tags)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/symbol/{symbol}/tags", response_model=ApiResponse[Dict[str, Any]])
+@router.post("/symbol/{symbol}/tags", response_model=ApiResponse[dict[str, Any]])
 async def add_symbol_tag(symbol: str, request: TagAddRequest):
     """给币种添加标签"""
     try:
-        edge_store = get_edge_store()
+        graph_store = get_graph_store()
 
         # 检查是否已存在
-        if edge_store.has_tag(EdgeEntityType.DATA, symbol, request.tag):
+        existing_tags = graph_store.get_entity_tags(NodeType.DATA, symbol)
+        if request.tag in existing_tags:
             return ApiResponse(data={"symbol": symbol, "tag": request.tag, "message": "标签已存在"})
 
-        edge_id = edge_store.add_tag(EdgeEntityType.DATA, symbol, request.tag)
-        if edge_id:
-            return ApiResponse(data={"symbol": symbol, "tag": request.tag, "edge_id": edge_id})
+        success = graph_store.add_tag(NodeType.DATA, symbol, request.tag)
+        if success:
+            return ApiResponse(data={"symbol": symbol, "tag": request.tag, "added": True})
         else:
             raise HTTPException(status_code=500, detail="添加标签失败")
     except HTTPException:
@@ -526,12 +538,12 @@ async def add_symbol_tag(symbol: str, request: TagAddRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/symbol/{symbol}/tags/{tag}", response_model=ApiResponse[Dict[str, Any]])
+@router.delete("/symbol/{symbol}/tags/{tag}", response_model=ApiResponse[dict[str, Any]])
 async def remove_symbol_tag(symbol: str, tag: str):
     """移除币种的标签"""
     try:
-        edge_store = get_edge_store()
-        success = edge_store.remove_tag(EdgeEntityType.DATA, symbol, tag)
+        graph_store = get_graph_store()
+        success = graph_store.remove_tag(NodeType.DATA, symbol, tag)
         if success:
             return ApiResponse(data={"symbol": symbol, "tag": tag, "removed": True})
         else:

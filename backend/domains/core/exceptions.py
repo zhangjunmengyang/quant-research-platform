@@ -8,9 +8,9 @@
 - 与 MCP 错误的转换
 """
 
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Optional, List
-from dataclasses import dataclass, field
+from typing import Any
 
 
 class ErrorCategory(str, Enum):
@@ -40,8 +40,8 @@ class ApplicationError(Exception):
     code: str                                    # 错误码 (如 "NOT_FOUND", "VALIDATION_ERROR")
     message: str                                 # 用户可读的错误信息
     category: ErrorCategory = ErrorCategory.INTERNAL
-    details: Optional[Dict[str, Any]] = None    # 附加详情
-    cause: Optional[Exception] = None           # 原始异常
+    details: dict[str, Any] | None = None    # 附加详情
+    cause: Exception | None = None           # 原始异常
 
     def __post_init__(self):
         super().__init__(self.message)
@@ -63,7 +63,7 @@ class ApplicationError(Exception):
         }
         return mapping.get(self.category, 500)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典格式（用于 API 响应）"""
         result = {
             "code": self.code,
@@ -76,7 +76,7 @@ class ApplicationError(Exception):
 
     def to_mcp_error(self) -> "MCPError":
         """转换为 MCP 错误格式"""
-        from domains.mcp_core.middleware.error_handler import MCPError, ErrorCode
+        from domains.mcp_core.middleware.error_handler import ErrorCode, MCPError
 
         # 映射到 MCP 错误码
         code_mapping = {
@@ -105,7 +105,7 @@ class NotFoundError(ApplicationError):
         self,
         resource_type: str,
         resource_id: Any,
-        details: Optional[Dict] = None
+        details: dict | None = None
     ):
         super().__init__(
             code="NOT_FOUND",
@@ -122,8 +122,8 @@ class ValidationError(ApplicationError):
     def __init__(
         self,
         message: str,
-        errors: Optional[List[Dict[str, Any]]] = None,
-        field: Optional[str] = None
+        errors: list[dict[str, Any]] | None = None,
+        field: str | None = None
     ):
         details = {}
         if errors:
@@ -148,7 +148,7 @@ class ConflictError(ApplicationError):
         resource_type: str,
         conflict_field: str,
         conflict_value: Any,
-        message: Optional[str] = None
+        message: str | None = None
     ):
         super().__init__(
             code="CONFLICT",
@@ -167,8 +167,8 @@ class PermissionError(ApplicationError):
     def __init__(
         self,
         action: str,
-        resource: Optional[str] = None,
-        message: Optional[str] = None
+        resource: str | None = None,
+        message: str | None = None
     ):
         super().__init__(
             code="PERMISSION_DENIED",
@@ -184,8 +184,8 @@ class BusinessError(ApplicationError):
         self,
         code: str,
         message: str,
-        details: Optional[Dict] = None,
-        cause: Optional[Exception] = None
+        details: dict | None = None,
+        cause: Exception | None = None
     ):
         super().__init__(
             code=code,
@@ -202,8 +202,8 @@ class ExternalServiceError(ApplicationError):
         self,
         service_name: str,
         message: str,
-        details: Optional[Dict] = None,
-        cause: Optional[Exception] = None
+        details: dict | None = None,
+        cause: Exception | None = None
     ):
         super().__init__(
             code="EXTERNAL_SERVICE_ERROR",
@@ -220,7 +220,7 @@ class ConfigurationError(ApplicationError):
         self,
         config_key: str,
         message: str,
-        details: Optional[Dict] = None
+        details: dict | None = None
     ):
         super().__init__(
             code="CONFIGURATION_ERROR",
@@ -248,7 +248,7 @@ class FactorExistsError(ConflictError):
 
 class FactorCodeError(BusinessError):
     """因子代码错误"""
-    def __init__(self, filename: str, message: str, cause: Optional[Exception] = None):
+    def __init__(self, filename: str, message: str, cause: Exception | None = None):
         super().__init__(
             code="FACTOR_CODE_ERROR",
             message=f"因子 {filename} 代码错误: {message}",
@@ -259,7 +259,7 @@ class FactorCodeError(BusinessError):
 
 class FactorCalculationError(BusinessError):
     """因子计算错误"""
-    def __init__(self, factor_name: str, message: str, cause: Optional[Exception] = None):
+    def __init__(self, factor_name: str, message: str, cause: Exception | None = None):
         super().__init__(
             code="FACTOR_CALCULATION_ERROR",
             message=f"因子 {factor_name} 计算失败: {message}",
@@ -278,7 +278,7 @@ class StrategyNotFoundError(NotFoundError):
 
 class BacktestError(BusinessError):
     """回测错误"""
-    def __init__(self, strategy_id: str, message: str, cause: Optional[Exception] = None):
+    def __init__(self, strategy_id: str, message: str, cause: Exception | None = None):
         super().__init__(
             code="BACKTEST_ERROR",
             message=f"策略 {strategy_id} 回测失败: {message}",
@@ -297,7 +297,7 @@ class DataNotFoundError(NotFoundError):
 
 class DataLoadError(BusinessError):
     """数据加载错误"""
-    def __init__(self, data_type: str, message: str, cause: Optional[Exception] = None):
+    def __init__(self, data_type: str, message: str, cause: Exception | None = None):
         super().__init__(
             code="DATA_LOAD_ERROR",
             message=f"加载{data_type}失败: {message}",
@@ -308,7 +308,7 @@ class DataLoadError(BusinessError):
 
 class CalculationError(BusinessError):
     """计算错误"""
-    def __init__(self, message: str, cause: Optional[Exception] = None):
+    def __init__(self, message: str, cause: Exception | None = None):
         super().__init__(
             code="CALCULATION_ERROR",
             message=message,

@@ -5,7 +5,7 @@
 """
 
 import re
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseTool, ToolResult
 
@@ -30,7 +30,7 @@ class ListFactorsTool(BaseTool):
 返回因子名称列表和总数。如需因子详情，请使用 get_factor 工具。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -160,7 +160,7 @@ class GetFactorTool(BaseTool):
 - 代码：完整的因子代码"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -241,7 +241,7 @@ class GetStatsTool(BaseTool):
 - 字段完整度"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {}
@@ -286,7 +286,7 @@ class GetStylesTool(BaseTool):
 可用于筛选因子时选择风格。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {}
@@ -322,7 +322,7 @@ class SearchByCodeTool(BaseTool):
 - 查找特定计算模式"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

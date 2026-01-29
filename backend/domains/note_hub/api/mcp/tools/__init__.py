@@ -3,7 +3,7 @@
 """
 
 from .base import BaseTool, ToolResult
-from .note_tools import CreateNoteTool, SearchNotesTool, GetNoteTool, ListNotesTool
+from .note_tools import CreateNoteTool, GetNoteTool, ListNotesTool, SearchNotesTool
 
 __all__ = [
     'BaseTool',

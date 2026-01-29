@@ -6,16 +6,14 @@
 """
 
 import asyncio
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
 import logging
+from typing import Any
 
 import pandas as pd
-import numpy as np
+from domains.core.exceptions import DataNotFoundError, FactorNotFoundError
 
 from .data_loader import DataLoader
 from .factor_calculator import FactorCalculator
-from domains.core.exceptions import DataNotFoundError, FactorNotFoundError, CalculationError
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +30,8 @@ class FactorDataLoader:
 
     def __init__(
         self,
-        data_loader: Optional[DataLoader] = None,
-        factor_calculator: Optional[FactorCalculator] = None,
+        data_loader: DataLoader | None = None,
+        factor_calculator: FactorCalculator | None = None,
     ):
         """
         初始化因子数据加载器
@@ -62,12 +60,12 @@ class FactorDataLoader:
     def load_factor_data(
         self,
         factor_name: str,
-        param: Optional[Any] = None,
-        symbols: Optional[List[str]] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        param: Any | None = None,
+        symbols: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         data_type: str = "swap",
-        return_periods: Optional[List[int]] = None,
+        return_periods: list[int] | None = None,
     ) -> pd.DataFrame:
         """
         加载因子数据（同步版本）
@@ -153,12 +151,12 @@ class FactorDataLoader:
     async def load_factor_data_async(
         self,
         factor_name: str,
-        param: Optional[Any] = None,
-        symbols: Optional[List[str]] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        param: Any | None = None,
+        symbols: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         data_type: str = "swap",
-        return_periods: Optional[List[int]] = None,
+        return_periods: list[int] | None = None,
     ) -> pd.DataFrame:
         """
         加载因子数据（异步版本）
@@ -178,12 +176,12 @@ class FactorDataLoader:
 
     def load_multiple_factors(
         self,
-        factor_params: Dict[str, List[Any]],
-        symbols: Optional[List[str]] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        factor_params: dict[str, list[Any]],
+        symbols: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         data_type: str = "swap",
-        return_periods: Optional[List[int]] = None,
+        return_periods: list[int] | None = None,
     ) -> pd.DataFrame:
         """
         加载多个因子数据（同步版本）
@@ -268,12 +266,12 @@ class FactorDataLoader:
 
     async def load_multiple_factors_async(
         self,
-        factor_params: Dict[str, List[Any]],
-        symbols: Optional[List[str]] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        factor_params: dict[str, list[Any]],
+        symbols: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         data_type: str = "swap",
-        return_periods: Optional[List[int]] = None,
+        return_periods: list[int] | None = None,
     ) -> pd.DataFrame:
         """
         加载多个因子数据（异步版本）
@@ -291,9 +289,9 @@ class FactorDataLoader:
     def load_factor_cross_section(
         self,
         factor_name: str,
-        param: Optional[Any] = None,
-        timestamp: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
+        param: Any | None = None,
+        timestamp: str | None = None,
+        symbols: list[str] | None = None,
         data_type: str = "swap",
         lookback_hours: int = 500,
     ) -> pd.DataFrame:
@@ -374,9 +372,9 @@ class FactorDataLoader:
     async def load_factor_cross_section_async(
         self,
         factor_name: str,
-        param: Optional[Any] = None,
-        timestamp: Optional[str] = None,
-        symbols: Optional[List[str]] = None,
+        param: Any | None = None,
+        timestamp: str | None = None,
+        symbols: list[str] | None = None,
         data_type: str = "swap",
         lookback_hours: int = 500,
     ) -> pd.DataFrame:
@@ -395,7 +393,7 @@ class FactorDataLoader:
 
 
 # 单例实例
-_factor_data_loader: Optional[FactorDataLoader] = None
+_factor_data_loader: FactorDataLoader | None = None
 
 
 def get_factor_data_loader() -> FactorDataLoader:

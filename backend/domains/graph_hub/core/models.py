@@ -7,7 +7,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class NodeType(str, Enum):
@@ -126,14 +126,14 @@ class GraphNode:
 
     node_type: NodeType
     node_id: str
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
 
     @property
     def label(self) -> str:
         """Neo4j 标签名 (首字母大写)"""
         return self.node_type.value.capitalize()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "node_type": self.node_type.value,
@@ -142,7 +142,7 @@ class GraphNode:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GraphNode":
+    def from_dict(cls, data: dict[str, Any]) -> "GraphNode":
         """从字典创建"""
         node_type = data.get("node_type", "data")
         if isinstance(node_type, str):
@@ -168,15 +168,15 @@ class GraphEdge:
     target_id: str
     relation: RelationType = RelationType.RELATED
     is_bidirectional: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    created_at: Optional[datetime] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime | None = None
 
     def __post_init__(self):
         """初始化后自动设置双向标记"""
         if self.relation in BIDIRECTIONAL_RELATIONS and not self.is_bidirectional:
             self.is_bidirectional = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "source_type": (
@@ -202,7 +202,7 @@ class GraphEdge:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "GraphEdge":
+    def from_dict(cls, data: dict[str, Any]) -> "GraphEdge":
         """从字典创建"""
         # 解析 source_type
         source_type = data.get("source_type", "data")
@@ -230,7 +230,7 @@ class GraphEdge:
 
         # 处理 created_at 类型转换
         created_at_raw = data.get("created_at")
-        created_at: Optional[datetime] = None
+        created_at: datetime | None = None
         if created_at_raw is not None:
             if isinstance(created_at_raw, datetime):
                 created_at = created_at_raw
@@ -265,7 +265,7 @@ class LineageNode:
     relation: RelationType
     direction: str  # "forward" 或 "backward"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "depth": self.depth,
@@ -284,7 +284,7 @@ class LineageNode:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LineageNode":
+    def from_dict(cls, data: dict[str, Any]) -> "LineageNode":
         """从字典创建"""
         # 解析 node_type
         node_type = data.get("node_type", "data")
@@ -319,14 +319,14 @@ class LineageResult:
     start_id: str
     direction: str
     max_depth: int
-    nodes: List[LineageNode] = field(default_factory=list)
+    nodes: list[LineageNode] = field(default_factory=list)
 
     @property
     def count(self) -> int:
         """节点数量"""
         return len(self.nodes)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "start_type": (
@@ -342,7 +342,7 @@ class LineageResult:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "LineageResult":
+    def from_dict(cls, data: dict[str, Any]) -> "LineageResult":
         """从字典创建"""
         # 解析 start_type
         start_type = data.get("start_type", "data")
@@ -373,14 +373,14 @@ class PathResult:
     source_id: str
     target_type: NodeType
     target_id: str
-    paths: List[List[Dict[str, Any]]] = field(default_factory=list)
+    paths: list[list[dict[str, Any]]] = field(default_factory=list)
 
     @property
     def count(self) -> int:
         """路径数量"""
         return len(self.paths)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "source_type": (
@@ -400,7 +400,7 @@ class PathResult:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PathResult":
+    def from_dict(cls, data: dict[str, Any]) -> "PathResult":
         """从字典创建"""
         # 解析 source_type
         source_type = data.get("source_type", "data")
@@ -442,16 +442,16 @@ class KnowledgeEdge:
     target_id: str
     relation: RelationType = RelationType.RELATED
     is_bidirectional: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    id: Optional[int] = None
-    created_at: Optional[datetime] = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    id: int | None = None
+    created_at: datetime | None = None
 
     def __post_init__(self):
         """初始化后处理"""
         if self.relation in BIDIRECTIONAL_RELATIONS and not self.is_bidirectional:
             self.is_bidirectional = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             "id": self.id,
@@ -466,7 +466,7 @@ class KnowledgeEdge:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "KnowledgeEdge":
+    def from_dict(cls, data: dict[str, Any]) -> "KnowledgeEdge":
         """从字典创建"""
         source_type = data.get("source_type", "data")
         if isinstance(source_type, str):
@@ -490,7 +490,7 @@ class KnowledgeEdge:
                 relation = RelationType.RELATED
 
         created_at_raw = data.get("created_at")
-        created_at: Optional[datetime] = None
+        created_at: datetime | None = None
         if created_at_raw is not None:
             if isinstance(created_at_raw, datetime):
                 created_at = created_at_raw

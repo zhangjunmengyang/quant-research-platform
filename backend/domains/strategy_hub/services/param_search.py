@@ -8,12 +8,11 @@ import itertools
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Any, Optional
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Any
 
-from domains.mcp_core.paths import get_data_dir
 from domains.engine.core.backtest import find_best_params
 from domains.engine.core.model.backtest_config import BacktestConfigFactory
+from domains.mcp_core.paths import get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +23,11 @@ class ParamSearchResult:
     name: str
     total_combinations: int
     completed: int = 0
-    best_params: Optional[Dict[str, Any]] = None
-    all_results: List[Dict[str, Any]] = field(default_factory=list)
+    best_params: dict[str, Any] | None = None
+    all_results: list[dict[str, Any]] = field(default_factory=list)
     status: str = "pending"
-    error: Optional[str] = None
-    output_path: Optional[str] = None
+    error: str | None = None
+    output_path: str | None = None
 
 
 class ParamSearchService:
@@ -38,7 +37,7 @@ class ParamSearchService:
     支持多参数组合的策略回测搜索，找到最优参数。
     """
 
-    def __init__(self, data_path: Optional[Path] = None):
+    def __init__(self, data_path: Path | None = None):
         """
         初始化服务
 
@@ -50,7 +49,7 @@ class ParamSearchService:
         self.output_path.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def _generate_param_combinations(batch_params: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
+    def _generate_param_combinations(batch_params: dict[str, list[Any]]) -> list[dict[str, Any]]:
         """
         生成参数组合
 
@@ -67,8 +66,8 @@ class ParamSearchService:
     def run_search(
         self,
         name: str,
-        batch_params: Dict[str, List[Any]],
-        strategy_template: Dict[str, Any],
+        batch_params: dict[str, list[Any]],
+        strategy_template: dict[str, Any],
         max_workers: int = 4
     ) -> ParamSearchResult:
         """
@@ -125,9 +124,9 @@ class ParamSearchService:
 
     def _apply_params(
         self,
-        template: Dict[str, Any],
-        params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        template: dict[str, Any],
+        params: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         将参数应用到模板
 
@@ -153,8 +152,8 @@ class ParamSearchService:
 
     def _set_nested_value(
         self,
-        config: Dict[str, Any],
-        path: List[str],
+        config: dict[str, Any],
+        path: list[str],
         value: Any
     ) -> None:
         """
@@ -179,7 +178,7 @@ class ParamSearchService:
 
 
 # 单例模式
-_param_search_service: Optional[ParamSearchService] = None
+_param_search_service: ParamSearchService | None = None
 
 
 def get_param_search_service() -> ParamSearchService:

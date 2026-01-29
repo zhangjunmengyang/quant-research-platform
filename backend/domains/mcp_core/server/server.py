@@ -8,33 +8,33 @@ MCP 服务器基类
 """
 
 import json
-import time
 import logging
-from typing import Any, Dict, List, Optional, Type
+import time
 from datetime import datetime
+from typing import Any
 
-from fastapi import FastAPI, Request, HTTPException, Response
-from fastapi.responses import JSONResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
 
+from ..base.prompt import BasePromptProvider, EmptyPromptProvider
+from ..base.resource import BaseResourceProvider
+from ..base.tool import BaseTool, ToolRegistry
+from ..config import MCPConfig
+from ..middleware.error_handler import (
+    ErrorHandler,
+    MCPError,
+    MethodNotFoundError,
+    ToolExecutionError,
+    ToolNotFoundError,
+)
 from .protocol import (
+    MCP_PROTOCOL_VERSION,
+    JSONRPCError,
     JSONRPCRequest,
     JSONRPCResponse,
-    JSONRPCError,
-    MCP_PROTOCOL_VERSION,
 )
-from ..base.tool import ToolRegistry, BaseTool
-from ..base.resource import BaseResourceProvider
-from ..base.prompt import BasePromptProvider, EmptyPromptProvider
-from ..middleware.error_handler import (
-    MCPError,
-    ErrorHandler,
-    MethodNotFoundError,
-    ToolNotFoundError,
-    ToolExecutionError,
-)
-from ..config import MCPConfig
 
 # 延迟导入可观测性模块（避免循环导入）
 _logger = None
@@ -90,7 +90,7 @@ class BaseMCPServer:
 
     def __init__(
         self,
-        config: Optional[MCPConfig] = None,
+        config: MCPConfig | None = None,
     ):
         """
         初始化服务器
@@ -100,7 +100,7 @@ class BaseMCPServer:
         """
         self.config = config or MCPConfig()
         self.tool_registry = ToolRegistry()
-        self.resource_provider: Optional[BaseResourceProvider] = None
+        self.resource_provider: BaseResourceProvider | None = None
         self.prompt_provider: BasePromptProvider = EmptyPromptProvider()
 
         # 错误处理
@@ -122,11 +122,11 @@ class BaseMCPServer:
         """
         pass
 
-    def register_tool(self, tool: BaseTool, category: Optional[str] = None) -> None:
+    def register_tool(self, tool: BaseTool, category: str | None = None) -> None:
         """注册工具"""
         self.tool_registry.register(tool, category)
 
-    def register_tool_class(self, tool_class: Type[BaseTool], category: Optional[str] = None, **kwargs) -> None:
+    def register_tool_class(self, tool_class: type[BaseTool], category: str | None = None, **kwargs) -> None:
         """注册工具类"""
         self.tool_registry.register_class(tool_class, category, **kwargs)
 
@@ -138,7 +138,7 @@ class BaseMCPServer:
         """设置 Prompt 提供者"""
         self.prompt_provider = provider
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """
         获取健康状态
 
@@ -159,7 +159,7 @@ class BaseMCPServer:
 
         return status
 
-    def _get_extended_health_status(self) -> Optional[Dict[str, Any]]:
+    def _get_extended_health_status(self) -> dict[str, Any] | None:
         """
         获取扩展健康状态信息
 
@@ -170,7 +170,7 @@ class BaseMCPServer:
         """
         return None
 
-    def get_ready_status(self) -> Dict[str, Any]:
+    def get_ready_status(self) -> dict[str, Any]:
         """获取就绪状态"""
         checks = {
             "tools_registered": len(self.tool_registry) > 0,
@@ -297,7 +297,7 @@ class BaseMCPServer:
         except Exception:
             return ""
 
-    def _extract_response_data(self, method: str, result: Any) -> Dict[str, Any]:
+    def _extract_response_data(self, method: str, result: Any) -> dict[str, Any]:
         """
         提取响应数据用于日志排查
 
@@ -748,8 +748,8 @@ def create_mcp_app(
 
 def run_server(
     server: BaseMCPServer,
-    host: Optional[str] = None,
-    port: Optional[int] = None,
+    host: str | None = None,
+    port: int | None = None,
     log_level: str = "info",
     reload: bool = False,
     use_structlog: bool = True,
@@ -779,7 +779,7 @@ def run_server(
 
     if use_structlog:
         try:
-            from ..logging import configure_logging, LogConfig, LogFormat
+            from ..logging import LogConfig, LogFormat, configure_logging
             log_config = LogConfig(
                 level=log_level.upper(),
                 format=LogFormat.JSON if use_json else LogFormat.CONSOLE,

@@ -6,8 +6,8 @@
 
 from .task_queue import (
     TaskQueue,
-    TaskStatus,
     TaskResult,
+    TaskStatus,
     get_task_queue,
 )
 

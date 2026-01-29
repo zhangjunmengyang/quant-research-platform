@@ -176,7 +176,7 @@ quant-research-platform/
 │       ├── components/      # 通用组件
 │       └── lib/             # 工具库
 ├── docker/                  # 容器配置
-├── docs/                    # 文档
+├── private/docs/            # 文档 (私有)
 └── factors/                 # 因子定义库
 ```
 

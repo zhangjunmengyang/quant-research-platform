@@ -4,7 +4,7 @@
 提供统一的 RAG 检索接口。
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseTool, ToolResult
 
@@ -40,7 +40,7 @@ class RetrieveTool(BaseTool):
 - 查找量化研究观点"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

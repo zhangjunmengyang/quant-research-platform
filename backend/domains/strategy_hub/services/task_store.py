@@ -6,8 +6,8 @@
 
 import logging
 import math
-from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
+from typing import Any
 
 from domains.mcp_core.base import ThreadSafeConnectionMixin
 
@@ -23,7 +23,7 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
     继承 ThreadSafeConnectionMixin 实现线程安全的连接管理。
     """
 
-    def __init__(self, database_url: Optional[str] = None):
+    def __init__(self, database_url: str | None = None):
         self._init_connection(database_url)
         self._init_db()
 
@@ -157,7 +157,7 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
             )
         return task
 
-    def get_task(self, task_id: str) -> Optional[BacktestTask]:
+    def get_task(self, task_id: str) -> BacktestTask | None:
         """获取任务单"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -175,10 +175,10 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
         self,
         page: int = 1,
         page_size: int = 20,
-        search: Optional[str] = None,
+        search: str | None = None,
         order_by: str = "created_at",
         order_desc: bool = True,
-    ) -> Tuple[List[BacktestTask], int]:
+    ) -> tuple[list[BacktestTask], int]:
         """列出任务单"""
         # 验证 order_by 字段，防止 SQL 注入
         if order_by not in self.ALLOWED_ORDER_FIELDS:
@@ -187,7 +187,7 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
         with self._cursor() as cursor:
             # 构建查询条件
             where_clause = ""
-            params: List[Any] = []
+            params: list[Any] = []
 
             if search:
                 where_clause = "WHERE name ILIKE %s OR description ILIKE %s"
@@ -334,7 +334,7 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
             )
         return execution
 
-    def get_execution(self, execution_id: str) -> Optional[TaskExecution]:
+    def get_execution(self, execution_id: str) -> TaskExecution | None:
         """获取执行记录"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -350,13 +350,13 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
         task_id: str,
         page: int = 1,
         page_size: int = 20,
-        status: Optional[str] = None,
-    ) -> Tuple[List[TaskExecution], int]:
+        status: str | None = None,
+    ) -> tuple[list[TaskExecution], int]:
         """列出任务的执行记录"""
         with self._cursor() as cursor:
             # 构建查询条件
             where_clause = "WHERE task_id = %s"
-            params: List[Any] = [task_id]
+            params: list[Any] = [task_id]
 
             if status:
                 where_clause += " AND status = %s"
@@ -443,7 +443,7 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
             )
             return cursor.rowcount > 0
 
-    def get_task_stats(self, task_id: str) -> Dict[str, Any]:
+    def get_task_stats(self, task_id: str) -> dict[str, Any]:
         """获取任务的统计信息"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -488,7 +488,7 @@ class BacktestTaskStore(ThreadSafeConnectionMixin):
 
 
 # 单例实例
-_task_store: Optional[BacktestTaskStore] = None
+_task_store: BacktestTaskStore | None = None
 
 
 def get_task_store() -> BacktestTaskStore:

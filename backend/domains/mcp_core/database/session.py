@@ -4,14 +4,15 @@
 提供同步和异步会话的创建和管理。
 """
 
-from typing import Generator, AsyncGenerator, Annotated
-from contextlib import contextmanager, asynccontextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
+from typing import Annotated
 
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
-from .connection import get_sync_engine, get_async_engine
+from .connection import get_async_engine, get_sync_engine
 
 
 def get_session_factory() -> sessionmaker:

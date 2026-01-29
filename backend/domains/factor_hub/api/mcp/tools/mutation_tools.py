@@ -4,10 +4,9 @@
 提供因子 CRUD 写操作：create_factor, update_factor, delete_factor
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseTool, ToolResult
-
 
 # 可更新字段的 schema 定义（复用）
 FACTOR_FIELDS_SCHEMA = {
@@ -146,7 +145,7 @@ class CreateFactorTool(BaseTool):
 如果没有指定 filename，会自动从代码注释中提取因子名，或使用时间戳生成。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         properties = {
             "filename": {
                 "type": "string",
@@ -232,7 +231,7 @@ class UpdateFactorTool(BaseTool):
 注意：不能更新 filename、uuid、code_path、created_at 等系统字段。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         properties = {
             "filename": {
                 "type": "string",
@@ -316,7 +315,7 @@ class DeleteFactorTool(BaseTool):
 如果只是想标记因子为无效而非删除，建议使用 update_factor 设置 excluded=1。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

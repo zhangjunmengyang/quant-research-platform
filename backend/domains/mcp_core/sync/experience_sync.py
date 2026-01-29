@@ -8,7 +8,7 @@
 import logging
 import uuid as uuid_lib
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import BaseSyncService
 
@@ -60,7 +60,7 @@ class ExperienceSyncService(BaseSyncService):
         self.experiences_dir = data_dir / "experiences" / "all"
         self.links_file = data_dir / "experiences" / "links.yaml"
 
-    def export_all(self, overwrite: bool = False) -> Dict[str, int]:
+    def export_all(self, overwrite: bool = False) -> dict[str, int]:
         """
         导出所有经验
 
@@ -126,7 +126,7 @@ class ExperienceSyncService(BaseSyncService):
         logger.info(f"experiences_exported: {stats}")
         return stats
 
-    def import_all(self) -> Dict[str, int]:
+    def import_all(self) -> dict[str, int]:
         """
         从文件导入经验
 
@@ -160,7 +160,7 @@ class ExperienceSyncService(BaseSyncService):
         logger.info(f"experiences_imported: {stats}")
         return stats
 
-    def _experience_to_yaml(self, exp: Any) -> Dict[str, Any]:
+    def _experience_to_yaml(self, exp: Any) -> dict[str, Any]:
         """将经验对象转换为 YAML 数据"""
         data = {
             'id': exp.id,
@@ -391,7 +391,7 @@ class ExperienceSyncService(BaseSyncService):
             logger.error(f"experience_import_single_error: {experience_id}, {e}")
             return False
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取同步状态"""
         status = {
             "db_count": 0,

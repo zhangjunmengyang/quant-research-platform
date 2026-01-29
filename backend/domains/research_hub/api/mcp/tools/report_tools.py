@@ -4,7 +4,7 @@
 提供研报的列表、详情、处理状态查询功能。
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseTool, ToolResult
 
@@ -28,7 +28,7 @@ class ListReportsTool(BaseTool):
 - 搜索特定主题的研报"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -127,7 +127,7 @@ class GetReportTool(BaseTool):
 - 标签和分类信息"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -203,7 +203,7 @@ class GetReportStatusTool(BaseTool):
 - 错误信息（如果有）"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -248,7 +248,7 @@ class GetReportChunksTool(BaseTool):
 - Token 数量"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

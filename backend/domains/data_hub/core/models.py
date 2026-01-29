@@ -6,7 +6,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Union
+from typing import Any
 
 import pandas as pd
 
@@ -30,15 +30,15 @@ class DataConfig:
     pre_data_path: str
     start_date: str = ""
     end_date: str = ""
-    black_list: List[str] = field(default_factory=list)
-    white_list: List[str] = field(default_factory=list)
+    black_list: list[str] = field(default_factory=list)
+    white_list: list[str] = field(default_factory=list)
     min_kline_num: int = 168
-    stable_symbols: List[str] = field(default_factory=lambda: [
+    stable_symbols: list[str] = field(default_factory=lambda: [
         'BKRW', 'USDC', 'USDP', 'TUSD', 'BUSD', 'FDUSD', 'DAI',
         'EUR', 'GBP', 'USBP', 'SUSD', 'PAXG', 'AEUR', 'EURI'
     ])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'pre_data_path': self.pre_data_path,
@@ -51,7 +51,7 @@ class DataConfig:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'DataConfig':
+    def from_dict(cls, data: dict[str, Any]) -> 'DataConfig':
         """从字典创建配置实例"""
         valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**valid_fields)
@@ -91,7 +91,7 @@ class KlineData:
     taker_buy_quote_asset_volume: float = 0.0
     is_spot: bool = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'symbol': self.symbol,
@@ -132,7 +132,7 @@ class FactorResult:
         """获取因子列名"""
         return f"{self.factor_name}_{self.param}"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典（不包含 data）"""
         return {
             'factor_name': self.factor_name,
@@ -159,11 +159,11 @@ class SymbolInfo:
     symbol: str
     has_spot: bool = False
     has_swap: bool = False
-    first_candle_time: Optional[datetime] = None
-    last_candle_time: Optional[datetime] = None
+    first_candle_time: datetime | None = None
+    last_candle_time: datetime | None = None
     kline_count: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'symbol': self.symbol,
@@ -189,9 +189,9 @@ class FactorInfo:
     name: str
     is_cross: bool = False
     has_extra_data: bool = False
-    extra_data_dict: Dict[str, List[str]] = field(default_factory=dict)
+    extra_data_dict: dict[str, list[str]] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'name': self.name,

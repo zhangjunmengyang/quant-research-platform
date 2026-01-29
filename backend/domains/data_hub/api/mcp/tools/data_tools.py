@@ -4,11 +4,12 @@
 提供币种列表、K线数据等查询能力。
 """
 
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from typing import Any
+
+from domains.mcp_core.base.tool import ExecutionMode
 
 from .base import BaseTool, ToolResult
-from domains.mcp_core.base.tool import ExecutionMode
 
 
 class ListSymbolsTool(BaseTool):
@@ -28,7 +29,7 @@ class ListSymbolsTool(BaseTool):
 返回币种列表，如：BTC-USDT, ETH-USDT 等。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -78,7 +79,7 @@ class GetSymbolInfoTool(BaseTool):
 - 最新价格等"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -143,7 +144,7 @@ class GetCoinMetadataTool(BaseTool):
 - last_close: 最新收盘价"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

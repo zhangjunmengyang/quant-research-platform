@@ -6,9 +6,9 @@ MCP Tool 基类
 
 from domains.mcp_core import (
     DomainBaseTool,
-    ToolResult,
     ToolDefinition,
     ToolRegistry,
+    ToolResult,
     get_tool_registry,
     register_tool,
 )

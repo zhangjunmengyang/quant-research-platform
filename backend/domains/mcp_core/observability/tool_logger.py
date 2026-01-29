@@ -11,9 +11,10 @@
 import json
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, TypeVar
 
 from .llm_logger import get_trace_id
 from .models import (
@@ -24,7 +25,6 @@ from .models import (
     generate_id,
 )
 from .storage import LogStorage, get_log_storage
-
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ class ToolLogger:
 
     def __init__(
         self,
-        storage: Optional[LogStorage] = None,
+        storage: LogStorage | None = None,
         enabled: bool = True,
         log_arguments: bool = True,
         log_results: bool = True,
@@ -111,12 +111,12 @@ class ToolLogger:
         self.log_results = log_results
         self.max_result_length = max_result_length
         self.console_output = console_output
-        self._pending_calls: Dict[str, ToolCallRecord] = {}
+        self._pending_calls: dict[str, ToolCallRecord] = {}
 
     def log_request(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         llm_call_id: str = "",
         tool_version: str = "",
     ) -> str:
@@ -171,7 +171,7 @@ class ToolLogger:
         success: bool = True,
         error_message: str = "",
         error_type: str = "",
-        extra: Optional[Dict[str, Any]] = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         """记录工具调用响应"""
         if not self.enabled:
@@ -245,20 +245,20 @@ class ToolLogger:
             duration_ms=duration_ms,
         )
 
-    def get_call(self, call_id: str) -> Optional[ToolCallRecord]:
+    def get_call(self, call_id: str) -> ToolCallRecord | None:
         """获取调用记录"""
         return self.storage.get_tool_call(call_id)
 
     def query_calls(
         self,
-        trace_id: Optional[str] = None,
-        llm_call_id: Optional[str] = None,
-        tool_name: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        status: Optional[CallStatus] = None,
+        trace_id: str | None = None,
+        llm_call_id: str | None = None,
+        tool_name: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        status: CallStatus | None = None,
         limit: int = 100,
-    ) -> List[ToolCallRecord]:
+    ) -> list[ToolCallRecord]:
         """查询调用记录"""
         return self.storage.query_tool_calls(
             trace_id=trace_id,
@@ -272,7 +272,7 @@ class ToolLogger:
 
 
 # 全局工具日志实例
-_tool_logger: Optional[ToolLogger] = None
+_tool_logger: ToolLogger | None = None
 
 
 def get_tool_logger() -> ToolLogger:
@@ -284,7 +284,7 @@ def get_tool_logger() -> ToolLogger:
 
 
 def configure_tool_logger(
-    storage: Optional[LogStorage] = None,
+    storage: LogStorage | None = None,
     **kwargs,
 ) -> ToolLogger:
     """配置全局工具日志实例"""
@@ -301,7 +301,7 @@ def logged_tool(
     tool_name: str = "",
     tool_version: str = "",
     log_result: bool = True,
-    extra_extractor: Optional[Callable[[Any], Dict[str, Any]]] = None,
+    extra_extractor: Callable[[Any], dict[str, Any]] | None = None,
 ):
     """
     工具调用日志装饰器
@@ -424,7 +424,7 @@ class ToolCallContext:
     def __init__(
         self,
         tool_name: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
         tool_version: str = "",
         llm_call_id: str = "",
     ):
@@ -432,7 +432,7 @@ class ToolCallContext:
         self.arguments = arguments
         self.tool_version = tool_version
         self.llm_call_id = llm_call_id
-        self.call_id: Optional[str] = None
+        self.call_id: str | None = None
         self.start_time: float = 0
         self._tool_logger = get_tool_logger()
         self._result_set = False
@@ -474,7 +474,7 @@ class ToolCallContext:
     def set_result(
         self,
         result: Any,
-        extra: Optional[Dict[str, Any]] = None,
+        extra: dict[str, Any] | None = None,
     ):
         """设置执行结果"""
         duration_ms = (time.time() - self.start_time) * 1000

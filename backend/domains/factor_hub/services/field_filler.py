@@ -9,18 +9,17 @@
 
 import ast
 import asyncio
-import logging
 import re
-import yaml
-from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
-from ..core.config import get_config_loader
-from ..core.store import get_factor_store, Factor
+import yaml
+
 from ...mcp_core.llm import get_llm_client, get_llm_settings
 from ...mcp_core.logging import setup_task_logger
-
+from ..core.config import get_config_loader
+from ..core.store import Factor, get_factor_store
 
 # 不可由大模型生成的字段（系统管理）
 PROTECTED_FIELDS = {'filename', 'code_path', 'code_content', 'created_at', 'updated_at', 'verification_status', 'verify_note'}
@@ -48,8 +47,8 @@ logger = setup_task_logger("field_filler")
 class ModelConfig:
     """模型配置"""
     name: str = ""  # 模型 key (claude/gpt/gemini)，空则使用默认
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
+    temperature: float | None = None
+    max_tokens: int | None = None
 
 
 @dataclass
@@ -61,7 +60,7 @@ class FieldConfig:
     user_prompt: str
     output_format: str = "text"
     max_length: int = 500
-    required_vars: List[str] = field(default_factory=list)
+    required_vars: list[str] = field(default_factory=list)
     model: ModelConfig = field(default_factory=ModelConfig)
 
 
@@ -80,7 +79,7 @@ class FillResult:
 class FieldFillResult:
     """单字段填充汇总结果"""
     field: str
-    results: List[FillResult] = field(default_factory=list)
+    results: list[FillResult] = field(default_factory=list)
     success_count: int = 0
     fail_count: int = 0
 
@@ -93,7 +92,7 @@ class FieldFiller:
         self.user_vars = self.config_loader.load_user_vars()
         self.llm_client = get_llm_client()
         self.llm_settings = get_llm_settings()
-        self.field_configs: Dict[str, FieldConfig] = {}
+        self.field_configs: dict[str, FieldConfig] = {}
         self._load_field_configs()
 
     def _load_field_configs(self):
@@ -108,7 +107,7 @@ class FieldFiller:
 
         for yaml_file in fields_dir.glob("*.yaml"):
             try:
-                with open(yaml_file, 'r', encoding='utf-8') as f:
+                with open(yaml_file, encoding='utf-8') as f:
                     config = yaml.safe_load(f)
 
                 field_name = config.get('field', yaml_file.stem)
@@ -131,11 +130,11 @@ class FieldFiller:
             except Exception as e:
                 logger.error(f"加载字段配置失败 {yaml_file}: {e}")
 
-    def get_fillable_fields(self) -> List[str]:
+    def get_fillable_fields(self) -> list[str]:
         """获取可填充的字段列表"""
         return [f for f in FIELD_ORDER if f in self.field_configs]
 
-    def _render_prompt(self, template: str, variables: Dict[str, Any]) -> str:
+    def _render_prompt(self, template: str, variables: dict[str, Any]) -> str:
         """渲染 prompt 模板"""
         result = template
 
@@ -169,8 +168,8 @@ class FieldFiller:
     def _build_prompt(
         self,
         field: str,
-        factor: Dict[str, Any],
-    ) -> Tuple[str, str]:
+        factor: dict[str, Any],
+    ) -> tuple[str, str]:
         """构建字段生成的 prompt"""
         if field not in self.field_configs:
             raise ValueError(f"未知字段: {field}")
@@ -209,8 +208,8 @@ class FieldFiller:
         user_prompt: str,
         purpose: str = "",
         factor_name: str = "",
-        field_config: Optional[FieldConfig] = None,
-    ) -> Tuple[bool, str, str]:
+        field_config: FieldConfig | None = None,
+    ) -> tuple[bool, str, str]:
         """
         调用 LLM（使用 mcp_core.llm 基础设施）
 
@@ -259,11 +258,11 @@ class FieldFiller:
         except Exception as e:
             return False, "", str(e)
 
-    def _is_task_cancelled(self, task_id: Optional[str]) -> bool:
+    def _is_task_cancelled(self, task_id: str | None) -> bool:
         """Check if the task has been cancelled"""
         if not task_id:
             return False
-        from ...mcp_core.server.sse import get_task_manager, TaskStatus
+        from ...mcp_core.server.sse import TaskStatus, get_task_manager
         manager = get_task_manager()
         task = manager.get_task(task_id)
         return task is not None and task.status == TaskStatus.CANCELLED
@@ -276,8 +275,8 @@ class FieldFiller:
         semaphore: asyncio.Semaphore,
         delay: float,
         is_first: bool,
-        task_id: Optional[str] = None,
-        progress_counter: Optional[Dict[str, int]] = None,
+        task_id: str | None = None,
+        progress_counter: dict[str, int] | None = None,
         total_to_fill: int = 0,
     ) -> FillResult:
         """填充单个因子的单个字段"""
@@ -400,13 +399,13 @@ class FieldFiller:
     async def _push_progress(
         self,
         task_id: str,
-        progress_counter: Dict[str, int],
+        progress_counter: dict[str, int],
         total_to_fill: int,
         factor_name: str,
         field: str,
         success: bool,
-        value: Optional[str],
-        error: Optional[str],
+        value: str | None,
+        error: str | None,
     ):
         """推送单个因子填充进度到 SSE"""
         from ...mcp_core.server.sse import get_task_manager
@@ -439,14 +438,14 @@ class FieldFiller:
 
     async def fill_field_async(
         self,
-        factors: List[Factor],
+        factors: list[Factor],
         field: str,
         mode: str = 'incremental',
         concurrency: int = 1,
         delay: float = 15.0,
         save_to_store: bool = True,
-        task_id: Optional[str] = None,
-        progress_counter: Optional[Dict[str, int]] = None,
+        task_id: str | None = None,
+        progress_counter: dict[str, int] | None = None,
         total_to_fill: int = 0,
     ) -> FieldFillResult:
         """
@@ -520,14 +519,14 @@ class FieldFiller:
 
     async def fill_fields_async(
         self,
-        factors: List[Factor],
-        fields: List[str],
+        factors: list[Factor],
+        fields: list[str],
         mode: str = 'incremental',
         concurrency: int = 1,
         delay: float = 15.0,
         save_to_store: bool = True,
-        task_id: Optional[str] = None,
-    ) -> Dict[str, FieldFillResult]:
+        task_id: str | None = None,
+    ) -> dict[str, FieldFillResult]:
         """
         异步填充多个字段（按依赖顺序）
 
@@ -591,7 +590,7 @@ class FieldFiller:
         self,
         field: str,
         mode: str = 'incremental',
-        filter_condition: Optional[Dict[str, Any]] = None,
+        filter_condition: dict[str, Any] | None = None,
         concurrency: int = 1,
         delay: float = 15.0,
         dry_run: bool = False,
@@ -640,13 +639,13 @@ class FieldFiller:
 
     def fill_fields(
         self,
-        fields: List[str],
+        fields: list[str],
         mode: str = 'incremental',
-        filter_condition: Optional[Dict[str, Any]] = None,
+        filter_condition: dict[str, Any] | None = None,
         concurrency: int = 1,
         delay: float = 15.0,
         dry_run: bool = False,
-    ) -> Dict[str, FieldFillResult]:
+    ) -> dict[str, FieldFillResult]:
         """
         填充多个字段（同步入口）
         """
@@ -739,7 +738,7 @@ def extract_pure_code(filepath: str) -> str:
     如果 AST 解析失败，回退到简单正则提取
     """
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, encoding='utf-8') as f:
             source = f.read()
     except Exception:
         return ""
@@ -790,7 +789,7 @@ def extract_pure_code(filepath: str) -> str:
 
 
 # 单例
-_field_filler: Optional[FieldFiller] = None
+_field_filler: FieldFiller | None = None
 
 
 def get_field_filler() -> FieldFiller:

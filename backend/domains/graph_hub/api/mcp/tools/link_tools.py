@@ -4,14 +4,15 @@
 提供实体间关联关系的创建和删除功能。
 """
 
-from typing import Any, Dict
+from typing import Any
 
-from .base import BaseTool, ToolResult
 from domains.graph_hub.core.models import (
     GraphEdge,
     NodeType,
     RelationType,
 )
+
+from .base import BaseTool, ToolResult
 
 
 class CreateLinkTool(BaseTool):
@@ -67,7 +68,7 @@ class CreateLinkTool(BaseTool):
    表示两个笔记相互关联"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -203,7 +204,7 @@ class DeleteLinkTool(BaseTool):
    delete_link("strategy", "uuid-123", "factor", "Momentum_5d", "applied_to")"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

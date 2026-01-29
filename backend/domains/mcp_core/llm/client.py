@@ -6,21 +6,21 @@ LLM 客户端
 """
 
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
 
-from langchain_openai import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
+    AIMessage,
     BaseMessage,
     BaseMessageChunk,
     HumanMessage,
     SystemMessage,
-    AIMessage,
 )
+from langchain_openai import ChatOpenAI
 
-from .compatible import ChatOpenAICompatible
-from .config import get_llm_settings, LLMSettings
 from ..observability.llm_logger import get_llm_logger
+from .compatible import ChatOpenAICompatible
+from .config import LLMSettings, get_llm_settings
 
 
 class LLMClient:
@@ -35,8 +35,8 @@ class LLMClient:
 
     def __init__(
         self,
-        settings: Optional[LLMSettings] = None,
-        model_key: Optional[str] = None,
+        settings: LLMSettings | None = None,
+        model_key: str | None = None,
     ):
         """
         初始化 LLM 客户端
@@ -47,13 +47,13 @@ class LLMClient:
         """
         self.settings = settings or get_llm_settings()
         self.default_model_key = model_key or self.settings.default_model
-        self._models: Dict[str, BaseChatModel] = {}
+        self._models: dict[str, BaseChatModel] = {}
 
     def _create_model(
         self,
-        model_key: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        model_key: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> BaseChatModel:
         """
         创建 LangChain 模型实例
@@ -83,9 +83,9 @@ class LLMClient:
 
     def get_model(
         self,
-        model_key: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        model_key: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> BaseChatModel:
         """
         获取模型实例 (带缓存)
@@ -106,10 +106,10 @@ class LLMClient:
 
     async def ainvoke(
         self,
-        messages: List[Dict[str, str]],
-        model_key: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, str]],
+        model_key: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         caller: str = "",
         purpose: str = "",
     ) -> str:
@@ -181,10 +181,10 @@ class LLMClient:
 
     async def astream(
         self,
-        messages: List[Dict[str, str]],
-        model_key: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, str]],
+        model_key: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         caller: str = "",
         purpose: str = "",
     ) -> AsyncIterator[BaseMessageChunk]:
@@ -265,10 +265,10 @@ class LLMClient:
 
     def invoke(
         self,
-        messages: List[Dict[str, str]],
-        model_key: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, str]],
+        model_key: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         caller: str = "",
         purpose: str = "",
     ) -> str:
@@ -331,8 +331,8 @@ class LLMClient:
 
     def _convert_messages(
         self,
-        messages: List[Dict[str, str]],
-    ) -> List[BaseMessage]:
+        messages: list[dict[str, str]],
+    ) -> list[BaseMessage]:
         """转换消息格式: dict -> LangChain Message"""
         result = []
         for msg in messages:
@@ -350,7 +350,7 @@ class LLMClient:
 
     @staticmethod
     def _extract_prompts(
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
     ) -> tuple[str, str]:
         """
         从消息列表提取 system 和 user prompt
@@ -388,7 +388,7 @@ class LLMClient:
 
 
 # 全局客户端实例
-_llm_client: Optional[LLMClient] = None
+_llm_client: LLMClient | None = None
 
 
 def get_llm_client() -> LLMClient:

@@ -4,11 +4,11 @@
 定义研报、切块等核心数据结构。
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
-import uuid
+from typing import Any
 
 
 class ProcessingStatus(Enum):
@@ -33,7 +33,7 @@ class ResearchReport:
     存储研报的基本信息、解析内容和处理状态。
     """
     # 基础信息
-    id: Optional[int] = None
+    id: int | None = None
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
     title: str = ""
     filename: str = ""
@@ -42,9 +42,9 @@ class ResearchReport:
     page_count: int = 0
 
     # 来源信息
-    author: Optional[str] = None
-    source_url: Optional[str] = None
-    publish_date: Optional[datetime] = None
+    author: str | None = None
+    source_url: str | None = None
+    publish_date: datetime | None = None
 
     # 解析后的内容
     content_markdown: str = ""  # 完整 Markdown
@@ -60,12 +60,12 @@ class ResearchReport:
     error_message: str = ""
 
     # 时间戳
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    parsed_at: Optional[datetime] = None
-    indexed_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    parsed_at: datetime | None = None
+    indexed_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'id': self.id,
@@ -92,13 +92,13 @@ class ResearchReport:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ResearchReport':
+    def from_dict(cls, data: dict[str, Any]) -> 'ResearchReport':
         """从字典创建实例"""
         valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**valid_fields)
 
     @property
-    def tags_list(self) -> List[str]:
+    def tags_list(self) -> list[str]:
         """获取标签列表"""
         if not self.tags:
             return []
@@ -123,15 +123,15 @@ class ResearchChunk:
     存储切块内容、向量和元数据。
     """
     # 基础信息
-    id: Optional[int] = None
+    id: int | None = None
     chunk_id: str = field(default_factory=lambda: str(uuid.uuid4())[:12])
-    report_id: Optional[int] = None
+    report_id: int | None = None
     report_uuid: str = ""
 
     # 位置信息
     chunk_index: int = 0
-    page_start: Optional[int] = None
-    page_end: Optional[int] = None
+    page_start: int | None = None
+    page_end: int | None = None
 
     # 内容
     chunk_type: str = "text"  # text / table / formula / figure
@@ -150,9 +150,9 @@ class ResearchChunk:
     metadata: str = "{}"  # JSON 格式的额外信息（JSONB 列需要有效 JSON）
 
     # 时间戳
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         return {
             'id': self.id,
@@ -173,7 +173,7 @@ class ResearchChunk:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ResearchChunk':
+    def from_dict(cls, data: dict[str, Any]) -> 'ResearchChunk':
         """从字典创建实例"""
         valid_fields = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(**valid_fields)

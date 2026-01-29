@@ -8,7 +8,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base import BaseSyncService
 
@@ -80,7 +80,7 @@ class StrategySyncService(BaseSyncService):
         self.configs_dir = data_dir / "strategies" / "configs"
         self.equity_dir = data_dir / "strategies" / "equity_curves"
 
-    def export_all(self, overwrite: bool = False) -> Dict[str, int]:
+    def export_all(self, overwrite: bool = False) -> dict[str, int]:
         """
         导出所有策略
 
@@ -140,7 +140,7 @@ class StrategySyncService(BaseSyncService):
         logger.info(f"strategies_exported: {stats}")
         return stats
 
-    def import_all(self) -> Dict[str, int]:
+    def import_all(self) -> dict[str, int]:
         """
         从文件导入策略
 
@@ -176,7 +176,7 @@ class StrategySyncService(BaseSyncService):
         safe = "".join(c if c.isalnum() or c in '_-' else '_' for c in name)
         return safe[:100] or "unnamed"
 
-    def _strategy_to_yaml(self, strategy: Any, filename: str) -> Dict[str, Any]:
+    def _strategy_to_yaml(self, strategy: Any, filename: str) -> dict[str, Any]:
         """将策略转换为 YAML 数据"""
         data = {}
 
@@ -331,7 +331,7 @@ class StrategySyncService(BaseSyncService):
             logger.error(f"strategy_import_single_error: {strategy_id}, {e}")
             return False
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取同步状态"""
         status = {
             "db_count": 0,

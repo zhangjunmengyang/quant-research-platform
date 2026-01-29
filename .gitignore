@@ -83,8 +83,6 @@ backups/*
 .pids/
 
 
-docs/*
-!docs/architecture/
 
 # Claude Code 本地配置
 .claude/

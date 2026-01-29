@@ -113,7 +113,6 @@ export function GraphChart({
   showToolbar = false,
 }: GraphChartProps) {
   const chartRef = useRef<EChartsType | null>(null)
-  const optionRef = useRef<EChartsOption | null>(null)
   const zoomRef = useRef(1)
   // 画布拖动状态
   const centerRef = useRef<[number, number] | null>(null)
@@ -289,11 +288,6 @@ export function GraphChart({
     gravity,
     edgeLength,
   ])
-
-  // 保存 option 用于重置
-  useEffect(() => {
-    optionRef.current = option
-  }, [option])
 
   // 处理图表事件
   const handleChartReady = useCallback(

@@ -10,14 +10,13 @@
 """
 
 import logging
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 from scipy.linalg import qr
 
 logger = logging.getLogger(__name__)
@@ -37,12 +36,12 @@ class CorrelationMatrixResult:
     """因子相关性矩阵结果"""
     correlation_matrix: pd.DataFrame = None  # 相关性矩阵
     rank_correlation_matrix: pd.DataFrame = None  # 秩相关性矩阵
-    factor_names: List[str] = field(default_factory=list)
-    high_corr_pairs: List[Tuple[str, str, float]] = field(default_factory=list)  # 高相关因子对
+    factor_names: list[str] = field(default_factory=list)
+    high_corr_pairs: list[tuple[str, str, float]] = field(default_factory=list)  # 高相关因子对
     avg_correlation: float = 0.0  # 平均相关性
     max_correlation: float = 0.0  # 最大相关性
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "factor_names": self.factor_names,
             "high_corr_pairs": [
@@ -61,11 +60,11 @@ class CorrelationMatrixResult:
 class OrthogonalizationResult:
     """因子正交化结果"""
     orthogonal_factors: pd.DataFrame = None  # 正交化后的因子
-    factor_names: List[str] = field(default_factory=list)
-    residual_ic: Dict[str, float] = field(default_factory=dict)  # 正交化后的IC
-    explained_variance_ratio: Dict[str, float] = field(default_factory=dict)
+    factor_names: list[str] = field(default_factory=list)
+    residual_ic: dict[str, float] = field(default_factory=dict)  # 正交化后的IC
+    explained_variance_ratio: dict[str, float] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "factor_names": self.factor_names,
             "residual_ic": {k: round(v, 4) for k, v in self.residual_ic.items()},
@@ -79,13 +78,13 @@ class OrthogonalizationResult:
 class SynthesisResult:
     """因子合成结果"""
     method: str = ""
-    weights: Dict[str, float] = field(default_factory=dict)
+    weights: dict[str, float] = field(default_factory=dict)
     synthetic_factor: pd.Series = None
     synthetic_ic: float = 0.0
     synthetic_icir: float = 0.0
     improvement_ratio: float = 0.0  # 相比单因子的提升比例
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "method": self.method,
             "weights": {k: round(v, 4) for k, v in self.weights.items()},
@@ -98,12 +97,12 @@ class SynthesisResult:
 @dataclass
 class RedundancyResult:
     """因子冗余检测结果"""
-    redundant_factors: List[str] = field(default_factory=list)  # 冗余因子
-    redundancy_scores: Dict[str, float] = field(default_factory=dict)  # 冗余度评分
-    recommended_removal: List[str] = field(default_factory=list)  # 建议移除的因子
-    factor_clusters: List[List[str]] = field(default_factory=list)  # 因子聚类
+    redundant_factors: list[str] = field(default_factory=list)  # 冗余因子
+    redundancy_scores: dict[str, float] = field(default_factory=dict)  # 冗余度评分
+    recommended_removal: list[str] = field(default_factory=list)  # 建议移除的因子
+    factor_clusters: list[list[str]] = field(default_factory=list)  # 因子聚类
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "redundant_factors": self.redundant_factors,
             "redundancy_scores": {k: round(v, 4) for k, v in self.redundancy_scores.items()},
@@ -115,13 +114,13 @@ class RedundancyResult:
 @dataclass
 class IncrementalContributionResult:
     """因子增量贡献分析结果"""
-    marginal_contributions: Dict[str, float] = field(default_factory=dict)  # 边际贡献
-    cumulative_contributions: Dict[str, float] = field(default_factory=dict)  # 累计贡献
-    contribution_order: List[str] = field(default_factory=list)  # 贡献排序
+    marginal_contributions: dict[str, float] = field(default_factory=dict)  # 边际贡献
+    cumulative_contributions: dict[str, float] = field(default_factory=dict)  # 累计贡献
+    contribution_order: list[str] = field(default_factory=list)  # 贡献排序
     total_ic: float = 0.0  # 总IC
-    shapley_values: Dict[str, float] = field(default_factory=dict)  # Shapley值
+    shapley_values: dict[str, float] = field(default_factory=dict)  # Shapley值
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "marginal_contributions": {
                 k: round(v, 4) for k, v in self.marginal_contributions.items()
@@ -138,15 +137,15 @@ class IncrementalContributionResult:
 @dataclass
 class MultiFactorAnalysisResult:
     """多因子分析完整结果"""
-    factor_names: List[str] = field(default_factory=list)
+    factor_names: list[str] = field(default_factory=list)
     analysis_date: str = field(default_factory=lambda: datetime.now().isoformat())
-    correlation: Optional[CorrelationMatrixResult] = None
-    orthogonalization: Optional[OrthogonalizationResult] = None
-    synthesis: Optional[SynthesisResult] = None
-    redundancy: Optional[RedundancyResult] = None
-    incremental_contribution: Optional[IncrementalContributionResult] = None
+    correlation: CorrelationMatrixResult | None = None
+    orthogonalization: OrthogonalizationResult | None = None
+    synthesis: SynthesisResult | None = None
+    redundancy: RedundancyResult | None = None
+    incremental_contribution: IncrementalContributionResult | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "factor_names": self.factor_names,
             "analysis_date": self.analysis_date,
@@ -186,7 +185,7 @@ class MultiFactorAnalysisService:
     def analyze(
         self,
         factor_df: pd.DataFrame,
-        factor_cols: List[str],
+        factor_cols: list[str],
         return_col: str = "next_return",
         time_col: str = "candle_begin_time",
         symbol_col: str = "symbol",
@@ -259,7 +258,7 @@ class MultiFactorAnalysisService:
     def calculate_correlation_matrix(
         self,
         df: pd.DataFrame,
-        factor_cols: List[str],
+        factor_cols: list[str],
     ) -> CorrelationMatrixResult:
         """
         计算因子相关性矩阵
@@ -307,7 +306,7 @@ class MultiFactorAnalysisService:
     def orthogonalize_factors(
         self,
         df: pd.DataFrame,
-        factor_cols: List[str],
+        factor_cols: list[str],
         return_col: str,
         time_col: str,
     ) -> OrthogonalizationResult:
@@ -365,7 +364,7 @@ class MultiFactorAnalysisService:
     def synthesize_factors(
         self,
         df: pd.DataFrame,
-        factor_cols: List[str],
+        factor_cols: list[str],
         return_col: str,
         time_col: str,
         method: SynthesisMethod = SynthesisMethod.IC_WEIGHT,
@@ -487,7 +486,7 @@ class MultiFactorAnalysisService:
     def detect_redundancy(
         self,
         df: pd.DataFrame,
-        factor_cols: List[str],
+        factor_cols: list[str],
         return_col: str,
         time_col: str,
         threshold: float = 0.8,
@@ -573,7 +572,7 @@ class MultiFactorAnalysisService:
     def analyze_incremental_contribution(
         self,
         df: pd.DataFrame,
-        factor_cols: List[str],
+        factor_cols: list[str],
         return_col: str,
         time_col: str,
     ) -> IncrementalContributionResult:
@@ -663,8 +662,8 @@ class MultiFactorAnalysisService:
     def quick_correlation_check(
         self,
         df: pd.DataFrame,
-        factor_cols: List[str],
-    ) -> Dict[str, Any]:
+        factor_cols: list[str],
+    ) -> dict[str, Any]:
         """
         快速相关性检查
 
@@ -689,11 +688,11 @@ class MultiFactorAnalysisService:
     def recommend_factors(
         self,
         df: pd.DataFrame,
-        factor_cols: List[str],
+        factor_cols: list[str],
         return_col: str,
         time_col: str,
         max_factors: int = 5,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         推荐因子组合
 
@@ -765,7 +764,7 @@ class MultiFactorAnalysisService:
 
 
 # 单例实例
-_multi_factor_analysis_service: Optional[MultiFactorAnalysisService] = None
+_multi_factor_analysis_service: MultiFactorAnalysisService | None = None
 
 
 def get_multi_factor_analysis_service(

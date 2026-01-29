@@ -10,7 +10,7 @@ import threading
 from abc import ABC, abstractmethod
 from collections import deque
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..logging import get_logger
 from .models import (
@@ -50,28 +50,28 @@ class LogStorage(ABC):
         pass
 
     # 查询方法 - 在 StdoutStorage 中返回空
-    def get_llm_call(self, call_id: str) -> Optional[LLMCallRecord]:
+    def get_llm_call(self, call_id: str) -> LLMCallRecord | None:
         return None
 
-    def get_tool_call(self, call_id: str) -> Optional[ToolCallRecord]:
+    def get_tool_call(self, call_id: str) -> ToolCallRecord | None:
         return None
 
-    def get_session(self, session_id: str) -> Optional[SessionRecord]:
+    def get_session(self, session_id: str) -> SessionRecord | None:
         return None
 
-    def get_mcp_request(self, request_id: str) -> Optional[MCPRequestRecord]:
+    def get_mcp_request(self, request_id: str) -> MCPRequestRecord | None:
         return None
 
-    def query_llm_calls(self, **kwargs) -> List[LLMCallRecord]:
+    def query_llm_calls(self, **kwargs) -> list[LLMCallRecord]:
         return []
 
-    def query_tool_calls(self, **kwargs) -> List[ToolCallRecord]:
+    def query_tool_calls(self, **kwargs) -> list[ToolCallRecord]:
         return []
 
-    def query_mcp_requests(self, **kwargs) -> List[MCPRequestRecord]:
+    def query_mcp_requests(self, **kwargs) -> list[MCPRequestRecord]:
         return []
 
-    def get_stats(self, **kwargs) -> Dict[str, Any]:
+    def get_stats(self, **kwargs) -> dict[str, Any]:
         return {"message": "请使用日志查询接口"}
 
 
@@ -96,7 +96,7 @@ class StdoutStorage(LogStorage):
         self.console_output = console_output
         self._log = get_logger("observability.storage")
 
-    def _emit_log(self, log_type: str, data: Dict[str, Any]) -> None:
+    def _emit_log(self, log_type: str, data: dict[str, Any]) -> None:
         """输出结构化日志"""
         if not self.console_output:
             return
@@ -326,10 +326,10 @@ class MemoryStorage(LogStorage):
         self._llm_calls: deque = deque(maxlen=max_records)
         self._tool_calls: deque = deque(maxlen=max_records)
         self._mcp_requests: deque = deque(maxlen=max_records)
-        self._sessions: Dict[str, SessionRecord] = {}
-        self._llm_index: Dict[str, LLMCallRecord] = {}
-        self._tool_index: Dict[str, ToolCallRecord] = {}
-        self._mcp_index: Dict[str, MCPRequestRecord] = {}
+        self._sessions: dict[str, SessionRecord] = {}
+        self._llm_index: dict[str, LLMCallRecord] = {}
+        self._tool_index: dict[str, ToolCallRecord] = {}
+        self._mcp_index: dict[str, MCPRequestRecord] = {}
         self._lock = threading.Lock()
 
     def save_llm_call(self, record: LLMCallRecord) -> None:
@@ -351,31 +351,31 @@ class MemoryStorage(LogStorage):
             self._mcp_requests.append(record)
             self._mcp_index[record.request_id] = record
 
-    def get_llm_call(self, call_id: str) -> Optional[LLMCallRecord]:
+    def get_llm_call(self, call_id: str) -> LLMCallRecord | None:
         return self._llm_index.get(call_id)
 
-    def get_tool_call(self, call_id: str) -> Optional[ToolCallRecord]:
+    def get_tool_call(self, call_id: str) -> ToolCallRecord | None:
         return self._tool_index.get(call_id)
 
-    def get_session(self, session_id: str) -> Optional[SessionRecord]:
+    def get_session(self, session_id: str) -> SessionRecord | None:
         return self._sessions.get(session_id)
 
-    def get_mcp_request(self, request_id: str) -> Optional[MCPRequestRecord]:
+    def get_mcp_request(self, request_id: str) -> MCPRequestRecord | None:
         return self._mcp_index.get(request_id)
 
     def query_llm_calls(
         self,
-        trace_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        model: Optional[str] = None,
-        caller: Optional[str] = None,
-        purpose: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        status: Optional[CallStatus] = None,
+        trace_id: str | None = None,
+        session_id: str | None = None,
+        model: str | None = None,
+        caller: str | None = None,
+        purpose: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        status: CallStatus | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[LLMCallRecord]:
+    ) -> list[LLMCallRecord]:
         results = []
         for record in self._llm_calls:
             if trace_id and record.request.trace_id != trace_id:
@@ -400,15 +400,15 @@ class MemoryStorage(LogStorage):
 
     def query_tool_calls(
         self,
-        trace_id: Optional[str] = None,
-        llm_call_id: Optional[str] = None,
-        tool_name: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        status: Optional[CallStatus] = None,
+        trace_id: str | None = None,
+        llm_call_id: str | None = None,
+        tool_name: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        status: CallStatus | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[ToolCallRecord]:
+    ) -> list[ToolCallRecord]:
         results = []
         for record in self._tool_calls:
             if trace_id and record.request.trace_id != trace_id:
@@ -429,16 +429,16 @@ class MemoryStorage(LogStorage):
 
     def query_mcp_requests(
         self,
-        server_name: Optional[str] = None,
-        method: Optional[str] = None,
-        tool_name: Optional[str] = None,
-        client_name: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        status: Optional[CallStatus] = None,
+        server_name: str | None = None,
+        method: str | None = None,
+        tool_name: str | None = None,
+        client_name: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        status: CallStatus | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[MCPRequestRecord]:
+    ) -> list[MCPRequestRecord]:
         results = []
         for record in self._mcp_requests:
             if server_name and record.server_name != server_name:
@@ -462,9 +462,9 @@ class MemoryStorage(LogStorage):
 
     def get_stats(
         self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+    ) -> dict[str, Any]:
         llm_calls = list(self._llm_calls)
         if start_time:
             llm_calls = [r for r in llm_calls if r.request.timestamp >= start_time]
@@ -510,11 +510,11 @@ class MemoryStorage(LogStorage):
 
 
 # 默认存储实例
-_default_storage: Optional[LogStorage] = None
+_default_storage: LogStorage | None = None
 
 
 def get_log_storage(
-    storage_type: Optional[str] = None,
+    storage_type: str | None = None,
     **kwargs
 ) -> LogStorage:
     """

@@ -8,10 +8,9 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import psycopg2
-
 from domains.mcp_core.base.store import (
     BaseStore,
     get_store_instance,
@@ -47,7 +46,7 @@ class ExperienceStore(BaseStore[Experience]):
 
     numeric_fields = {'id'}
 
-    def _row_to_entity(self, row: Dict[str, Any]) -> Experience:
+    def _row_to_entity(self, row: dict[str, Any]) -> Experience:
         """将数据库行转换为 Experience 对象"""
         content = row.get('content')
         if isinstance(content, str):
@@ -87,7 +86,7 @@ class ExperienceStore(BaseStore[Experience]):
 
     # ==================== 基本 CRUD ====================
 
-    def get(self, experience_id: int) -> Optional[Experience]:
+    def get(self, experience_id: int) -> Experience | None:
         """获取单个经验（通过 ID）"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -99,7 +98,7 @@ class ExperienceStore(BaseStore[Experience]):
                 return self._row_to_entity(dict(row))
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Experience]:
+    def get_by_uuid(self, uuid: str) -> Experience | None:
         """获取单个经验（通过 UUID）"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -111,7 +110,7 @@ class ExperienceStore(BaseStore[Experience]):
                 return self._row_to_entity(dict(row))
         return None
 
-    def get_all(self, limit: int = 100, offset: int = 0) -> List[Experience]:
+    def get_all(self, limit: int = 100, offset: int = 0) -> list[Experience]:
         """获取所有经验"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -120,7 +119,7 @@ class ExperienceStore(BaseStore[Experience]):
             )
             return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
 
-    def add(self, experience: Experience) -> Optional[int]:
+    def add(self, experience: Experience) -> int | None:
         """添加经验，返回新经验的 ID"""
         experience.created_at = datetime.now()
         experience.updated_at = datetime.now()
@@ -181,7 +180,7 @@ class ExperienceStore(BaseStore[Experience]):
 
         safe_fields['updated_at'] = datetime.now()
 
-        set_clause = ', '.join(f'{k} = %s' for k in safe_fields.keys())
+        set_clause = ', '.join(f'{k} = %s' for k in safe_fields)
         values = list(safe_fields.values()) + [experience_id]
 
         with self._cursor() as cursor:
@@ -215,14 +214,13 @@ class ExperienceStore(BaseStore[Experience]):
             return cursor.rowcount > 0
 
     def _delete_experience_edges(self, experience_id: int) -> None:
-        """删除经验关联的所有边"""
+        """删除经验关联的所有边 (Neo4j)"""
         try:
-            from domains.mcp_core.edge.store import get_edge_store
-            from domains.mcp_core.edge.models import EdgeEntityType
+            from domains.graph_hub.core import NodeType, get_graph_store
 
-            edge_store = get_edge_store()
-            deleted_count = edge_store.delete_edges_by_entity(
-                EdgeEntityType.EXPERIENCE,
+            graph_store = get_graph_store()
+            deleted_count = graph_store.delete_edges_by_entity(
+                NodeType.EXPERIENCE,
                 str(experience_id)
             )
             if deleted_count > 0:
@@ -235,19 +233,19 @@ class ExperienceStore(BaseStore[Experience]):
 
     def query(
         self,
-        search: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        source_type: Optional[str] = None,
-        market_regime: Optional[str] = None,
-        factor_styles: Optional[List[str]] = None,
-        created_after: Optional[datetime] = None,
-        created_before: Optional[datetime] = None,
-        updated_after: Optional[datetime] = None,
-        updated_before: Optional[datetime] = None,
+        search: str | None = None,
+        tags: list[str] | None = None,
+        source_type: str | None = None,
+        market_regime: str | None = None,
+        factor_styles: list[str] | None = None,
+        created_after: datetime | None = None,
+        created_before: datetime | None = None,
+        updated_after: datetime | None = None,
+        updated_before: datetime | None = None,
         order_by: str = "updated_at DESC",
         limit: int = 50,
         offset: int = 0
-    ) -> Tuple[List[Experience], int]:
+    ) -> tuple[list[Experience], int]:
         """
         条件查询经验
 
@@ -318,12 +316,12 @@ class ExperienceStore(BaseStore[Experience]):
 
         return experiences, total
 
-    def search(self, keyword: str, limit: int = 20) -> List[Experience]:
+    def search(self, keyword: str, limit: int = 20) -> list[Experience]:
         """全文搜索经验"""
         experiences, _ = self.query(search=keyword, limit=limit)
         return experiences
 
-    def get_by_source(self, source_type: str, source_ref: str) -> List[Experience]:
+    def get_by_source(self, source_type: str, source_ref: str) -> list[Experience]:
         """根据来源获取经验"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -332,7 +330,7 @@ class ExperienceStore(BaseStore[Experience]):
             )
             return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
 
-    def get_all_tags(self) -> List[str]:
+    def get_all_tags(self) -> list[str]:
         """获取所有标签（去重）"""
         with self._cursor() as cursor:
             cursor.execute("""
@@ -351,7 +349,7 @@ class ExperienceStore(BaseStore[Experience]):
 
     # ==================== 关联管理 ====================
 
-    def add_link(self, link: ExperienceLink) -> Optional[int]:
+    def add_link(self, link: ExperienceLink) -> int | None:
         """添加经验关联"""
         link.created_at = datetime.now()
 
@@ -372,7 +370,7 @@ class ExperienceStore(BaseStore[Experience]):
             logger.error(f"添加经验关联失败: {e}")
             return None
 
-    def get_links(self, experience_id: int) -> List[ExperienceLink]:
+    def get_links(self, experience_id: int) -> list[ExperienceLink]:
         """获取经验的所有关联"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -385,7 +383,7 @@ class ExperienceStore(BaseStore[Experience]):
         self,
         entity_type: str,
         entity_id: str
-    ) -> List[Experience]:
+    ) -> list[Experience]:
         """根据关联实体获取经验"""
         with self._cursor() as cursor:
             cursor.execute('''
@@ -405,7 +403,7 @@ class ExperienceStore(BaseStore[Experience]):
             )
             return cursor.rowcount > 0
 
-    def get_all_links(self) -> List[ExperienceLink]:
+    def get_all_links(self) -> list[ExperienceLink]:
         """获取所有经验关联"""
         with self._cursor() as cursor:
             cursor.execute('SELECT * FROM experience_links ORDER BY experience_id')
@@ -442,7 +440,7 @@ class ExperienceStore(BaseStore[Experience]):
 
 # ==================== 单例管理 ====================
 
-def get_experience_store(database_url: Optional[str] = None) -> ExperienceStore:
+def get_experience_store(database_url: str | None = None) -> ExperienceStore:
     """获取经验存储层单例"""
     return get_store_instance(ExperienceStore, "ExperienceStore", database_url=database_url)
 

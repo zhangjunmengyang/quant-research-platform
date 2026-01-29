@@ -9,7 +9,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class SyncTrigger:
     使用延迟初始化避免循环导入。
     """
 
-    def __init__(self, private_data_dir: Optional[Path] = None):
+    def __init__(self, private_data_dir: Path | None = None):
         """
         初始化同步触发器
 
@@ -36,7 +36,7 @@ class SyncTrigger:
         self.data_dir = private_data_dir
         self._services: dict[str, Any] = {}
 
-    def _get_service(self, service_type: str) -> Optional[Any]:
+    def _get_service(self, service_type: str) -> Any | None:
         """
         延迟初始化并获取同步服务
 
@@ -51,30 +51,35 @@ class SyncTrigger:
 
         try:
             if service_type == "strategy":
-                from .strategy_sync import StrategySyncService
-                from domains.strategy_hub.services.strategy_store import StrategyStore
                 from domains.mcp_core.base import get_store_instance
+                from domains.strategy_hub.services.strategy_store import StrategyStore
+
+                from .strategy_sync import StrategySyncService
                 store = get_store_instance(StrategyStore)
                 self._services["strategy"] = StrategySyncService(self.data_dir, store)
 
             elif service_type == "factor":
-                from .factor_sync import FactorSyncService
                 from domains.factor_hub.core.store import get_factor_store
+
+                from .factor_sync import FactorSyncService
                 self._services["factor"] = FactorSyncService(self.data_dir, get_factor_store())
 
             elif service_type == "note":
-                from .note_sync import NoteSyncService
                 from domains.note_hub.core.store import get_note_store
+
+                from .note_sync import NoteSyncService
                 self._services["note"] = NoteSyncService(self.data_dir, get_note_store())
 
             elif service_type == "experience":
-                from .experience_sync import ExperienceSyncService
                 from domains.experience_hub.core.store import get_experience_store
+
+                from .experience_sync import ExperienceSyncService
                 self._services["experience"] = ExperienceSyncService(self.data_dir, get_experience_store())
 
             elif service_type == "edge":
-                from .edge_sync import EdgeSyncService
                 from domains.graph_hub.core import get_graph_store
+
+                from .edge_sync import EdgeSyncService
                 self._services["edge"] = EdgeSyncService(self.data_dir, get_graph_store())
 
         except Exception as e:
@@ -212,7 +217,7 @@ class SyncTrigger:
 
 
 # 单例
-_trigger: Optional[SyncTrigger] = None
+_trigger: SyncTrigger | None = None
 
 
 def get_sync_trigger() -> SyncTrigger:

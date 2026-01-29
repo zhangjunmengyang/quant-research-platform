@@ -7,18 +7,16 @@
 - 提供 async 版本的数据加载方法，避免阻塞事件循环
 """
 
-from typing import Dict, List, Optional, Tuple, Set
 
 import pandas as pd
-
-from ..core.models import DataConfig, SymbolInfo
-from domains.core.exceptions import DataNotFoundError, ConfigError
+from domains.core.exceptions import DataNotFoundError
 
 # 使用 engine 服务
 from domains.engine.services import (
-    DataLoaderService as EngineDataLoader,
     get_data_loader as get_engine_data_loader,
 )
+
+from ..core.models import DataConfig, SymbolInfo
 
 
 class DataLoader:
@@ -28,7 +26,7 @@ class DataLoader:
     代理到 engine.services.DataLoaderService，确保一致性。
     """
 
-    def __init__(self, config: Optional[DataConfig] = None):
+    def __init__(self, config: DataConfig | None = None):
         """
         初始化数据加载器
 
@@ -38,7 +36,7 @@ class DataLoader:
         self.config = config
         self._engine_loader = get_engine_data_loader()
 
-    def load_spot_data(self, reload: bool = False) -> Dict[str, pd.DataFrame]:
+    def load_spot_data(self, reload: bool = False) -> dict[str, pd.DataFrame]:
         """
         加载现货数据
 
@@ -53,7 +51,7 @@ class DataLoader:
         except FileNotFoundError as e:
             raise DataNotFoundError(str(e))
 
-    def load_swap_data(self, reload: bool = False) -> Dict[str, pd.DataFrame]:
+    def load_swap_data(self, reload: bool = False) -> dict[str, pd.DataFrame]:
         """
         加载合约数据
 
@@ -68,7 +66,7 @@ class DataLoader:
         except FileNotFoundError as e:
             raise DataNotFoundError(str(e))
 
-    def load_all(self, reload: bool = False) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+    def load_all(self, reload: bool = False) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame]]:
         """
         加载全部数据
 
@@ -82,7 +80,7 @@ class DataLoader:
         swap_data = self.load_swap_data(reload)
         return spot_data, swap_data
 
-    def get_symbols(self, data_type: str = 'all') -> List[str]:
+    def get_symbols(self, data_type: str = 'all') -> list[str]:
         """
         获取可用币种列表
 
@@ -121,8 +119,8 @@ class DataLoader:
         self,
         symbol: str,
         data_type: str = 'swap',
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        start_date: str | None = None,
+        end_date: str | None = None
     ) -> pd.DataFrame:
         """
         获取单个币种 K 线数据
@@ -143,9 +141,9 @@ class DataLoader:
 
     def get_merged_kline(
         self,
-        symbols: Optional[List[str]] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        symbols: list[str] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None
     ) -> pd.DataFrame:
         """
         获取合并的 K 线数据
@@ -187,7 +185,7 @@ class DataLoader:
         """清除数据缓存"""
         self._engine_loader.clear_cache()
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """
         获取数据统计信息
 
@@ -200,21 +198,21 @@ class DataLoader:
     # 异步方法 - 代理到 engine 的异步方法
     # ============================================
 
-    async def load_spot_data_async(self, reload: bool = False) -> Dict[str, pd.DataFrame]:
+    async def load_spot_data_async(self, reload: bool = False) -> dict[str, pd.DataFrame]:
         """异步加载现货数据"""
         try:
             return await self._engine_loader.load_spot_data_async(reload)
         except FileNotFoundError as e:
             raise DataNotFoundError(str(e))
 
-    async def load_swap_data_async(self, reload: bool = False) -> Dict[str, pd.DataFrame]:
+    async def load_swap_data_async(self, reload: bool = False) -> dict[str, pd.DataFrame]:
         """异步加载合约数据"""
         try:
             return await self._engine_loader.load_swap_data_async(reload)
         except FileNotFoundError as e:
             raise DataNotFoundError(str(e))
 
-    async def load_all_async(self, reload: bool = False) -> Tuple[Dict[str, pd.DataFrame], Dict[str, pd.DataFrame]]:
+    async def load_all_async(self, reload: bool = False) -> tuple[dict[str, pd.DataFrame], dict[str, pd.DataFrame]]:
         """异步加载全部数据"""
         return await self._engine_loader.load_all_async(reload)
 
@@ -222,8 +220,8 @@ class DataLoader:
         self,
         symbol: str,
         data_type: str = 'swap',
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        start_date: str | None = None,
+        end_date: str | None = None
     ) -> pd.DataFrame:
         """异步获取单个币种 K 线数据"""
         try:
@@ -231,11 +229,11 @@ class DataLoader:
         except KeyError as e:
             raise DataNotFoundError(str(e))
 
-    async def get_symbols_async(self, data_type: str = 'all') -> List[str]:
+    async def get_symbols_async(self, data_type: str = 'all') -> list[str]:
         """异步获取可用币种列表"""
         return await self._engine_loader.get_symbols_async(data_type)
 
-    async def get_stats_async(self) -> Dict:
+    async def get_stats_async(self) -> dict:
         """异步获取数据统计信息"""
         return await self._engine_loader.get_stats_async()
 

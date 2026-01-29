@@ -6,7 +6,7 @@ Graph 模块 Pydantic Schemas
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -47,8 +47,8 @@ class GraphEdge(BaseModel):
     target_id: str
     relation: GraphRelationType
     is_bidirectional: bool = False
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    created_at: Optional[datetime] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime | None = None
 
 
 class GetEdgesResponse(BaseModel):
@@ -57,7 +57,7 @@ class GetEdgesResponse(BaseModel):
     entity_type: GraphNodeType
     entity_id: str
     count: int
-    edges: List[GraphEdge]
+    edges: list[GraphEdge]
 
 
 # ==================== 链路追溯 ====================
@@ -81,7 +81,7 @@ class LineageResult(BaseModel):
     direction: str
     max_depth: int
     count: int
-    nodes: List[LineageNode]
+    nodes: list[LineageNode]
 
 
 # ==================== 路径查找 ====================
@@ -91,9 +91,9 @@ class PathElement(BaseModel):
     """路径元素"""
 
     type: str  # "node" 或 "relationship"
-    label: Optional[str] = None
-    id: Optional[str] = None
-    relation: Optional[str] = None
+    label: str | None = None
+    id: str | None = None
+    relation: str | None = None
     position: int
 
 
@@ -105,7 +105,7 @@ class PathResult(BaseModel):
     target_type: GraphNodeType
     target_id: str
     count: int
-    paths: List[List[Dict[str, Any]]]
+    paths: list[list[dict[str, Any]]]
 
 
 # ==================== 标签相关 ====================
@@ -114,15 +114,15 @@ class PathResult(BaseModel):
 class TagInfo(BaseModel):
     """标签信息"""
 
-    name: str
+    tag: str
     count: int
 
 
 class TaggedEntity(BaseModel):
     """带标签的实体"""
 
-    entity_type: GraphNodeType
-    entity_id: str
+    type: GraphNodeType
+    id: str
 
 
 class EntityTagsResponse(BaseModel):
@@ -130,7 +130,7 @@ class EntityTagsResponse(BaseModel):
 
     entity_type: GraphNodeType
     entity_id: str
-    tags: List[str]
+    tags: list[str]
     count: int
 
 
@@ -150,7 +150,7 @@ class GraphOverviewStats(BaseModel):
 
     total_nodes: int
     total_edges: int
-    node_counts: Dict[str, int]
+    node_counts: dict[str, int]
     returned_nodes: int
     returned_edges: int
 
@@ -169,6 +169,6 @@ class GraphOverviewEdge(BaseModel):
 class GraphOverviewResponse(BaseModel):
     """图谱概览响应"""
 
-    nodes: List[GraphNode]
-    edges: List[GraphOverviewEdge]
+    nodes: list[GraphNode]
+    edges: list[GraphOverviewEdge]
     stats: GraphOverviewStats

@@ -11,13 +11,12 @@
 如需支持，需要修改回测引擎的选币代码，将缓存路径作为参数传递。
 """
 
+import logging
 import os
 import shutil
-import logging
 import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
 
 from domains.mcp_core.paths import get_data_dir
 
@@ -30,7 +29,7 @@ _ENV_CACHE_DIR = "BACKTEST_CACHE_DIR"
 _env_lock = threading.Lock()
 
 
-def get_thread_cache_dir() -> Optional[str]:
+def get_thread_cache_dir() -> str | None:
     """
     获取当前的缓存目录
 
@@ -40,7 +39,7 @@ def get_thread_cache_dir() -> Optional[str]:
     return os.environ.get(_ENV_CACHE_DIR)
 
 
-def set_thread_cache_dir(cache_dir: Optional[str]):
+def set_thread_cache_dir(cache_dir: str | None):
     """
     设置缓存目录
 
@@ -56,7 +55,7 @@ def set_thread_cache_dir(cache_dir: Optional[str]):
 @contextmanager
 def isolated_cache(
     task_id: str,
-    base_dir: Optional[Path] = None,
+    base_dir: Path | None = None,
     cleanup_on_exit: bool = False,
 ):
     """
@@ -117,7 +116,7 @@ def get_cache_dir() -> Path:
     return get_data_dir() / "cache"
 
 
-def cleanup_task_cache(task_id: str, base_dir: Optional[Path] = None) -> bool:
+def cleanup_task_cache(task_id: str, base_dir: Path | None = None) -> bool:
     """
     清理指定任务的缓存
 
@@ -143,7 +142,7 @@ def cleanup_task_cache(task_id: str, base_dir: Optional[Path] = None) -> bool:
     return True
 
 
-def list_task_caches(base_dir: Optional[Path] = None) -> list:
+def list_task_caches(base_dir: Path | None = None) -> list:
     """
     列出所有任务缓存目录
 

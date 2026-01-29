@@ -5,12 +5,11 @@
 与 REST API 统一使用 StrategyService 服务层，遵循分层架构规范。
 """
 
-from typing import Any, Dict, Optional
 import logging
+from typing import Any
 
 from domains.mcp_core import BaseTool, ToolResult
 from domains.mcp_core.base.tool import ExecutionMode
-
 from domains.strategy_hub.services import get_strategy_service
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,7 @@ class ListStrategiesTool(BaseTool):
         return "列出所有策略，支持按验证、上线状态筛选"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -54,7 +53,7 @@ class ListStrategiesTool(BaseTool):
 
     async def execute(
         self,
-        verified: Optional[bool] = None,
+        verified: bool | None = None,
         order_by: str = "created_at",
         limit: int = 20,
     ) -> ToolResult:
@@ -96,7 +95,7 @@ class GetStrategyTool(BaseTool):
         return "获取指定策略的详细信息"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -136,7 +135,7 @@ class SearchStrategiesTool(BaseTool):
         return "按名称、描述或因子搜索策略"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -176,7 +175,7 @@ class GetStrategyStatsTool(BaseTool):
         return "获取策略库的统计信息"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {},
@@ -242,7 +241,7 @@ class UpdateStrategyTool(BaseTool):
 更新后会自动同步到 YAML 元数据文件。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -306,7 +305,7 @@ class DeleteStrategyTool(BaseTool):
 如果只是想标记策略为无效而非删除，建议使用 update_strategy 添加备注。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -357,7 +356,7 @@ class RunBacktestTool(BaseTool):
         return "运行因子策略回测"
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -460,8 +459,8 @@ class RunBacktestTool(BaseTool):
         self,
         name: str,
         strategy_list: list,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         leverage: float = 1.0,
     ) -> ToolResult:
         try:

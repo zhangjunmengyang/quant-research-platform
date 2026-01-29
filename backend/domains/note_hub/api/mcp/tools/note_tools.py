@@ -14,10 +14,9 @@ Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
 - 提炼为经验（promote_to_experience）
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseTool, ToolResult
-
 
 # ==================== 基础 CRUD 工具 ====================
 
@@ -50,7 +49,7 @@ class CreateNoteTool(BaseTool):
 - 记录假设验证的过程和结论（verification）"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -128,7 +127,7 @@ class UpdateNoteTool(BaseTool):
 - 变更笔记类型"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -215,7 +214,7 @@ class SearchNotesTool(BaseTool):
 - 回顾历史洞察"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -279,7 +278,7 @@ class GetNoteTool(BaseTool):
 通过笔记 ID 获取完整的笔记详情，包括标题、内容、标签等。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -335,7 +334,7 @@ class ListNotesTool(BaseTool):
 支持按标签筛选，返回笔记摘要列表。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -435,7 +434,7 @@ class DeleteNoteTool(BaseTool):
 - 清理无价值的临时记录"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -496,7 +495,7 @@ class ArchiveNoteTool(BaseTool):
 - 清理笔记列表"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -543,7 +542,7 @@ class UnarchiveNoteTool(BaseTool):
 将笔记从归档状态恢复为正常状态。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -598,7 +597,7 @@ class PromoteToExperienceTool(BaseTool):
 - 追踪笔记与经验的关系"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

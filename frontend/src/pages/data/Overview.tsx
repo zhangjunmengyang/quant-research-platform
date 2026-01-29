@@ -250,8 +250,6 @@ export function Component() {
 
   const totalPages = Math.ceil(filteredAndSortedSymbols.length / pageSize)
 
-  // K线图数据 - 直接使用 klineData（类型兼容，无需转换）
-
   // 详情页分页数据
   const paginatedKlineData = useMemo(() => {
     const reversed = [...klineData].reverse()

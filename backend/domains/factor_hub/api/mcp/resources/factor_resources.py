@@ -5,13 +5,11 @@
 基于 mcp_core.BaseResourceProvider 实现。
 """
 
-from typing import Any, Dict, List, Optional
 import json
 import logging
 
 from domains.mcp_core import (
     BaseResourceProvider,
-    ResourceDefinition,
     ResourceContent,
 )
 
@@ -204,7 +202,7 @@ class FactorResourceProvider(BaseResourceProvider):
             text=json.dumps(result, ensure_ascii=False, indent=2),
         )
 
-    async def _read_factor_detail(self, filename: str) -> Optional[ResourceContent]:
+    async def _read_factor_detail(self, filename: str) -> ResourceContent | None:
         """读取因子详情"""
         factor = self.factor_service.get_factor(filename)
         if factor is None:
@@ -236,7 +234,7 @@ class FactorResourceProvider(BaseResourceProvider):
             text=json.dumps(data, ensure_ascii=False, indent=2),
         )
 
-    async def _read_factor_code(self, filename: str) -> Optional[ResourceContent]:
+    async def _read_factor_code(self, filename: str) -> ResourceContent | None:
         """读取因子代码"""
         factor = self.factor_service.get_factor(filename)
         if factor is None:

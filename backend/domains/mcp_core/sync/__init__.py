@@ -7,12 +7,12 @@
 """
 
 from .base import BaseSyncService
+from .edge_sync import EdgeSyncService
+from .experience_sync import ExperienceSyncService
 from .factor_sync import FactorSyncService
+from .manager import SyncManager
 from .note_sync import NoteSyncService
 from .strategy_sync import StrategySyncService
-from .experience_sync import ExperienceSyncService
-from .edge_sync import EdgeSyncService
-from .manager import SyncManager
 from .trigger import SyncTrigger, get_sync_trigger
 
 __all__ = [

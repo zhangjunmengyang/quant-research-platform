@@ -5,18 +5,18 @@
 """
 
 import logging
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Any
 
-from ..core.store import get_factor_store, FactorStore
-from ..core.models import Factor
-
-from domains.mcp_core.edge import (
-    KnowledgeEdge,
-    EdgeEntityType,
-    EdgeRelationType,
-    EdgeStore,
-    get_edge_store,
+from domains.graph_hub.core import (
+    GraphEdge,
+    GraphStore,
+    NodeType,
+    RelationType,
+    get_graph_store,
 )
+
+from ..core.models import Factor
+from ..core.store import FactorStore, get_factor_store
 
 logger = logging.getLogger(__name__)
 
@@ -30,25 +30,25 @@ class FactorService:
 
     def __init__(
         self,
-        store: Optional[FactorStore] = None,
-        edge_store: Optional[EdgeStore] = None,
+        store: FactorStore | None = None,
+        graph_store: GraphStore | None = None,
     ):
         """
         初始化服务
 
         Args:
             store: 因子存储实例，默认使用单例
-            edge_store: 知识边存储层实例
+            graph_store: 图存储层实例（Neo4j）
         """
         self.store = store or get_factor_store()
-        self._edge_store = edge_store
+        self._graph_store = graph_store
 
     @property
-    def edge_store(self) -> EdgeStore:
-        """延迟获取知识边存储层"""
-        if self._edge_store is None:
-            self._edge_store = get_edge_store()
-        return self._edge_store
+    def graph_store(self) -> GraphStore:
+        """延迟获取图存储层"""
+        if self._graph_store is None:
+            self._graph_store = get_graph_store()
+        return self._graph_store
 
     def list_factors(
         self,
@@ -60,7 +60,7 @@ class FactorService:
         order_desc: bool = False,
         page: int = 1,
         page_size: int = 20,
-    ) -> Tuple[List[Factor], int]:
+    ) -> tuple[list[Factor], int]:
         """
         获取因子列表
 
@@ -127,9 +127,9 @@ class FactorService:
 
     def query(
         self,
-        filter_condition: Optional[Dict[str, Any]] = None,
-        order_by: Optional[str] = None,
-    ) -> List[Factor]:
+        filter_condition: dict[str, Any] | None = None,
+        order_by: str | None = None,
+    ) -> list[Factor]:
         """
         查询因子列表（底层查询接口）
 
@@ -147,12 +147,12 @@ class FactorService:
 
     def query_factors(
         self,
-        filter_condition: Optional[Dict[str, Any]] = None,
-        order_by: Optional[str] = None,
+        filter_condition: dict[str, Any] | None = None,
+        order_by: str | None = None,
         include_excluded: bool = False,
-        page: Optional[int] = None,
-        page_size: Optional[int] = None,
-    ) -> Tuple[List[Factor], int]:
+        page: int | None = None,
+        page_size: int | None = None,
+    ) -> tuple[list[Factor], int]:
         """
         查询因子列表（支持分页和排除状态）
 
@@ -183,11 +183,11 @@ class FactorService:
 
         return factors, total
 
-    def get_factor(self, filename: str) -> Optional[Factor]:
+    def get_factor(self, filename: str) -> Factor | None:
         """获取单个因子"""
         return self.store.get(filename)
 
-    def get_factor_with_excluded(self, filename: str) -> Optional[Factor]:
+    def get_factor_with_excluded(self, filename: str) -> Factor | None:
         """获取单个因子（包含已排除的）"""
         return self.store.get(filename, include_excluded=True)
 
@@ -197,8 +197,8 @@ class FactorService:
 
     def delete_factor(self, filename: str) -> bool:
         """删除因子（同时删除数据库记录、代码文件和元数据文件）"""
-        from pathlib import Path
         import os
+        from pathlib import Path
 
         # 先获取因子信息，以便知道文件路径
         factor = self.store.get(filename, include_excluded=True)
@@ -246,7 +246,7 @@ class FactorService:
         """重置因子验证状态为未验证"""
         return self.store.reset_verification(filename)
 
-    def batch_mark_as_passed(self, filenames: List[str], note: str = "") -> int:
+    def batch_mark_as_passed(self, filenames: list[str], note: str = "") -> int:
         """批量标记为验证通过"""
         success = 0
         for filename in filenames:
@@ -254,7 +254,7 @@ class FactorService:
                 success += 1
         return success
 
-    def batch_mark_as_failed(self, filenames: List[str], note: str = "") -> int:
+    def batch_mark_as_failed(self, filenames: list[str], note: str = "") -> int:
         """批量标记为废弃"""
         success = 0
         for filename in filenames:
@@ -262,7 +262,7 @@ class FactorService:
                 success += 1
         return success
 
-    def batch_reset_verification(self, filenames: List[str]) -> int:
+    def batch_reset_verification(self, filenames: list[str]) -> int:
         """批量重置验证状态"""
         success = 0
         for filename in filenames:
@@ -270,7 +270,7 @@ class FactorService:
                 success += 1
         return success
 
-    def batch_delete(self, filenames: List[str]) -> int:
+    def batch_delete(self, filenames: list[str]) -> int:
         """批量删除（同时删除数据库记录、代码文件和元数据文件）"""
         success = 0
         for filename in filenames:
@@ -278,15 +278,15 @@ class FactorService:
                 success += 1
         return success
 
-    def get_styles(self) -> List[str]:
+    def get_styles(self) -> list[str]:
         """获取所有风格"""
         return self.store.get_styles()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息"""
         return self.store.get_stats()
 
-    def export_markdown(self, output_path: Optional[str] = None) -> str:
+    def export_markdown(self, output_path: str | None = None) -> str:
         """导出 Markdown"""
         return self.store.export_to_markdown(output_path)
 
@@ -298,7 +298,7 @@ class FactorService:
         """取消排除因子"""
         return self.store.unexclude_factor(filename)
 
-    def get_excluded_factors(self) -> Dict[str, str]:
+    def get_excluded_factors(self) -> dict[str, str]:
         """获取所有排除的因子"""
         return self.store.get_excluded_factors()
 
@@ -309,7 +309,7 @@ class FactorService:
         style: str = "",
         formula: str = "",
         description: str = "",
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         创建新因子
 
@@ -326,7 +326,7 @@ class FactorService:
             (是否成功, 消息)
         """
         import re
-        from pathlib import Path
+
         from ..core.config import get_config_loader
 
         # 验证文件名
@@ -381,7 +381,7 @@ class FactorService:
         self,
         filename: str,
         code_content: str,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         更新因子代码
 
@@ -394,7 +394,6 @@ class FactorService:
         Returns:
             (是否成功, 消息)
         """
-        from pathlib import Path
         from ..core.config import get_config_loader
 
         # 验证因子存在
@@ -423,7 +422,7 @@ class FactorService:
         else:
             return False, "更新数据库失败"
 
-    def check_consistency(self) -> Dict[str, Any]:
+    def check_consistency(self) -> dict[str, Any]:
         """
         检测因子一致性
 
@@ -443,8 +442,9 @@ class FactorService:
                 "missing_db_records": [...],     # 代码文件存在但数据库记录不存在
             }
         """
-        from pathlib import Path
         import os
+        from pathlib import Path
+
         from ..core.config import get_config_loader
 
         config = get_config_loader()
@@ -494,7 +494,7 @@ class FactorService:
             "missing_db_records": missing_db_records,
         }
 
-    def cleanup_orphans(self, dry_run: bool = True) -> Dict[str, Any]:
+    def cleanup_orphans(self, dry_run: bool = True) -> dict[str, Any]:
         """
         清理孤立数据
 
@@ -511,8 +511,8 @@ class FactorService:
                 "errors": [...],
             }
         """
-        from pathlib import Path
         import os
+        from pathlib import Path
 
         consistency = self.check_consistency()
         private_dir = Path(os.environ.get('PRIVATE_DATA_DIR', 'private'))
@@ -555,7 +555,7 @@ class FactorService:
             "errors": errors,
         }
 
-    def sync_missing(self) -> Dict[str, Any]:
+    def sync_missing(self) -> dict[str, Any]:
         """
         同步缺失的数据
 
@@ -605,7 +605,7 @@ class FactorService:
         self,
         code_content: str,
         auto_name: bool = True,
-    ) -> Tuple[bool, str, Optional[str]]:
+    ) -> tuple[bool, str, str | None]:
         """
         从代码内容入库因子
 
@@ -655,7 +655,7 @@ class FactorService:
         return success, message, factor_name if success else None
 
 
-    # ==================== 知识边关联 ====================
+    # ==================== 知识边关联 (Neo4j) ====================
 
     def link_factor(
         self,
@@ -664,8 +664,8 @@ class FactorService:
         target_id: str,
         relation: str = "related",
         is_bidirectional: bool = False,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[bool, str, Optional[int]]:
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[bool, str]:
         """
         创建因子与其他实体的关联
 
@@ -678,48 +678,48 @@ class FactorService:
             metadata: 扩展元数据
 
         Returns:
-            (成功, 消息, 边ID)
+            (成功, 消息)
         """
         # 验证因子存在
         factor = self.store.get(factor_name)
         if factor is None:
-            return False, f"因子不存在: {factor_name}", None
+            return False, f"因子不存在: {factor_name}"
 
         # 验证实体类型
         try:
-            target_entity_type = EdgeEntityType(target_type)
+            target_node_type = NodeType(target_type)
         except ValueError:
-            return False, f"无效的实体类型: {target_type}", None
+            return False, f"无效的实体类型: {target_type}"
 
         # 验证关系类型
         try:
-            relation_type = EdgeRelationType(relation)
+            relation_type = RelationType(relation)
         except ValueError:
-            return False, f"无效的关系类型: {relation}", None
+            return False, f"无效的关系类型: {relation}"
 
-        # 创建知识边
-        edge = KnowledgeEdge(
-            source_type=EdgeEntityType.FACTOR,
+        # 创建图边
+        edge = GraphEdge(
+            source_type=NodeType.FACTOR,
             source_id=factor_name,
-            target_type=target_entity_type,
+            target_type=target_node_type,
             target_id=target_id,
             relation=relation_type,
             is_bidirectional=is_bidirectional,
             metadata=metadata or {},
         )
 
-        edge_id = self.edge_store.create(edge)
-        if edge_id:
+        success = self.graph_store.create_edge(edge)
+        if success:
             logger.info(f"创建因子关联: factor:{factor_name} -[{relation}]-> {target_type}:{target_id}")
-            return True, "关联成功", edge_id
+            return True, "关联成功"
         else:
-            return False, "关联失败（可能已存在）", None
+            return False, "关联失败"
 
     def get_factor_edges(
         self,
         factor_name: str,
         include_bidirectional: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         获取因子的所有关联
 
@@ -730,14 +730,14 @@ class FactorService:
         Returns:
             关联列表
         """
-        edges = self.edge_store.get_edges_by_entity(
-            entity_type=EdgeEntityType.FACTOR,
+        edges = self.graph_store.get_edges_by_entity(
+            entity_type=NodeType.FACTOR,
             entity_id=factor_name,
             include_bidirectional=include_bidirectional,
         )
         return [edge.to_dict() for edge in edges]
 
-    def get_edges_to_factor(self, factor_name: str) -> List[Dict[str, Any]]:
+    def get_edges_to_factor(self, factor_name: str) -> list[dict[str, Any]]:
         """
         获取指向因子的所有关联
 
@@ -747,8 +747,8 @@ class FactorService:
         Returns:
             关联列表
         """
-        edges = self.edge_store.get_edges_to_entity(
-            entity_type=EdgeEntityType.FACTOR,
+        edges = self.graph_store.get_edges_to_entity(
+            entity_type=NodeType.FACTOR,
             entity_id=factor_name,
         )
         return [edge.to_dict() for edge in edges]
@@ -758,7 +758,7 @@ class FactorService:
         factor_name: str,
         direction: str = "backward",
         max_depth: int = 5,
-    ) -> List[Dict[str, Any]]:
+    ) -> dict[str, Any]:
         """
         追溯因子的知识链路
 
@@ -770,35 +770,57 @@ class FactorService:
             max_depth: 最大追溯深度
 
         Returns:
-            链路列表，每项包含 depth 和 edge
+            链路追溯结果，包含 start_type, start_id, direction, max_depth, count, nodes
         """
-        return self.edge_store.trace_lineage(
-            entity_type=EdgeEntityType.FACTOR,
+        result = self.graph_store.trace_lineage(
+            entity_type=NodeType.FACTOR,
             entity_id=factor_name,
             direction=direction,
             max_depth=max_depth,
         )
+        return result.to_dict()
 
-    def delete_factor_edge(self, edge_id: int) -> Tuple[bool, str]:
+    def delete_factor_edge(
+        self,
+        target_type: str,
+        target_id: str,
+        relation: str,
+        factor_name: str,
+    ) -> tuple[bool, str]:
         """
         删除因子关联
 
         Args:
-            edge_id: 边 ID
+            target_type: 目标实体类型
+            target_id: 目标实体 ID
+            relation: 关系类型
+            factor_name: 因子名称（作为源）
 
         Returns:
             (成功, 消息)
         """
-        success = self.edge_store.delete(edge_id)
+        try:
+            target_node_type = NodeType(target_type)
+            relation_type = RelationType(relation)
+        except ValueError as e:
+            return False, f"无效的参数: {e}"
+
+        success = self.graph_store.delete_edge(
+            source_type=NodeType.FACTOR,
+            source_id=factor_name,
+            target_type=target_node_type,
+            target_id=target_id,
+            relation=relation_type,
+        )
         if success:
-            logger.info(f"删除因子关联: {edge_id}")
+            logger.info(f"删除因子关联: factor:{factor_name} -[{relation}]-> {target_type}:{target_id}")
             return True, "删除成功"
         else:
             return False, "删除失败"
 
 
 # 单例
-_service: Optional[FactorService] = None
+_service: FactorService | None = None
 
 
 def get_factor_service() -> FactorService:

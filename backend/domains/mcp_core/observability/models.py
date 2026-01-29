@@ -8,7 +8,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class CallStatus(str, Enum):
@@ -39,9 +39,9 @@ class Message:
     """消息"""
     role: str
     content: str
-    name: Optional[str] = None
-    tool_call_id: Optional[str] = None
-    tool_calls: Optional[List[Dict[str, Any]]] = None
+    name: str | None = None
+    tool_call_id: str | None = None
+    tool_calls: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -49,7 +49,7 @@ class ToolDefinition:
     """工具定义"""
     name: str
     description: str
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -59,7 +59,7 @@ class TokenUsage:
     completion_tokens: int = 0
     total_tokens: int = 0
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         return {
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
@@ -80,21 +80,21 @@ class LLMCallRequest:
     provider: str = ""
 
     # 输入内容
-    messages: List[Message] = field(default_factory=list)
+    messages: list[Message] = field(default_factory=list)
     system_prompt: str = ""
     user_prompt: str = ""
 
     # 配置参数
     temperature: float = 0.7
     max_tokens: int = 4096
-    tools: List[ToolDefinition] = field(default_factory=list)
-    extra_params: Dict[str, Any] = field(default_factory=dict)
+    tools: list[ToolDefinition] = field(default_factory=list)
+    extra_params: dict[str, Any] = field(default_factory=dict)
 
     # 上下文信息
     caller: str = ""  # 调用方（函数/服务名）
     purpose: str = ""  # 调用目的
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "call_id": self.call_id,
             "trace_id": self.trace_id,
@@ -121,7 +121,7 @@ class LLMCallResponse:
 
     # 输出内容
     content: str = ""
-    tool_calls: List[Dict[str, Any]] = field(default_factory=list)
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
     finish_reason: str = ""
 
     # Token 统计
@@ -140,7 +140,7 @@ class LLMCallResponse:
     # 服务端信息
     provider_request_id: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "call_id": self.call_id,
             "timestamp": self.timestamp.isoformat(),
@@ -161,7 +161,7 @@ class LLMCallResponse:
 class LLMCallRecord:
     """完整的 LLM 调用记录（请求 + 响应）"""
     request: LLMCallRequest
-    response: Optional[LLMCallResponse] = None
+    response: LLMCallResponse | None = None
 
     @property
     def call_id(self) -> str:
@@ -171,7 +171,7 @@ class LLMCallRecord:
     def success(self) -> bool:
         return self.response is not None and self.response.status == CallStatus.SUCCESS
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "request": self.request.to_dict(),
         }
@@ -193,10 +193,10 @@ class ToolCallRequest:
     tool_version: str = ""
 
     # 输入
-    arguments: Dict[str, Any] = field(default_factory=dict)
+    arguments: dict[str, Any] = field(default_factory=dict)
     arguments_raw: str = ""  # 原始参数字符串
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "call_id": self.call_id,
             "trace_id": self.trace_id,
@@ -228,9 +228,9 @@ class ToolCallResponse:
     error_type: str = ""
 
     # 额外信息（特定工具）
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "call_id": self.call_id,
             "timestamp": self.timestamp.isoformat(),
@@ -247,7 +247,7 @@ class ToolCallResponse:
 class ToolCallRecord:
     """完整的工具调用记录"""
     request: ToolCallRequest
-    response: Optional[ToolCallResponse] = None
+    response: ToolCallResponse | None = None
 
     @property
     def call_id(self) -> str:
@@ -257,7 +257,7 @@ class ToolCallRecord:
     def success(self) -> bool:
         return self.response is not None and self.response.status == CallStatus.SUCCESS
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "request": self.request.to_dict(),
         }
@@ -271,7 +271,7 @@ class SessionRecord:
     """会话记录"""
     session_id: str = field(default_factory=lambda: generate_id("sess"))
     start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
 
     # 统计信息
     total_llm_calls: int = 0
@@ -284,13 +284,13 @@ class SessionRecord:
     error_message: str = ""
 
     # 关联的调用记录
-    llm_call_ids: List[str] = field(default_factory=list)
-    tool_call_ids: List[str] = field(default_factory=list)
+    llm_call_ids: list[str] = field(default_factory=list)
+    tool_call_ids: list[str] = field(default_factory=list)
 
     # 元数据
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "session_id": self.session_id,
             "start_time": self.start_time.isoformat(),
@@ -341,31 +341,31 @@ class MCPRequestRecord:
 
     # 请求信息
     method: str = ""  # JSON-RPC 方法 (initialize, tools/call, resources/read 等)
-    jsonrpc_id: Optional[Any] = None  # JSON-RPC 请求 ID
-    params: Dict[str, Any] = field(default_factory=dict)  # 请求参数
+    jsonrpc_id: Any | None = None  # JSON-RPC 请求 ID
+    params: dict[str, Any] = field(default_factory=dict)  # 请求参数
 
     # 工具/资源特定信息
     tool_name: str = ""  # 如果是 tools/call，记录工具名
-    tool_arguments: Dict[str, Any] = field(default_factory=dict)  # 工具调用入参（排查必需）
+    tool_arguments: dict[str, Any] = field(default_factory=dict)  # 工具调用入参（排查必需）
     resource_uri: str = ""  # 如果是 resources/read，记录资源 URI
 
     # 响应信息
-    response_timestamp: Optional[datetime] = None
+    response_timestamp: datetime | None = None
     duration_ms: float = 0
     status: CallStatus = CallStatus.PENDING
-    error_code: Optional[int] = None
+    error_code: int | None = None
     error_message: str = ""
 
     # 响应数据（排查必需）
     response_size: int = 0  # 响应数据大小 (字节)
     response_summary: str = ""  # 响应摘要
-    response_data: Dict[str, Any] = field(default_factory=dict)  # 结构化响应数据
+    response_data: dict[str, Any] = field(default_factory=dict)  # 结构化响应数据
 
     # 追踪
     trace_id: str = ""
     session_id: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_id": self.request_id,
             "timestamp": self.timestamp.isoformat(),
@@ -390,7 +390,7 @@ class MCPRequestRecord:
             "session_id": self.session_id,
         }
 
-    def to_summary(self) -> Dict[str, Any]:
+    def to_summary(self) -> dict[str, Any]:
         """返回简化的摘要信息"""
         return {
             "request_id": self.request_id,

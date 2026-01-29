@@ -5,13 +5,11 @@
 基于 mcp_core.BaseResourceProvider 实现。
 """
 
-from typing import Any, Dict, List, Optional
-import logging
 import json
+import logging
 
 from domains.mcp_core import (
     BaseResourceProvider,
-    ResourceDefinition,
     ResourceContent,
 )
 
@@ -167,7 +165,7 @@ class DataResourceProvider(BaseResourceProvider):
             text=json.dumps(data, ensure_ascii=False, indent=2),
         )
 
-    async def _read_kline(self, symbol: str) -> Optional[ResourceContent]:
+    async def _read_kline(self, symbol: str) -> ResourceContent | None:
         """读取 K 线数据"""
         try:
             df = self.data_loader.get_kline(symbol=symbol, data_type="swap")
@@ -205,7 +203,7 @@ class DataResourceProvider(BaseResourceProvider):
             logger.error(f"读取 K 线数据失败: {e}")
             return None
 
-    async def _read_symbol_info(self, symbol: str) -> Optional[ResourceContent]:
+    async def _read_symbol_info(self, symbol: str) -> ResourceContent | None:
         """读取币种信息"""
         try:
             info = self.data_loader.get_symbol_info(symbol)

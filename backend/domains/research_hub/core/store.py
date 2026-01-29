@@ -7,10 +7,9 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import psycopg2
-
 from domains.mcp_core.base.store import (
     BaseStore,
     get_store_instance,
@@ -19,9 +18,8 @@ from domains.mcp_core.base.store import (
 from domains.mcp_core.database.query_builder import QueryBuilder
 
 from .models import (
-    ResearchReport,
     ResearchChunk,
-    ProcessingStatus,
+    ResearchReport,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,7 +44,7 @@ class ResearchStore(BaseStore[ResearchReport]):
 
     numeric_fields = {'id', 'file_size', 'page_count', 'progress'}
 
-    def _row_to_entity(self, row: Dict[str, Any]) -> ResearchReport:
+    def _row_to_entity(self, row: dict[str, Any]) -> ResearchReport:
         """将数据库行转换为 ResearchReport 对象"""
         valid_fields = {k: v for k, v in row.items() if k in ResearchReport.__dataclass_fields__}
         return ResearchReport(**valid_fields)
@@ -61,7 +59,7 @@ class ResearchStore(BaseStore[ResearchReport]):
 
     # ==================== 基本 CRUD ====================
 
-    def get(self, report_id: int) -> Optional[ResearchReport]:
+    def get(self, report_id: int) -> ResearchReport | None:
         """获取单个研报"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -73,7 +71,7 @@ class ResearchStore(BaseStore[ResearchReport]):
                 return self._row_to_entity(dict(row))
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[ResearchReport]:
+    def get_by_uuid(self, uuid: str) -> ResearchReport | None:
         """通过 UUID 获取研报"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -85,7 +83,7 @@ class ResearchStore(BaseStore[ResearchReport]):
                 return self._row_to_entity(dict(row))
         return None
 
-    def get_all(self, limit: int = 100, offset: int = 0) -> List[ResearchReport]:
+    def get_all(self, limit: int = 100, offset: int = 0) -> list[ResearchReport]:
         """获取所有研报"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -94,7 +92,7 @@ class ResearchStore(BaseStore[ResearchReport]):
             )
             return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
 
-    def add(self, report: ResearchReport) -> Optional[int]:
+    def add(self, report: ResearchReport) -> int | None:
         """添加研报，返回新研报的 ID"""
         report.created_at = datetime.now()
         report.updated_at = datetime.now()
@@ -136,7 +134,7 @@ class ResearchStore(BaseStore[ResearchReport]):
 
         safe_fields['updated_at'] = datetime.now()
 
-        set_clause = ', '.join(f'{k} = %s' for k in safe_fields.keys())
+        set_clause = ', '.join(f'{k} = %s' for k in safe_fields)
         values = list(safe_fields.values()) + [report_id]
 
         with self._cursor() as cursor:
@@ -156,14 +154,14 @@ class ResearchStore(BaseStore[ResearchReport]):
 
     def query(
         self,
-        search: Optional[str] = None,
-        status: Optional[str] = None,
-        category: Optional[str] = None,
-        tags: Optional[List[str]] = None,
+        search: str | None = None,
+        status: str | None = None,
+        category: str | None = None,
+        tags: list[str] | None = None,
         order_by: str = "created_at DESC",
         limit: int = 50,
         offset: int = 0
-    ) -> Tuple[List[ResearchReport], int]:
+    ) -> tuple[list[ResearchReport], int]:
         """条件查询研报"""
         builder = self._create_query_builder()
 
@@ -202,7 +200,7 @@ class ResearchStore(BaseStore[ResearchReport]):
 
         return reports, total
 
-    def get_by_status(self, status: str) -> List[ResearchReport]:
+    def get_by_status(self, status: str) -> list[ResearchReport]:
         """按状态获取研报"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -226,7 +224,7 @@ class ResearchStore(BaseStore[ResearchReport]):
             error_message=error_message
         )
 
-    def count(self, status: Optional[str] = None) -> int:
+    def count(self, status: str | None = None) -> int:
         """统计研报数量"""
         with self._cursor() as cursor:
             if status:
@@ -260,12 +258,12 @@ class ChunkStore(BaseStore[ResearchChunk]):
 
     numeric_fields = {'id', 'report_id', 'chunk_index', 'page_start', 'page_end', 'token_count'}
 
-    def _row_to_entity(self, row: Dict[str, Any]) -> ResearchChunk:
+    def _row_to_entity(self, row: dict[str, Any]) -> ResearchChunk:
         """将数据库行转换为 ResearchChunk 对象"""
         valid_fields = {k: v for k, v in row.items() if k in ResearchChunk.__dataclass_fields__}
         return ResearchChunk(**valid_fields)
 
-    def add(self, chunk: ResearchChunk) -> Optional[int]:
+    def add(self, chunk: ResearchChunk) -> int | None:
         """添加切块"""
         chunk.created_at = datetime.now()
 
@@ -295,7 +293,7 @@ class ChunkStore(BaseStore[ResearchChunk]):
             logger.error(f"添加切块失败: {e}")
             return None
 
-    def add_batch(self, chunks: List[ResearchChunk]) -> int:
+    def add_batch(self, chunks: list[ResearchChunk]) -> int:
         """批量添加切块"""
         if not chunks:
             return 0
@@ -340,9 +338,9 @@ class ChunkStore(BaseStore[ResearchChunk]):
     def get_by_report(
         self,
         report_id: int,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0,
-    ) -> Tuple[List[ResearchChunk], int]:
+    ) -> tuple[list[ResearchChunk], int]:
         """获取研报的切块(支持分页)
 
         Args:
@@ -396,12 +394,12 @@ class ChunkStore(BaseStore[ResearchChunk]):
 
 # ==================== 单例管理 ====================
 
-def get_research_store(database_url: Optional[str] = None) -> ResearchStore:
+def get_research_store(database_url: str | None = None) -> ResearchStore:
     """获取研报存储层单例"""
     return get_store_instance(ResearchStore, "ResearchStore", database_url=database_url)
 
 
-def get_chunk_store(database_url: Optional[str] = None) -> ChunkStore:
+def get_chunk_store(database_url: str | None = None) -> ChunkStore:
     """获取切块存储层单例"""
     return get_store_instance(ChunkStore, "ChunkStore", database_url=database_url)
 

@@ -4,29 +4,29 @@ MCP Tools - 工具定义模块
 包含所有可供 LLM 调用的工具函数。
 """
 
-from .base import BaseTool, ToolRegistry, ToolResult, ToolDefinition
-from .query_tools import (
-    ListFactorsTool,
-    GetFactorTool,
-    GetStatsTool,
-    GetStylesTool,
-    SearchByCodeTool,
-)
-from .mutation_tools import (
-    CreateFactorTool,
-    UpdateFactorTool,
-    DeleteFactorTool,
-)
 from .analysis_tools import (
-    GetFactorICTool,
+    # 因子分箱分析工具
+    AnalyzeFactorGroupsTool,
     CompareFactorsTool,
     # 多因子分析工具 (placeholder)
     GetFactorCorrelationTool,
+    GetFactorICTool,
     MultiFactorAnalyzeTool,
-    # 因子分箱分析工具
-    AnalyzeFactorGroupsTool,
     # 因子参数分析工具（支持一维柱状图和二维热力图）
     RunFactorParamAnalysisTool,
+)
+from .base import BaseTool, ToolDefinition, ToolRegistry, ToolResult
+from .mutation_tools import (
+    CreateFactorTool,
+    DeleteFactorTool,
+    UpdateFactorTool,
+)
+from .query_tools import (
+    GetFactorTool,
+    GetStatsTool,
+    GetStylesTool,
+    ListFactorsTool,
+    SearchByCodeTool,
 )
 
 __all__ = [

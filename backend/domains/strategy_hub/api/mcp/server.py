@@ -6,30 +6,27 @@ MCP Server - 策略知识库 MCP 服务器
 """
 
 import logging
-from typing import Optional
 
 from domains.mcp_core import (
     BaseMCPServer,
     MCPConfig,
-    create_mcp_app,
     create_streamable_http_app,
     run_streamable_http_server,
 )
-from domains.mcp_core.server.server import run_server as mcp_run_server
 
-from .tools.strategy_tools import (
-    ListStrategiesTool,
-    GetStrategyTool,
-    SearchStrategiesTool,
-    GetStrategyStatsTool,
-    RunBacktestTool,
-)
+from .resources.strategy_resources import StrategyResourceProvider
 from .tools.analysis_tools import (
     CompareBacktestLiveTool,
-    CompareStrategyCoinsTool,
     CompareEquityCurvesTool,
+    CompareStrategyCoinsTool,
 )
-from .resources.strategy_resources import StrategyResourceProvider
+from .tools.strategy_tools import (
+    GetStrategyStatsTool,
+    GetStrategyTool,
+    ListStrategiesTool,
+    RunBacktestTool,
+    SearchStrategiesTool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +72,7 @@ def create_strategy_hub_config(
     port: int = 6791,
     log_level: str = "INFO",
     auth_enabled: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MCPConfig:
     """
     创建策略知识库 MCP 配置
@@ -104,7 +101,7 @@ def create_strategy_hub_config(
     )
 
 
-def create_mcp_server(config: Optional[MCPConfig] = None):
+def create_mcp_server(config: MCPConfig | None = None):
     """
     创建 MCP FastAPI 应用 (Streamable HTTP)
 

@@ -9,9 +9,8 @@ LLM 配置管理
 配置文件路径通过函数参数传入，不硬编码业务路径。
 """
 
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
@@ -55,10 +54,10 @@ class LLMSettings(BaseSettings):
     # 运行时配置 (从 yaml 加载)
     default_model: str = "gpt"
     timeout: int = 120
-    models: Dict[str, ModelConfig] = Field(default_factory=dict)
+    models: dict[str, ModelConfig] = Field(default_factory=dict)
 
     @classmethod
-    def from_yaml(cls, yaml_path: Optional[Path] = None) -> "LLMSettings":
+    def from_yaml(cls, yaml_path: Path | None = None) -> "LLMSettings":
         """
         从 yaml 文件加载配置
 
@@ -75,7 +74,7 @@ class LLMSettings(BaseSettings):
         if not yaml_path.exists():
             return cls()
 
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         default = data.get("default", {})
@@ -89,7 +88,7 @@ class LLMSettings(BaseSettings):
             models=models,
         )
 
-    def get_model_config(self, model_key: Optional[str] = None) -> ModelConfig:
+    def get_model_config(self, model_key: str | None = None) -> ModelConfig:
         """
         获取模型配置
 
@@ -104,10 +103,10 @@ class LLMSettings(BaseSettings):
 
     def resolve_config(
         self,
-        model_key: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        model_key: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
         """
         解析最终配置 (支持覆盖)
 
@@ -132,10 +131,10 @@ class LLMSettings(BaseSettings):
 
 
 # 全局配置实例
-_llm_settings: Optional[LLMSettings] = None
+_llm_settings: LLMSettings | None = None
 
 
-def get_llm_settings(yaml_path: Optional[Path] = None) -> LLMSettings:
+def get_llm_settings(yaml_path: Path | None = None) -> LLMSettings:
     """
     获取 LLM 配置单例
 
@@ -147,7 +146,7 @@ def get_llm_settings(yaml_path: Optional[Path] = None) -> LLMSettings:
     return _llm_settings
 
 
-def reload_llm_settings(yaml_path: Optional[Path] = None) -> LLMSettings:
+def reload_llm_settings(yaml_path: Path | None = None) -> LLMSettings:
     """
     重新加载配置
 

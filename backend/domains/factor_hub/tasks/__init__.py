@@ -23,9 +23,9 @@ __all__ = [
 def __getattr__(name):
     """延迟导入，避免启动时的循环依赖"""
     if name in ('discover_factors', 'run_discover', 'DiscoverResult'):
-        from .diff_catalog import discover_factors, run_discover, DiscoverResult
+        from .diff_catalog import DiscoverResult, discover_factors, run_discover
         return locals()[name]
     elif name in ('run_review', 'ReviewResult', 'ReviewSummary'):
-        from .review import run_review, ReviewResult, ReviewSummary
+        from .review import ReviewResult, ReviewSummary, run_review
         return locals()[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

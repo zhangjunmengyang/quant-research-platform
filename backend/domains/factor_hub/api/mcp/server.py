@@ -6,41 +6,38 @@ MCP Server - 因子知识库 MCP 服务器
 """
 
 import logging
-from typing import Optional
 
 from domains.mcp_core import (
     BaseMCPServer,
     MCPConfig,
-    create_mcp_app,
     create_streamable_http_app,
     run_streamable_http_server,
 )
-from domains.mcp_core.server.server import run_server as mcp_run_server
 
-from .tools.query_tools import (
-    ListFactorsTool,
-    GetFactorTool,
-    GetStatsTool,
-    GetStylesTool,
-    SearchByCodeTool,
-)
-from .tools.mutation_tools import (
-    CreateFactorTool,
-    UpdateFactorTool,
-    DeleteFactorTool,
-)
+from .resources.factor_resources import FactorResourceProvider
 from .tools.analysis_tools import (
-    GetFactorICTool,
+    # 分组分析工具
+    AnalyzeFactorGroupsTool,
     CompareFactorsTool,
     # 多因子分析工具
     GetFactorCorrelationTool,
+    GetFactorICTool,
     MultiFactorAnalyzeTool,
-    # 分组分析工具
-    AnalyzeFactorGroupsTool,
     # 参数分析工具（支持一维柱状图和二维热力图）
     RunFactorParamAnalysisTool,
 )
-from .resources.factor_resources import FactorResourceProvider
+from .tools.mutation_tools import (
+    CreateFactorTool,
+    DeleteFactorTool,
+    UpdateFactorTool,
+)
+from .tools.query_tools import (
+    GetFactorTool,
+    GetStatsTool,
+    GetStylesTool,
+    ListFactorsTool,
+    SearchByCodeTool,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +98,7 @@ def create_factor_hub_config(
     port: int = 6789,
     log_level: str = "INFO",
     auth_enabled: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MCPConfig:
     """
     创建因子知识库 MCP 配置
@@ -130,7 +127,7 @@ def create_factor_hub_config(
     )
 
 
-def create_mcp_server(config: Optional[MCPConfig] = None):
+def create_mcp_server(config: MCPConfig | None = None):
     """
     创建 MCP FastAPI 应用 (Streamable HTTP)
 

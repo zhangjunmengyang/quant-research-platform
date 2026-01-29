@@ -5,12 +5,17 @@
 """
 
 import os
-import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
+
+from domains.mcp_core.paths import (
+    get_config_dir,
+    get_factors_dir,
+    get_project_root,
+    get_sections_dir,
+)
 
 from .models import DataConfig
-from domains.mcp_core.paths import get_project_root, get_config_dir, get_factors_dir, get_sections_dir
 
 
 class DataHubConfig:
@@ -20,7 +25,7 @@ class DataHubConfig:
     负责加载数据层相关配置，包括回测配置和数据源配置。
     """
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         """
         初始化配置加载器
 
@@ -33,10 +38,10 @@ class DataHubConfig:
         self.project_root = get_project_root()
 
         # 缓存
-        self._data_config: Optional[DataConfig] = None
-        self._backtest_config_cache: Optional[Dict[str, Any]] = None
+        self._data_config: DataConfig | None = None
+        self._backtest_config_cache: dict[str, Any] | None = None
 
-    def load_backtest_config(self, reload: bool = False) -> Dict[str, Any]:
+    def load_backtest_config(self, reload: bool = False) -> dict[str, Any]:
         """
         加载回测配置
 
@@ -62,7 +67,7 @@ class DataHubConfig:
         # 这样可以避免 import 带来的依赖问题
         config_vars = {}
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
+            with open(config_file, encoding='utf-8') as f:
                 content = f.read()
 
             # 创建一个受限的执行环境
@@ -80,7 +85,7 @@ class DataHubConfig:
             # 执行配置文件
             exec(content, exec_globals, config_vars)
 
-        except Exception as e:
+        except Exception:
             # 如果 exec 失败，尝试直接解析关键变量
             config_vars = self._parse_config_file(config_file)
 
@@ -99,7 +104,7 @@ class DataHubConfig:
 
         return self._backtest_config_cache
 
-    def _parse_config_file(self, config_file: Path) -> Dict[str, Any]:
+    def _parse_config_file(self, config_file: Path) -> dict[str, Any]:
         """
         备用方法：直接解析配置文件中的关键变量
 
@@ -114,7 +119,7 @@ class DataHubConfig:
         result = {}
 
         try:
-            with open(config_file, 'r', encoding='utf-8') as f:
+            with open(config_file, encoding='utf-8') as f:
                 content = f.read()
 
             # 解析 pre_data_path
@@ -182,14 +187,14 @@ class DataHubConfig:
         return self._data_config
 
     @property
-    def spot_path(self) -> Optional[Path]:
+    def spot_path(self) -> Path | None:
         """获取现货数据路径"""
         cfg = self.load_backtest_config()
         path = cfg.get('spot_path')
         return Path(path) if path else None
 
     @property
-    def swap_path(self) -> Optional[Path]:
+    def swap_path(self) -> Path | None:
         """获取合约数据路径"""
         cfg = self.load_backtest_config()
         path = cfg.get('swap_path')
@@ -207,7 +212,7 @@ class DataHubConfig:
 
 
 # 单例实例
-_data_hub_config: Optional[DataHubConfig] = None
+_data_hub_config: DataHubConfig | None = None
 
 
 def get_data_hub_config() -> DataHubConfig:

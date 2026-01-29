@@ -5,10 +5,10 @@
 与 REST API 和 MCP 统一使用此服务层，遵循分层架构规范。
 """
 
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Any
 
-from .strategy_store import StrategyStore, get_strategy_store
 from .models import Strategy
+from .strategy_store import StrategyStore, get_strategy_store
 
 
 class StrategyService:
@@ -18,7 +18,7 @@ class StrategyService:
     封装存储层操作，提供业务逻辑处理。
     """
 
-    def __init__(self, store: Optional[StrategyStore] = None):
+    def __init__(self, store: StrategyStore | None = None):
         """
         初始化服务
 
@@ -29,13 +29,13 @@ class StrategyService:
 
     def list_strategies(
         self,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         order_by: str = "created_at",
         order_desc: bool = True,
         page: int = 1,
         page_size: int = 50,
-        limit: Optional[int] = None,
-    ) -> Tuple[List[Strategy], int]:
+        limit: int | None = None,
+    ) -> tuple[list[Strategy], int]:
         """
         获取策略列表
 
@@ -59,7 +59,7 @@ class StrategyService:
             limit=limit,
         )
 
-    def get_strategy(self, strategy_id: str) -> Optional[Strategy]:
+    def get_strategy(self, strategy_id: str) -> Strategy | None:
         """获取单个策略"""
         return self.store.get(strategy_id)
 
@@ -93,15 +93,15 @@ class StrategyService:
         """删除策略"""
         return self.store.delete(strategy_id)
 
-    def search_strategies(self, query: str) -> List[Strategy]:
+    def search_strategies(self, query: str) -> list[Strategy]:
         """搜索策略"""
         return self.store.search(query)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取统计信息"""
         return self.store.get_stats()
 
-    def batch_delete(self, strategy_ids: List[str]) -> int:
+    def batch_delete(self, strategy_ids: list[str]) -> int:
         """批量删除"""
         success = 0
         for sid in strategy_ids:
@@ -111,7 +111,7 @@ class StrategyService:
 
 
 # 单例
-_service: Optional[StrategyService] = None
+_service: StrategyService | None = None
 
 
 def get_strategy_service() -> StrategyService:

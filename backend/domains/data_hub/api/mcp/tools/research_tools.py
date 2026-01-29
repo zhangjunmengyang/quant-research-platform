@@ -4,12 +4,12 @@
 提供多周期收益率计算、回撤统计、顶底识别和分阶段统计等研究分析能力。
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
+from domains.mcp_core.base.tool import ExecutionMode
 
 from .base import BaseTool, ToolResult
-from domains.mcp_core.base.tool import ExecutionMode
 
 
 class CalculateReturnsTool(BaseTool):
@@ -35,7 +35,7 @@ class CalculateReturnsTool(BaseTool):
 返回该时间点相对于各周期的收益率。正数周期表示从过去到当前的收益率，负数周期表示从当前到未来的收益率。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -152,7 +152,7 @@ class CalculateDrawdownTool(BaseTool):
 返回最大回撤、回撤起止时间、持续时长、当前回撤等统计信息。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -273,7 +273,7 @@ class FindPeaksTroughsTool(BaseTool):
 返回识别出的顶部和底部列表，包含时间、价格和相对涨跌幅。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -438,7 +438,7 @@ class CalculateStageStatsTool(BaseTool):
 返回每个阶段的收益率、最大回撤、波动率、平均成交量等统计信息。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {

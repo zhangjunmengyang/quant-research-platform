@@ -4,14 +4,13 @@
 PostgreSQL 连接配置。
 """
 
-import os
 import logging
+import os
 from dataclasses import dataclass
-from typing import Optional
 
 from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
 from sqlalchemy.engine import Engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ class DatabaseConfig:
 
 
 # 全局配置缓存
-_config: Optional[DatabaseConfig] = None
+_config: DatabaseConfig | None = None
 
 
 def get_database_url() -> str:
@@ -67,7 +66,7 @@ def get_database_config() -> DatabaseConfig:
     return _config
 
 
-def create_engine_from_config(config: Optional[DatabaseConfig] = None) -> Engine:
+def create_engine_from_config(config: DatabaseConfig | None = None) -> Engine:
     """
     根据配置创建 SQLAlchemy 引擎
 
@@ -89,7 +88,7 @@ def create_engine_from_config(config: Optional[DatabaseConfig] = None) -> Engine
     )
 
 
-def create_async_engine_from_config(config: Optional[DatabaseConfig] = None) -> AsyncEngine:
+def create_async_engine_from_config(config: DatabaseConfig | None = None) -> AsyncEngine:
     """
     根据配置创建异步 SQLAlchemy 引擎
 
@@ -112,8 +111,8 @@ def create_async_engine_from_config(config: Optional[DatabaseConfig] = None) -> 
 
 
 # 全局引擎缓存
-_sync_engine: Optional[Engine] = None
-_async_engine: Optional[AsyncEngine] = None
+_sync_engine: Engine | None = None
+_async_engine: AsyncEngine | None = None
 
 
 def get_sync_engine() -> Engine:

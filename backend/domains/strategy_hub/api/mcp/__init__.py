@@ -3,8 +3,8 @@ def __getattr__(name: str):
         from .server import (
             StrategyHubMCPServer,
             create_mcp_server,
-            run_server,
             create_strategy_hub_config,
+            run_server,
         )
         return locals()[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

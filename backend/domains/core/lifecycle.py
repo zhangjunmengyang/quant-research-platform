@@ -23,12 +23,13 @@
     await registry.shutdown()
 """
 
-import logging
 import asyncio
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Generic, Type
-from dataclasses import dataclass, field
+import logging
+from collections.abc import Callable
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from functools import wraps
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +41,10 @@ class ServiceDefinition:
     """服务定义"""
     name: str
     factory: Callable[[], Any]
-    instance: Optional[Any] = None
-    dependencies: List[str] = field(default_factory=list)
-    cleanup: Optional[Callable[[Any], None]] = None
-    async_cleanup: Optional[Callable[[Any], Any]] = None
+    instance: Any | None = None
+    dependencies: list[str] = field(default_factory=list)
+    cleanup: Callable[[Any], None] | None = None
+    async_cleanup: Callable[[Any], Any] | None = None
     initialized: bool = False
 
 
@@ -59,17 +60,17 @@ class ServiceRegistry:
     """
 
     def __init__(self):
-        self._services: Dict[str, ServiceDefinition] = {}
-        self._init_order: List[str] = []
-        self._shutdown_callbacks: List[Callable] = []
+        self._services: dict[str, ServiceDefinition] = {}
+        self._init_order: list[str] = []
+        self._shutdown_callbacks: list[Callable] = []
 
     def register(
         self,
         name: str,
         factory: Callable[[], T],
-        dependencies: Optional[List[str]] = None,
-        cleanup: Optional[Callable[[T], None]] = None,
-        async_cleanup: Optional[Callable[[T], Any]] = None,
+        dependencies: list[str] | None = None,
+        cleanup: Callable[[T], None] | None = None,
+        async_cleanup: Callable[[T], Any] | None = None,
     ) -> "ServiceRegistry":
         """
         注册服务
@@ -99,10 +100,10 @@ class ServiceRegistry:
     def register_class(
         self,
         name: str,
-        cls: Type[T],
-        dependencies: Optional[List[str]] = None,
-        cleanup: Optional[Callable[[T], None]] = None,
-        async_cleanup: Optional[Callable[[T], Any]] = None,
+        cls: type[T],
+        dependencies: list[str] | None = None,
+        cleanup: Callable[[T], None] | None = None,
+        async_cleanup: Callable[[T], Any] | None = None,
     ) -> "ServiceRegistry":
         """
         注册类（自动创建工厂函数）
@@ -163,7 +164,7 @@ class ServiceRegistry:
 
         return definition.instance
 
-    def get_optional(self, name: str) -> Optional[Any]:
+    def get_optional(self, name: str) -> Any | None:
         """获取服务实例，不存在时返回 None"""
         try:
             return self.get(name)
@@ -290,12 +291,12 @@ class ServiceRegistry:
         self._cleanup_service(definition)
 
     @property
-    def registered_services(self) -> List[str]:
+    def registered_services(self) -> list[str]:
         """获取所有已注册的服务名称"""
         return list(self._services.keys())
 
     @property
-    def initialized_services(self) -> List[str]:
+    def initialized_services(self) -> list[str]:
         """获取所有已初始化的服务名称"""
         return self._init_order.copy()
 
@@ -305,7 +306,7 @@ class ServiceRegistry:
 
 # ==================== 全局注册表 ====================
 
-_registry: Optional[ServiceRegistry] = None
+_registry: ServiceRegistry | None = None
 
 
 def get_service_registry() -> ServiceRegistry:

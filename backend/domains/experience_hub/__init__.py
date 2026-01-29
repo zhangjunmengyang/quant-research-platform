@@ -7,12 +7,12 @@
 """
 
 from .core.models import (
+    EntityType,
     Experience,
     ExperienceContent,
     ExperienceContext,
     ExperienceLink,
     SourceType,
-    EntityType,
 )
 from .core.store import ExperienceStore, get_experience_store
 from .services.experience import ExperienceService, get_experience_service

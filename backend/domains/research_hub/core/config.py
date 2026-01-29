@@ -6,7 +6,6 @@ Research Hub 配置管理
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -72,10 +71,10 @@ class ResearchHubSettings(BaseSettings):
     default_pipeline: str = "default"
     upload_dir: str = "private/research"
     max_file_size_mb: int = 100
-    pipelines: Dict[str, PipelineConfig] = Field(default_factory=dict)
+    pipelines: dict[str, PipelineConfig] = Field(default_factory=dict)
 
     @classmethod
-    def from_yaml(cls, yaml_path: Optional[Path] = None) -> "ResearchHubSettings":
+    def from_yaml(cls, yaml_path: Path | None = None) -> "ResearchHubSettings":
         """从 YAML 文件加载配置"""
         if yaml_path is None:
             current = Path(__file__).resolve()
@@ -85,7 +84,7 @@ class ResearchHubSettings(BaseSettings):
         if not yaml_path.exists():
             return cls()
 
-        with open(yaml_path, "r", encoding="utf-8") as f:
+        with open(yaml_path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         default = data.get("default", {})
@@ -114,22 +113,22 @@ class ResearchHubSettings(BaseSettings):
             pipelines=pipelines,
         )
 
-    def get_pipeline_config(self, pipeline_name: Optional[str] = None) -> PipelineConfig:
+    def get_pipeline_config(self, pipeline_name: str | None = None) -> PipelineConfig:
         """获取流水线配置"""
         name = pipeline_name or self.default_pipeline
         if name not in self.pipelines:
             return PipelineConfig(name=name)
         return self.pipelines[name]
 
-    def list_pipelines(self) -> List[str]:
+    def list_pipelines(self) -> list[str]:
         """列出所有可用的流水线"""
         return list(self.pipelines.keys())
 
 
-_settings: Optional[ResearchHubSettings] = None
+_settings: ResearchHubSettings | None = None
 
 
-def get_research_hub_settings(yaml_path: Optional[Path] = None) -> ResearchHubSettings:
+def get_research_hub_settings(yaml_path: Path | None = None) -> ResearchHubSettings:
     """获取 Research Hub 配置单例"""
     global _settings
     if _settings is None:
@@ -137,7 +136,7 @@ def get_research_hub_settings(yaml_path: Optional[Path] = None) -> ResearchHubSe
     return _settings
 
 
-def get_pipeline_config(pipeline_name: Optional[str] = None) -> PipelineConfig:
+def get_pipeline_config(pipeline_name: str | None = None) -> PipelineConfig:
     """获取流水线配置的便捷函数"""
     settings = get_research_hub_settings()
     return settings.get_pipeline_config(pipeline_name)

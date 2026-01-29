@@ -7,15 +7,14 @@
 Note Hub 定位为"研究草稿/临时记录"层，支持：
 - 笔记类型分类（observation/hypothesis/verification）
 - 归档管理
-- 实体关联通过 Edge 系统 (mcp_core/edge) 管理
+- 实体关联通过 Graph 系统 (graph_hub) 管理
 """
 
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Any
 
 import psycopg2
-
 from domains.mcp_core.base.store import (
     BaseStore,
     get_store_instance,
@@ -23,7 +22,7 @@ from domains.mcp_core.base.store import (
 )
 from domains.mcp_core.database.query_builder import QueryBuilder
 
-from .models import Note, NoteType
+from .models import Note
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,7 @@ class NoteStore(BaseStore[Note]):
     # 向后兼容别名
     ALLOWED_COLUMNS = allowed_columns
 
-    def _row_to_entity(self, row: Dict[str, Any]) -> Note:
+    def _row_to_entity(self, row: dict[str, Any]) -> Note:
         """将数据库行转换为 Note 对象"""
         valid_fields = {k: v for k, v in row.items() if k in Note.__dataclass_fields__}
         return Note(**valid_fields)
@@ -66,7 +65,7 @@ class NoteStore(BaseStore[Note]):
 
     # ==================== 基本 CRUD ====================
 
-    def get(self, note_id: int) -> Optional[Note]:
+    def get(self, note_id: int) -> Note | None:
         """获取单个笔记"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -78,7 +77,7 @@ class NoteStore(BaseStore[Note]):
                 return self._row_to_entity(dict(row))
         return None
 
-    def get_by_uuid(self, uuid: str) -> Optional[Note]:
+    def get_by_uuid(self, uuid: str) -> Note | None:
         """通过 UUID 获取笔记"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -90,7 +89,7 @@ class NoteStore(BaseStore[Note]):
                 return self._row_to_entity(dict(row))
         return None
 
-    def get_all(self, limit: int = 100, offset: int = 0) -> List[Note]:
+    def get_all(self, limit: int = 100, offset: int = 0) -> list[Note]:
         """获取所有笔记"""
         with self._cursor() as cursor:
             cursor.execute(
@@ -99,7 +98,7 @@ class NoteStore(BaseStore[Note]):
             )
             return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
 
-    def add(self, note: Note) -> Optional[int]:
+    def add(self, note: Note) -> int | None:
         """添加笔记，返回新笔记的 ID"""
         import uuid as uuid_lib
 
@@ -161,7 +160,7 @@ class NoteStore(BaseStore[Note]):
 
         safe_fields['updated_at'] = datetime.now()
 
-        set_clause = ', '.join(f'{k} = %s' for k in safe_fields.keys())
+        set_clause = ', '.join(f'{k} = %s' for k in safe_fields)
         values = list(safe_fields.values()) + [note_id]
 
         with self._cursor() as cursor:
@@ -199,14 +198,13 @@ class NoteStore(BaseStore[Note]):
         return deleted
 
     def _delete_note_edges(self, note_id: int) -> None:
-        """删除笔记关联的所有边"""
+        """删除笔记关联的所有边 (使用 Neo4j)"""
         try:
-            from domains.mcp_core.edge.store import get_edge_store
-            from domains.mcp_core.edge.models import EdgeEntityType
+            from domains.graph_hub.core import NodeType, get_graph_store
 
-            edge_store = get_edge_store()
-            deleted_count = edge_store.delete_edges_by_entity(
-                EdgeEntityType.NOTE,
+            graph_store = get_graph_store()
+            deleted_count = graph_store.delete_edges_by_entity(
+                NodeType.NOTE,
                 str(note_id)
             )
             if deleted_count > 0:
@@ -218,9 +216,10 @@ class NoteStore(BaseStore[Note]):
     def _delete_note_file(self, note: Note) -> None:
         """删除笔记对应的文件"""
         try:
-            from domains.mcp_core.sync.note_sync import NoteSyncService
-            from pathlib import Path
             import os
+            from pathlib import Path
+
+            from domains.mcp_core.sync.note_sync import NoteSyncService
 
             # 获取私有数据目录
             private_dir = Path(os.environ.get('PRIVATE_DATA_DIR', 'private'))
@@ -238,15 +237,15 @@ class NoteStore(BaseStore[Note]):
 
     def query(
         self,
-        search: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        note_type: Optional[str] = None,
-        is_archived: Optional[bool] = None,
-        is_promoted: Optional[bool] = None,
+        search: str | None = None,
+        tags: list[str] | None = None,
+        note_type: str | None = None,
+        is_archived: bool | None = None,
+        is_promoted: bool | None = None,
         order_by: str = "updated_at DESC",
         limit: int = 50,
         offset: int = 0
-    ) -> Tuple[List[Note], int]:
+    ) -> tuple[list[Note], int]:
         """
         条件查询笔记
 
@@ -306,12 +305,12 @@ class NoteStore(BaseStore[Note]):
 
         return notes, total
 
-    def search(self, keyword: str, limit: int = 20) -> List[Note]:
+    def search(self, keyword: str, limit: int = 20) -> list[Note]:
         """全文搜索笔记"""
         notes, _ = self.query(search=keyword, limit=limit)
         return notes
 
-    def get_tags(self, include_archived: bool = False) -> List[str]:
+    def get_tags(self, include_archived: bool = False) -> list[str]:
         """获取所有标签（去重）
 
         Args:
@@ -345,7 +344,7 @@ class NoteStore(BaseStore[Note]):
         note_type: str,
         limit: int = 50,
         include_archived: bool = False
-    ) -> List[Note]:
+    ) -> list[Note]:
         """
         按类型获取笔记
 
@@ -388,7 +387,7 @@ class NoteStore(BaseStore[Note]):
         """标记笔记已提炼为经验"""
         return self.update(note_id, promoted_to_experience_id=experience_id)
 
-    def get_stats_extended(self) -> Dict[str, Any]:
+    def get_stats_extended(self) -> dict[str, Any]:
         """
         获取扩展统计信息
 
@@ -442,7 +441,7 @@ class NoteStore(BaseStore[Note]):
 
 # ==================== 单例管理 ====================
 
-def get_note_store(database_url: Optional[str] = None) -> NoteStore:
+def get_note_store(database_url: str | None = None) -> NoteStore:
     """获取笔记存储层单例"""
     return get_store_instance(NoteStore, "NoteStore", database_url=database_url)
 

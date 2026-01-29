@@ -4,16 +4,14 @@ MCP 请求日志记录器
 提供对外部 MCP 请求的完整日志记录功能。
 """
 
-import json
-import time
 import logging
 import threading
-from contextlib import contextmanager
+import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .models import CallStatus, MCPRequestRecord, generate_id
-from .storage import get_log_storage, LogStorage
+from .storage import LogStorage, get_log_storage
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +49,7 @@ class MCPRequestLogger:
         )
     """
 
-    def __init__(self, storage: Optional[LogStorage] = None):
+    def __init__(self, storage: LogStorage | None = None):
         """
         初始化
 
@@ -59,7 +57,7 @@ class MCPRequestLogger:
             storage: 日志存储实例
         """
         self._storage = storage
-        self._pending: Dict[str, MCPRequestRecord] = {}
+        self._pending: dict[str, MCPRequestRecord] = {}
         self._lock = threading.Lock()
 
     @property
@@ -74,8 +72,8 @@ class MCPRequestLogger:
         server_name: str,
         server_port: int,
         method: str,
-        params: Optional[Dict[str, Any]] = None,
-        jsonrpc_id: Optional[Any] = None,
+        params: dict[str, Any] | None = None,
+        jsonrpc_id: Any | None = None,
         client_ip: str = "",
         client_name: str = "",
         user_agent: str = "",
@@ -149,8 +147,8 @@ class MCPRequestLogger:
         success: bool,
         response_size: int = 0,
         response_summary: str = "",
-        response_data: Optional[Dict[str, Any]] = None,
-        error_code: Optional[int] = None,
+        response_data: dict[str, Any] | None = None,
+        error_code: int | None = None,
         error_message: str = "",
     ) -> None:
         """
@@ -222,16 +220,16 @@ class MCPRequestLogger:
 
     def query(
         self,
-        server_name: Optional[str] = None,
-        method: Optional[str] = None,
-        tool_name: Optional[str] = None,
-        client_name: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        status: Optional[CallStatus] = None,
+        server_name: str | None = None,
+        method: str | None = None,
+        tool_name: str | None = None,
+        client_name: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        status: CallStatus | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[MCPRequestRecord]:
+    ) -> list[MCPRequestRecord]:
         """查询 MCP 请求记录"""
         return self.storage.query_mcp_requests(
             server_name=server_name,
@@ -245,7 +243,7 @@ class MCPRequestLogger:
             offset=offset,
         )
 
-    def get(self, request_id: str) -> Optional[MCPRequestRecord]:
+    def get(self, request_id: str) -> MCPRequestRecord | None:
         """获取单个请求记录"""
         return self.storage.get_mcp_request(request_id)
 
@@ -276,8 +274,8 @@ class MCPRequestContext:
         server_name: str,
         server_port: int,
         method: str,
-        params: Optional[Dict[str, Any]] = None,
-        jsonrpc_id: Optional[Any] = None,
+        params: dict[str, Any] | None = None,
+        jsonrpc_id: Any | None = None,
         client_ip: str = "",
         client_name: str = "",
         user_agent: str = "",
@@ -292,7 +290,7 @@ class MCPRequestContext:
         self.client_name = client_name
         self.user_agent = user_agent
 
-        self.request_id: Optional[str] = None
+        self.request_id: str | None = None
         self.start_time: float = 0
         self._response_logged = False
 
@@ -300,7 +298,7 @@ class MCPRequestContext:
         self._success = True
         self._response_size = 0
         self._response_summary = ""
-        self._error_code: Optional[int] = None
+        self._error_code: int | None = None
         self._error_message = ""
 
     def set_response(
@@ -308,7 +306,7 @@ class MCPRequestContext:
         success: bool = True,
         response_size: int = 0,
         response_summary: str = "",
-        error_code: Optional[int] = None,
+        error_code: int | None = None,
         error_message: str = "",
     ) -> None:
         """设置响应信息"""
@@ -400,7 +398,7 @@ class MCPRequestContext:
 
 
 # 单例
-_mcp_logger: Optional[MCPRequestLogger] = None
+_mcp_logger: MCPRequestLogger | None = None
 _logger_lock = threading.Lock()
 
 

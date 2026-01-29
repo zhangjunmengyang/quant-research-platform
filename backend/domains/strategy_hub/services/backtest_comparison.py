@@ -7,22 +7,19 @@
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any
 
 import numpy as np
-import pandas as pd
-
 from domains.mcp_core.paths import get_data_dir
+
+from ..utils.data_functions import (
+    process_coin_selection_data,
+    process_equity_data,
+)
 from ..utils.plot_functions import (
-    draw_equity_curve_plotly,
     draw_coins_difference,
     draw_coins_table,
+    draw_equity_curve_plotly,
     merge_html_flexible,
-)
-from ..utils.data_functions import (
-    process_equity_data,
-    process_coin_selection_data,
-    process_backtest_trading_factors,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,10 +31,10 @@ class BacktestComparisonResult:
     backtest_name: str
     start_time: str
     end_time: str
-    equity_similarity: Optional[float] = None
-    coin_selection_similarity: Optional[float] = None
-    html_path: Optional[str] = None
-    error: Optional[str] = None
+    equity_similarity: float | None = None
+    coin_selection_similarity: float | None = None
+    html_path: str | None = None
+    error: str | None = None
 
 
 @dataclass
@@ -45,9 +42,9 @@ class FactorComparisonResult:
     """因子值对比结果"""
     backtest_name: str
     coin: str
-    factors: List[str] = field(default_factory=list)
-    html_path: Optional[str] = None
-    error: Optional[str] = None
+    factors: list[str] = field(default_factory=list)
+    html_path: str | None = None
+    error: str | None = None
 
 
 class BacktestComparisonService:
@@ -57,7 +54,7 @@ class BacktestComparisonService:
     对比回测和实盘的资金曲线、选币结果、因子值。
     """
 
-    def __init__(self, data_path: Optional[Path] = None):
+    def __init__(self, data_path: Path | None = None):
         """
         初始化服务
 
@@ -184,7 +181,7 @@ class BacktestComparisonService:
         self,
         backtest_name: str,
         coin: str,
-        factor_names: Optional[List[str]] = None
+        factor_names: list[str] | None = None
     ) -> FactorComparisonResult:
         """
         对比单个币种的因子值
@@ -261,7 +258,7 @@ class BacktestComparisonService:
 
 
 # 单例模式
-_backtest_comparison_service: Optional[BacktestComparisonService] = None
+_backtest_comparison_service: BacktestComparisonService | None = None
 
 
 def get_backtest_comparison_service() -> BacktestComparisonService:

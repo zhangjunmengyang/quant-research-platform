@@ -11,11 +11,12 @@ LLM 调用日志记录器
 import logging
 import re
 import time
+from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
+from typing import Any, TypeVar
 
 from .models import (
     CallStatus,
@@ -28,7 +29,6 @@ from .models import (
     generate_id,
 )
 from .storage import LogStorage, get_log_storage
-
 
 # 当前追踪 ID 的上下文变量
 _current_trace_id: ContextVar[str] = ContextVar("trace_id", default="")
@@ -97,26 +97,26 @@ class LLMLogger:
 
     def __init__(
         self,
-        storage: Optional[LogStorage] = None,
-        config: Optional[LogConfig] = None,
+        storage: LogStorage | None = None,
+        config: LogConfig | None = None,
     ):
         self.storage = storage or get_log_storage()
         self.config = config or LogConfig()
-        self._pending_calls: Dict[str, LLMCallRecord] = {}
+        self._pending_calls: dict[str, LLMCallRecord] = {}
 
     def log_request(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         system_prompt: str = "",
         user_prompt: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: list[dict[str, Any]] | None = None,
         caller: str = "",
         purpose: str = "",
         provider: str = "",
-        extra_params: Optional[Dict[str, Any]] = None,
+        extra_params: dict[str, Any] | None = None,
     ) -> str:
         """
         记录 LLM 请求
@@ -198,7 +198,7 @@ class LLMLogger:
         self,
         call_id: str,
         content: str = "",
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: list[dict[str, Any]] | None = None,
         finish_reason: str = "",
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
@@ -284,20 +284,20 @@ class LLMLogger:
             retry_count=retry_count,
         )
 
-    def get_call(self, call_id: str) -> Optional[LLMCallRecord]:
+    def get_call(self, call_id: str) -> LLMCallRecord | None:
         """获取调用记录"""
         return self.storage.get_llm_call(call_id)
 
     def query_calls(
         self,
-        trace_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        model: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-        status: Optional[CallStatus] = None,
+        trace_id: str | None = None,
+        session_id: str | None = None,
+        model: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        status: CallStatus | None = None,
         limit: int = 100,
-    ) -> List[LLMCallRecord]:
+    ) -> list[LLMCallRecord]:
         """查询调用记录"""
         return self.storage.query_llm_calls(
             trace_id=trace_id,
@@ -311,15 +311,15 @@ class LLMLogger:
 
     def get_stats(
         self,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+    ) -> dict[str, Any]:
         """获取统计信息"""
         return self.storage.get_stats(start_time=start_time, end_time=end_time)
 
 
 # 全局日志实例
-_llm_logger: Optional[LLMLogger] = None
+_llm_logger: LLMLogger | None = None
 
 
 def get_llm_logger() -> LLMLogger:
@@ -331,8 +331,8 @@ def get_llm_logger() -> LLMLogger:
 
 
 def configure_llm_logger(
-    storage: Optional[LogStorage] = None,
-    config: Optional[LogConfig] = None,
+    storage: LogStorage | None = None,
+    config: LogConfig | None = None,
 ) -> LLMLogger:
     """配置全局 LLM 日志实例"""
     global _llm_logger
@@ -539,7 +539,7 @@ class LLMCallContext:
     def __init__(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         caller: str = "",
         purpose: str = "",
         provider: str = "",
@@ -551,7 +551,7 @@ class LLMCallContext:
         self.purpose = purpose
         self.provider = provider
         self.kwargs = kwargs
-        self.call_id: Optional[str] = None
+        self.call_id: str | None = None
         self.start_time: float = 0
         self._llm_logger = get_llm_logger()
 
@@ -587,7 +587,7 @@ class LLMCallContext:
     def set_response(
         self,
         content: str = "",
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: list[dict[str, Any]] | None = None,
         finish_reason: str = "",
         prompt_tokens: int = 0,
         completion_tokens: int = 0,
