@@ -27,6 +27,8 @@ const ResearchSearch = () => import('@/pages/research/Search')
 
 const ExperiencesDashboard = () => import('@/pages/experiences/Dashboard')
 
+const GraphExplorer = () => import('@/pages/graph/Explorer')
+
 const LogsExplorer = () => import('@/pages/logs/Explorer')
 
 // Error element for routes
@@ -116,6 +118,11 @@ export const router = createBrowserRouter([
       {
         path: 'experiences',
         children: [{ index: true, lazy: ExperiencesDashboard }],
+      },
+      // Graph Hub
+      {
+        path: 'graph',
+        children: [{ index: true, lazy: GraphExplorer }],
       },
       // Logs Hub
       {

@@ -43,6 +43,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # ============================================
+  # Neo4j 图数据库
+  # ============================================
+  neo4j:
+    image: neo4j:5-community
+    container_name: quant-neo4j
+    environment:
+      - NEO4J_AUTH=neo4j/quant123
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_apoc_import_file_use__neo4j__config=true
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
 volumes:
   postgres_data:
   redis_data:
+  neo4j_data:
+  neo4j_logs:

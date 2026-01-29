@@ -15,9 +15,10 @@ import {
   Edit2,
   X,
 } from 'lucide-react'
-import { useNoteDetail, useNoteMutations, useVerifications, useNote } from '@/features/note'
+import { useNoteDetail, useNoteMutations, useVerifications } from '@/features/note'
 import { NoteType, NOTE_TYPE_LABELS, NOTE_TYPE_COLORS } from '@/features/note/types'
 import { Link } from 'react-router-dom'
+import { EntityGraph } from '@/features/graph'
 
 export function Component() {
   const { id } = useParams<{ id: string }>()
@@ -247,6 +248,18 @@ export function Component() {
           </div>
         )}
       </div>
+
+      {/* 知识关联图 */}
+      {note?.id && (
+        <div className="rounded-lg border bg-card p-6">
+          <EntityGraph
+            entityType="note"
+            entityId={String(note.id)}
+            entityName={note.title}
+            height={200}
+          />
+        </div>
+      )}
 
       {/* 假设类型笔记显示相关验证（通过 Edge 系统查询） */}
       {note?.note_type === NoteType.HYPOTHESIS && (

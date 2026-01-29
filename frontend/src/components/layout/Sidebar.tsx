@@ -21,6 +21,7 @@ import {
   FileTextIcon,
   FlaskConical,
   Lightbulb,
+  Network,
   Server,
   Sparkles,
   Target,
@@ -74,7 +75,10 @@ const navigation: NavGroup[] = [
   {
     titleKey: 'nav.wisdom',
     defaultOpen: true,
-    items: [{ labelKey: 'nav.experienceOverview', href: '/experiences', icon: Lightbulb }],
+    items: [
+      { labelKey: 'nav.experienceOverview', href: '/experiences', icon: Lightbulb },
+      { labelKey: 'nav.graphExplorer', href: '/graph', icon: Network },
+    ],
   },
   // System
   {

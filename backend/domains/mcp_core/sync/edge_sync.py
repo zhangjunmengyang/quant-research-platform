@@ -1,7 +1,7 @@
 """
 知识边同步服务
 
-将 knowledge_edges 表中的关系数据在数据库和文件之间同步。
+将 Neo4j 图数据库中的关系数据导出到文件系统。
 
 同步策略：
 1. 标签关系 (has_tag): 存储在 private/tags/{entity_type}/{entity_id}.yaml
@@ -46,6 +46,7 @@ class EdgeSyncService(BaseSyncService):
     """
     知识边同步服务
 
+    从 Neo4j 图数据库读取数据，导出到文件系统。
     支持两种同步模式：
     1. 标签同步: has_tag 关系，按实体组织存储在 private/tags/
     2. 关系同步: 其他关系，按关系类型组织存储在 private/edges/
@@ -76,11 +77,23 @@ class EdgeSyncService(BaseSyncService):
 
         Args:
             data_dir: 私有数据目录 (private/)
-            store: EdgeStore 实例
+            store: GraphStore 实例 (Neo4j)
         """
         super().__init__(data_dir, store)
         self.tags_dir = data_dir / "tags"
         self.edges_dir = data_dir / "edges"
+        self._graph_store = None
+
+    @property
+    def graph_store(self):
+        """延迟获取 GraphStore 实例"""
+        if self._graph_store is None:
+            try:
+                from domains.graph_hub.core import get_graph_store
+                self._graph_store = get_graph_store()
+            except Exception as e:
+                logger.warning(f"graph_store_init_failed: {e}")
+        return self._graph_store
 
     # ==================== 标签同步 (has_tag) ====================
 
@@ -113,8 +126,8 @@ class EdgeSyncService(BaseSyncService):
         """
         stats = {"exported": 0, "skipped": 0, "errors": 0}
 
-        if self.store is None:
-            logger.warning("edge_sync_export_skipped: store is None")
+        if self.graph_store is None:
+            logger.warning("edge_sync_export_skipped: graph_store is None")
             return stats
 
         # 1. 导出标签
@@ -153,9 +166,10 @@ class EdgeSyncService(BaseSyncService):
         stats = {"exported": 0, "skipped": 0, "errors": 0}
 
         try:
-            from domains.mcp_core.edge.models import EdgeEntityType
-            etype = EdgeEntityType(entity_type)
-            tags_map = self.store.get_all_entity_tags_by_type(etype)
+            from domains.graph_hub.core import NodeType
+            etype = NodeType(entity_type)
+            # 从 Neo4j 获取所有该类型实体的标签
+            tags_map = self._get_all_entity_tags_by_type(etype)
         except Exception as e:
             logger.error(f"tag_export_get_error: {entity_type}, {e}")
             stats["errors"] = 1
@@ -181,6 +195,32 @@ class EdgeSyncService(BaseSyncService):
                 stats["errors"] += 1
 
         return stats
+
+    def _get_all_entity_tags_by_type(self, entity_type) -> Dict[str, List[str]]:
+        """从 Neo4j 获取指定类型所有实体的标签映射"""
+        result = {}
+        if self.graph_store is None:
+            return result
+
+        try:
+            # 查询所有 has_tag 关系
+            from domains.graph_hub.core import RelationType
+            edges = self.graph_store.get_edges_by_relation(RelationType.HAS_TAG, limit=10000)
+
+            entity_type_value = entity_type.value if hasattr(entity_type, 'value') else entity_type
+
+            for edge in edges:
+                src_type = edge.source_type.value if hasattr(edge.source_type, 'value') else edge.source_type
+                if src_type == entity_type_value:
+                    entity_id = edge.source_id
+                    tag = edge.target_id
+                    if entity_id not in result:
+                        result[entity_id] = []
+                    result[entity_id].append(tag)
+        except Exception as e:
+            logger.error(f"get_all_entity_tags_error: {entity_type}, {e}")
+
+        return result
 
     def _export_single_entity_tags(
         self,
@@ -226,9 +266,9 @@ class EdgeSyncService(BaseSyncService):
     def _export_relation_type(self, relation: str, overwrite: bool) -> str:
         """导出某种关系类型的所有边"""
         try:
-            from domains.mcp_core.edge.models import EdgeRelationType
-            rtype = EdgeRelationType(relation)
-            edges = self.store.get_edges_by_relation(rtype, limit=10000)
+            from domains.graph_hub.core import RelationType
+            rtype = RelationType(relation)
+            edges = self.graph_store.get_edges_by_relation(rtype, limit=10000)
         except Exception as e:
             logger.error(f"relation_export_get_error: {relation}, {e}")
             return "error"
@@ -246,8 +286,6 @@ class EdgeSyncService(BaseSyncService):
         edges_data = []
         for edge in edges:
             edge_dict = edge.to_dict()
-            # 移除 id 字段（同步不依赖数据库 ID）
-            edge_dict.pop("id", None)
             edges_data.append(edge_dict)
 
         data = {"edges": edges_data}
@@ -266,7 +304,7 @@ class EdgeSyncService(BaseSyncService):
 
     def import_all(self, full_sync: bool = False) -> Dict[str, int]:
         """
-        从文件导入所有知识边数据
+        从文件导入所有知识边数据到 Neo4j
 
         Args:
             full_sync: 是否完全同步（删除文件中不存在的边）
@@ -276,8 +314,8 @@ class EdgeSyncService(BaseSyncService):
         """
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
-        if self.store is None:
-            logger.warning("edge_sync_import_skipped: store is None")
+        if self.graph_store is None:
+            logger.warning("edge_sync_import_skipped: graph_store is None")
             return stats
 
         # 1. 导入标签
@@ -300,12 +338,7 @@ class EdgeSyncService(BaseSyncService):
         return stats
 
     def _import_all_tags(self, full_sync: bool = False) -> Dict[str, int]:
-        """
-        导入所有标签
-
-        Args:
-            full_sync: 是否完全同步（删除文件中不存在的标签）
-        """
+        """导入所有标签"""
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
         if not self.tags_dir.exists():
@@ -330,23 +363,17 @@ class EdgeSyncService(BaseSyncService):
         return stats
 
     def _import_entity_type_tags(self, entity_type: str, full_sync: bool = False) -> Dict[str, int]:
-        """
-        导入某个实体类型的所有标签
-
-        Args:
-            entity_type: 实体类型
-            full_sync: 是否完全同步（删除文件中不存在的标签）
-        """
+        """导入某个实体类型的所有标签"""
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
         entity_dir = self._get_tag_entity_dir(entity_type)
         if not entity_dir.exists():
             return stats
 
-        from domains.mcp_core.edge.models import EdgeEntityType
-        etype = EdgeEntityType(entity_type)
+        from domains.graph_hub.core import NodeType
+        etype = NodeType(entity_type)
 
-        db_tags_map = self.store.get_all_entity_tags_by_type(etype)
+        db_tags_map = self._get_all_entity_tags_by_type(etype)
         file_entities = set()
 
         for yaml_file in entity_dir.glob("*.yaml"):
@@ -367,7 +394,6 @@ class EdgeSyncService(BaseSyncService):
                 file_tags_set = set(file_tags)
 
                 tags_to_add = file_tags_set - db_tags
-                # 只在 full_sync 模式下删除数据库中多余的标签
                 tags_to_remove = (db_tags - file_tags_set) if full_sync else set()
 
                 if not tags_to_add and not tags_to_remove:
@@ -376,7 +402,7 @@ class EdgeSyncService(BaseSyncService):
 
                 for tag in tags_to_add:
                     try:
-                        self.store.add_tag(etype, entity_id, tag)
+                        self.graph_store.add_tag(etype, entity_id, tag)
                         stats["created"] += 1
                     except Exception as e:
                         logger.error(f"tag_import_add_error: {entity_id}, {tag}, {e}")
@@ -384,7 +410,7 @@ class EdgeSyncService(BaseSyncService):
 
                 for tag in tags_to_remove:
                     try:
-                        self.store.remove_tag(etype, entity_id, tag)
+                        self.graph_store.remove_tag(etype, entity_id, tag)
                         stats["deleted"] += 1
                     except Exception as e:
                         logger.error(f"tag_import_remove_error: {entity_id}, {tag}, {e}")
@@ -394,13 +420,13 @@ class EdgeSyncService(BaseSyncService):
                 logger.error(f"tag_import_file_error: {yaml_file}, {e}")
                 stats["errors"] += 1
 
-        # 仅在 full_sync 模式下处理文件中不存在但数据库中存在的实体（完全删除）
+        # 仅在 full_sync 模式下处理文件中不存在但数据库中存在的实体
         if full_sync:
             for entity_id in db_tags_map:
                 if entity_id not in file_entities:
                     for tag in db_tags_map[entity_id]:
                         try:
-                            self.store.remove_tag(etype, entity_id, tag)
+                            self.graph_store.remove_tag(etype, entity_id, tag)
                             stats["deleted"] += 1
                         except Exception as e:
                             logger.error(f"tag_import_cleanup_error: {entity_id}, {e}")
@@ -430,23 +456,15 @@ class EdgeSyncService(BaseSyncService):
         return stats
 
     def _import_relation_type(self, relation: str, full_sync: bool = False) -> Dict[str, int]:
-        """
-        导入某种关系类型的所有边
-
-        Args:
-            relation: 关系类型
-            full_sync: 是否完全同步（删除文件中不存在的边）
-        """
+        """导入某种关系类型的所有边"""
         stats = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "errors": 0}
 
         filepath = self._get_relation_file(relation)
 
-        # 获取数据库中该关系类型的所有边
-        from domains.mcp_core.edge.models import EdgeRelationType, KnowledgeEdge
-        rtype = EdgeRelationType(relation)
-        db_edges = self.store.get_edges_by_relation(rtype, limit=10000)
+        from domains.graph_hub.core import RelationType, GraphEdge
+        rtype = RelationType(relation)
+        db_edges = self.graph_store.get_edges_by_relation(rtype, limit=10000)
 
-        # 构建数据库边的唯一键集合和映射
         db_edge_keys = set()
         db_edge_map = {}
         for edge in db_edges:
@@ -454,14 +472,12 @@ class EdgeSyncService(BaseSyncService):
             db_edge_keys.add(key)
             db_edge_map[key] = edge
 
-        # 如果文件不存在
         if not filepath.exists():
-            # full_sync 模式下删除数据库中所有该类型的边
             if full_sync and db_edge_keys:
                 for key in db_edge_keys:
                     edge = db_edge_map[key]
                     try:
-                        self.store.delete_by_key(
+                        self.graph_store.delete_edge(
                             edge.source_type,
                             edge.source_id,
                             edge.target_type,
@@ -477,12 +493,11 @@ class EdgeSyncService(BaseSyncService):
         try:
             data = self.read_yaml(filepath)
             if not data:
-                # 空文件，full_sync 模式下删除所有
                 if full_sync:
                     for key in db_edge_keys:
                         edge = db_edge_map[key]
                         try:
-                            self.store.delete_by_key(
+                            self.graph_store.delete_edge(
                                 edge.source_type,
                                 edge.source_id,
                                 edge.target_type,
@@ -505,12 +520,11 @@ class EdgeSyncService(BaseSyncService):
             stats["errors"] = 1
             return stats
 
-        # 构建文件边的唯一键集合
         file_edge_keys = set()
         file_edge_map = {}
         for edge_data in file_edges:
             try:
-                edge = KnowledgeEdge.from_dict(edge_data)
+                edge = GraphEdge.from_dict(edge_data)
                 key = self._edge_key(edge)
                 file_edge_keys.add(key)
                 file_edge_map[key] = edge
@@ -518,34 +532,28 @@ class EdgeSyncService(BaseSyncService):
                 logger.error(f"relation_import_parse_error: {relation}, {e}")
                 stats["errors"] += 1
 
-        # 需要添加的边
         edges_to_add = file_edge_keys - db_edge_keys
-        # 需要删除的边（文件中没有但数据库中有）
         edges_to_remove = db_edge_keys - file_edge_keys if full_sync else set()
 
-        # 计算 unchanged：文件和数据库都有的边
         unchanged_keys = file_edge_keys & db_edge_keys
         stats["unchanged"] = len(unchanged_keys)
 
-        # 添加新边
         for key in edges_to_add:
             edge = file_edge_map[key]
             try:
-                result = self.store.create(edge)
+                result = self.graph_store.create_edge(edge)
                 if result:
                     stats["created"] += 1
                 else:
-                    # 创建失败但不是错误（可能是并发导致的重复），计入 unchanged
                     stats["unchanged"] += 1
             except Exception as e:
                 logger.error(f"relation_import_create_error: {relation}, {key}, {e}")
                 stats["errors"] += 1
 
-        # 删除多余的边（仅 full_sync 模式）
         for key in edges_to_remove:
             edge = db_edge_map[key]
             try:
-                self.store.delete_by_key(
+                self.graph_store.delete_edge(
                     edge.source_type,
                     edge.source_id,
                     edge.target_type,
@@ -569,23 +577,14 @@ class EdgeSyncService(BaseSyncService):
     # ==================== 单个实体同步 ====================
 
     def export_single(self, entity_type: str, entity_id: str) -> bool:
-        """
-        导出单个实体的标签
-
-        Args:
-            entity_type: 实体类型
-            entity_id: 实体 ID
-
-        Returns:
-            是否成功
-        """
-        if self.store is None:
+        """导出单个实体的标签"""
+        if self.graph_store is None:
             return False
 
         try:
-            from domains.mcp_core.edge.models import EdgeEntityType
-            etype = EdgeEntityType(entity_type)
-            tags = self.store.get_entity_tags(etype, entity_id)
+            from domains.graph_hub.core import NodeType
+            etype = NodeType(entity_type)
+            tags = self.graph_store.get_entity_tags(etype, entity_id)
 
             filepath = self._get_tag_entity_file(entity_type, entity_id)
 
@@ -606,16 +605,8 @@ class EdgeSyncService(BaseSyncService):
             return False
 
     def export_relation(self, relation: str) -> bool:
-        """
-        导出某种关系类型的所有边
-
-        Args:
-            relation: 关系类型
-
-        Returns:
-            是否成功
-        """
-        if self.store is None:
+        """导出某种关系类型的所有边"""
+        if self.graph_store is None:
             return False
 
         try:
@@ -626,23 +617,13 @@ class EdgeSyncService(BaseSyncService):
             return False
 
     def export_edge(self, edge) -> bool:
-        """
-        导出单条边（触发该关系类型的完整导出）
-
-        Args:
-            edge: KnowledgeEdge 对象
-
-        Returns:
-            是否成功
-        """
+        """导出单条边（触发该关系类型的完整导出）"""
         relation = edge.relation.value if hasattr(edge.relation, 'value') else edge.relation
 
         if relation == "has_tag":
-            # 标签关系，导出实体的标签
             source_type = edge.source_type.value if hasattr(edge.source_type, 'value') else edge.source_type
             return self.export_single(source_type, edge.source_id)
         else:
-            # 其他关系，导出该关系类型
             return self.export_relation(relation)
 
     # ==================== 状态查询 ====================
@@ -660,15 +641,15 @@ class EdgeSyncService(BaseSyncService):
             },
         }
 
-        if self.store is None:
+        if self.graph_store is None:
             return status
 
         # 标签统计
         for entity_type in self.SUPPORTED_ENTITY_TYPES:
             try:
-                from domains.mcp_core.edge.models import EdgeEntityType
-                etype = EdgeEntityType(entity_type)
-                tags_map = self.store.get_all_entity_tags_by_type(etype)
+                from domains.graph_hub.core import NodeType
+                etype = NodeType(entity_type)
+                tags_map = self._get_all_entity_tags_by_type(etype)
                 status["tags"]["db_counts"][entity_type] = len(tags_map)
             except Exception:
                 status["tags"]["db_counts"][entity_type] = 0
@@ -682,9 +663,9 @@ class EdgeSyncService(BaseSyncService):
         # 关系统计
         for relation in self.SUPPORTED_RELATION_TYPES:
             try:
-                from domains.mcp_core.edge.models import EdgeRelationType
-                rtype = EdgeRelationType(relation)
-                edges = self.store.get_edges_by_relation(rtype, limit=10000)
+                from domains.graph_hub.core import RelationType
+                rtype = RelationType(relation)
+                edges = self.graph_store.get_edges_by_relation(rtype, limit=10000)
                 status["relations"]["db_counts"][relation] = len(edges)
             except Exception:
                 status["relations"]["db_counts"][relation] = 0
@@ -701,134 +682,6 @@ class EdgeSyncService(BaseSyncService):
 
         return status
 
-    def verify_sync(self) -> Dict[str, Any]:
-        """
-        验证数据库和文件的同步状态
-
-        Returns:
-            {
-                "is_synced": bool,
-                "tags": {"synced": bool, "missing_in_file": [...], "missing_in_db": [...]},
-                "relations": {"synced": bool, "missing_in_file": {...}, "missing_in_db": {...}}
-            }
-        """
-        result = {
-            "is_synced": True,
-            "tags": {
-                "synced": True,
-                "missing_in_file": [],
-                "missing_in_db": [],
-            },
-            "relations": {
-                "synced": True,
-                "missing_in_file": {},
-                "missing_in_db": {},
-            },
-        }
-
-        if self.store is None:
-            return result
-
-        # 验证标签同步
-        for entity_type in self.SUPPORTED_ENTITY_TYPES:
-            try:
-                from domains.mcp_core.edge.models import EdgeEntityType
-                etype = EdgeEntityType(entity_type)
-                db_tags_map = self.store.get_all_entity_tags_by_type(etype)
-
-                entity_dir = self._get_tag_entity_dir(entity_type)
-                file_entities = set()
-
-                if entity_dir.exists():
-                    for yaml_file in entity_dir.glob("*.yaml"):
-                        entity_id = yaml_file.stem
-                        file_entities.add(entity_id)
-
-                        data = self.read_yaml(yaml_file)
-                        if not data:
-                            continue
-
-                        file_tags = set(data.get("tags", []))
-                        db_tags = set(db_tags_map.get(entity_id, []))
-
-                        if file_tags != db_tags:
-                            result["tags"]["synced"] = False
-                            result["is_synced"] = False
-
-                            missing_in_db = file_tags - db_tags
-                            missing_in_file = db_tags - file_tags
-
-                            if missing_in_db:
-                                result["tags"]["missing_in_db"].append({
-                                    "entity": f"{entity_type}:{entity_id}",
-                                    "tags": list(missing_in_db)
-                                })
-                            if missing_in_file:
-                                result["tags"]["missing_in_file"].append({
-                                    "entity": f"{entity_type}:{entity_id}",
-                                    "tags": list(missing_in_file)
-                                })
-
-                # 检查数据库中有但文件中没有的实体
-                for entity_id in db_tags_map:
-                    if entity_id not in file_entities:
-                        result["tags"]["synced"] = False
-                        result["is_synced"] = False
-                        result["tags"]["missing_in_file"].append({
-                            "entity": f"{entity_type}:{entity_id}",
-                            "tags": db_tags_map[entity_id]
-                        })
-
-            except Exception as e:
-                logger.error(f"verify_tags_error: {entity_type}, {e}")
-
-        # 验证关系同步
-        for relation in self.SUPPORTED_RELATION_TYPES:
-            try:
-                from domains.mcp_core.edge.models import EdgeRelationType, KnowledgeEdge
-                rtype = EdgeRelationType(relation)
-                db_edges = self.store.get_edges_by_relation(rtype, limit=10000)
-
-                db_edge_keys = set()
-                for edge in db_edges:
-                    db_edge_keys.add(self._edge_key(edge))
-
-                file_edge_keys = set()
-                filepath = self._get_relation_file(relation)
-                if filepath.exists():
-                    data = self.read_yaml(filepath)
-                    if data:
-                        for edge_data in data.get("edges", []):
-                            try:
-                                edge = KnowledgeEdge.from_dict(edge_data)
-                                file_edge_keys.add(self._edge_key(edge))
-                            except Exception:
-                                pass
-
-                missing_in_file = db_edge_keys - file_edge_keys
-                missing_in_db = file_edge_keys - db_edge_keys
-
-                if missing_in_file or missing_in_db:
-                    result["relations"]["synced"] = False
-                    result["is_synced"] = False
-
-                    if missing_in_file:
-                        result["relations"]["missing_in_file"][relation] = list(missing_in_file)
-                    if missing_in_db:
-                        result["relations"]["missing_in_db"][relation] = list(missing_in_db)
-
-            except Exception as e:
-                logger.error(f"verify_relations_error: {relation}, {e}")
-
-        return result
-
     def restore_from_file(self) -> Dict[str, int]:
-        """
-        从文件完全恢复数据到数据库
-
-        这是一个便捷方法，等同于 import_all(full_sync=True)
-
-        Returns:
-            {"created": N, "updated": M, "deleted": D, "unchanged": K, "errors": L}
-        """
+        """从文件完全恢复数据到 Neo4j"""
         return self.import_all(full_sync=True)

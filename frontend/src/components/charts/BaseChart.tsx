@@ -38,6 +38,8 @@ export interface BaseChartProps {
   loading?: boolean
   theme?: 'light' | 'dark'
   onChartReady?: (chart: EChartsType) => void
+  /** 更新时是否完全替换配置（默认 true）。设为 false 可保留 roam 等用户状态 */
+  notMerge?: boolean
 }
 
 export function BaseChart({
@@ -47,10 +49,13 @@ export function BaseChart({
   loading = false,
   theme = 'light',
   onChartReady,
+  notMerge = true,
 }: BaseChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<EChartsType | null>(null)
   const onChartReadyRef = useRef(onChartReady)
+  const isFirstOptionSet = useRef(true)
+  const prevOptionStrRef = useRef<string>('')
 
   // 保持 onChartReady 的最新引用，但不触发重新初始化
   useEffect(() => {
@@ -65,6 +70,10 @@ export function BaseChart({
     if (chartRef.current) {
       chartRef.current.dispose()
     }
+
+    // 重新初始化时重置标志
+    isFirstOptionSet.current = true
+    prevOptionStrRef.current = ''
 
     const chart = echarts.init(containerRef.current, theme)
     chartRef.current = chart
@@ -84,10 +93,26 @@ export function BaseChart({
   }, [theme])
 
   // Update option
+  // 首次必须用 notMerge=true 完整初始化
+  // 后续只有 option 内容真正变化时才调用 setOption，避免干扰 roam 等用户状态
   useEffect(() => {
     if (!chartRef.current) return
-    chartRef.current.setOption(option, true)
-  }, [option])
+
+    // 首次设置必须调用
+    if (isFirstOptionSet.current) {
+      chartRef.current.setOption(option, true)
+      isFirstOptionSet.current = false
+      prevOptionStrRef.current = JSON.stringify(option)
+      return
+    }
+
+    // 后续只有 option 真正变化时才调用
+    const optionStr = JSON.stringify(option)
+    if (optionStr !== prevOptionStrRef.current) {
+      chartRef.current.setOption(option, notMerge)
+      prevOptionStrRef.current = optionStr
+    }
+  }, [option, notMerge])
 
   // Handle loading state
   useEffect(() => {

@@ -25,7 +25,13 @@ import {
 } from 'lucide-react'
 
 // 标签颜色配置 - 柔和的颜色方案
-const TAG_COLORS = [
+interface TagColor {
+  bg: string
+  text: string
+  dot: string
+}
+
+const TAG_COLORS: TagColor[] = [
   { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
   { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
   { bg: 'bg-pink-100 dark:bg-pink-900/30', text: 'text-pink-700 dark:text-pink-300', dot: 'bg-pink-500' },
@@ -35,6 +41,8 @@ const TAG_COLORS = [
   { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
   { bg: 'bg-rose-100 dark:bg-rose-900/30', text: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' },
 ]
+
+const DEFAULT_TAG_COLOR: TagColor = { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' }
 
 // 根据标签名生成稳定的颜色索引
 function getTagColorIndex(tag: string): number {
@@ -47,8 +55,8 @@ function getTagColorIndex(tag: string): number {
 }
 
 // 获取标签颜色
-function getTagColor(tag: string) {
-  return TAG_COLORS[getTagColorIndex(tag)]
+function getTagColor(tag: string): TagColor {
+  return TAG_COLORS[getTagColorIndex(tag)] ?? DEFAULT_TAG_COLOR
 }
 import { useDataOverview, useSymbols, useKline, useSymbolTags, useAddSymbolTag, useRemoveSymbolTag, useAllTags, useAllSymbolTags } from '@/features/data'
 import type { Symbol } from '@/features/data'

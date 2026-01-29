@@ -43,13 +43,7 @@ from .tools.signal_tools import (
     ScreenMarketTool,
     SimulateHoldingStrategyTool,
 )
-from .tools.tag_tools import (
-    AddTagTool,
-    RemoveTagTool,
-    GetEntityTagsTool,
-    GetEntitiesByTagTool,
-    ListAllTagsTool,
-)
+# 注: tag_tools 已迁移至 graph-hub (端口 6795)
 from .resources.data_resources import DataResourceProvider
 
 logger = logging.getLogger(__name__)
@@ -95,12 +89,7 @@ class DataHubMCPServer(BaseMCPServer):
         self.register_tool(ScreenMarketTool(), "signal")
         self.register_tool(SimulateHoldingStrategyTool(), "signal")
 
-        # 标签管理工具
-        self.register_tool(AddTagTool(), "tag")
-        self.register_tool(RemoveTagTool(), "tag")
-        self.register_tool(GetEntityTagsTool(), "tag")
-        self.register_tool(GetEntitiesByTagTool(), "tag")
-        self.register_tool(ListAllTagsTool(), "tag")
+        # 注: 标签管理工具已迁移至 graph-hub (端口 6795)
 
         logger.info(f"注册了 {len(self.tool_registry)} 个数据模块工具")
 

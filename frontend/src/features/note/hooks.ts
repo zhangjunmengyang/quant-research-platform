@@ -230,7 +230,7 @@ export function useVerifications(
  */
 export function useLinkedNotes(
   noteId: number | null,
-  noteType?: string,
+  _noteType?: string,
   includeArchived = false
 ) {
   // Redirect to verifications endpoint for hypothesis

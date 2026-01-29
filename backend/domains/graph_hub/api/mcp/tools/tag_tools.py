@@ -1,18 +1,13 @@
 """
-实体标签 MCP 工具
+标签管理 MCP 工具
 
-提供实体标签的管理功能，用于给币种、因子、策略等打标签。
-支持构建币池（如妖币池）并进行后续研究。
+提供实体标签的添加、移除、查询功能，用于给币种、因子、策略等打标签。
 """
 
 from typing import Any, Dict
 
 from .base import BaseTool, ToolResult
-
-from domains.mcp_core.edge import (
-    EdgeEntityType,
-    get_edge_store,
-)
+from domains.graph_hub.core.models import NodeType
 
 
 class AddTagTool(BaseTool):
@@ -27,15 +22,30 @@ class AddTagTool(BaseTool):
         return """给实体添加标签。
 
 用于给币种、因子、策略等实体打标签，便于分类管理和研究。
+标签存储在 Neo4j 图数据库中，通过 HAS_TAG 边连接实体和标签节点。
 
 典型使用场景:
-- 给币种打标签构建币池（如：妖币、蓝筹、DeFi）
-- 给因子打标签分类（如：动量类、反转类）
-- 给策略打标签（如：高频、低频、趋势）
+- 给币种打标签构建币池（如: 妖币、蓝筹、DeFi、Meme）
+- 给因子打标签分类（如: 动量类、反转类、波动类、价值类）
+- 给策略打标签（如: 高频、低频、趋势、套利）
+- 给笔记打标签便于检索（如: 待验证、已验证、重要发现）
 
-示例:
-- 给 BTC-USDT 打上"蓝筹"标签
-- 给 DOGE-USDT 打上"妖币"标签"""
+使用示例:
+1. 给币种打标签:
+   add_tag("data", "BTC-USDT", "蓝筹")
+   add_tag("data", "DOGE-USDT", "Meme")
+
+2. 给因子分类:
+   add_tag("factor", "Momentum_5d", "动量类")
+   add_tag("factor", "RSI_14d", "技术指标")
+
+3. 给策略分类:
+   add_tag("strategy", "uuid-123", "趋势跟踪")
+
+注意:
+- 标签名称大小写敏感
+- 重复添加相同标签不会报错，返回"标签已存在"
+- 一个实体可以有多个标签"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -44,16 +54,16 @@ class AddTagTool(BaseTool):
             "properties": {
                 "entity_type": {
                     "type": "string",
-                    "description": "实体类型",
-                    "enum": ["data", "factor", "strategy", "note", "research", "experience"]
+                    "enum": ["data", "factor", "strategy", "note", "research", "experience"],
+                    "description": "实体类型"
                 },
                 "entity_id": {
                     "type": "string",
-                    "description": "实体 ID（如：BTC-USDT、Momentum_5d）"
+                    "description": "实体标识 (如: BTC-USDT, Momentum_5d)"
                 },
                 "tag": {
                     "type": "string",
-                    "description": "标签名称（如：妖币、蓝筹、高波动）"
+                    "description": "标签名称 (如: 妖币, 蓝筹, 高波动)"
                 }
             },
             "required": ["entity_type", "entity_id", "tag"]
@@ -68,40 +78,40 @@ class AddTagTool(BaseTool):
             if not tag:
                 return ToolResult(success=False, error="标签名称不能为空")
 
+            # 解析实体类型
             try:
-                entity_type = EdgeEntityType(entity_type_str)
+                entity_type = NodeType(entity_type_str)
             except ValueError:
                 return ToolResult(success=False, error=f"无效的实体类型: {entity_type_str}")
 
-            edge_store = get_edge_store()
-
-            # 检查是否已存在
-            if edge_store.has_tag(entity_type, entity_id, tag):
+            # 检查标签是否已存在
+            existing_tags = self.graph_store.get_entity_tags(entity_type, entity_id)
+            if tag in existing_tags:
                 return ToolResult(
                     success=True,
                     data={
                         "entity_type": entity_type_str,
                         "entity_id": entity_id,
                         "tag": tag,
-                        "message": "标签已存在"
+                        "message": "标签已存在",
                     }
                 )
 
-            edge_id = edge_store.add_tag(entity_type, entity_id, tag)
+            # 添加标签
+            success = self.graph_store.add_tag(entity_type, entity_id, tag)
 
-            if edge_id:
+            if success:
                 return ToolResult(
                     success=True,
                     data={
-                        "edge_id": edge_id,
                         "entity_type": entity_type_str,
                         "entity_id": entity_id,
                         "tag": tag,
-                        "message": "添加标签成功"
+                        "message": "添加标签成功",
                     }
                 )
             else:
-                return ToolResult(success=False, error="添加标签失败")
+                return ToolResult(success=False, error="添加标签失败，请检查 Neo4j 连接")
 
         except Exception as e:
             return ToolResult(success=False, error=str(e))
@@ -118,7 +128,18 @@ class RemoveTagTool(BaseTool):
     def description(self) -> str:
         return """移除实体的标签。
 
-用于从币种、因子、策略等实体上移除标签。"""
+用于从币种、因子、策略等实体上移除标签。
+
+使用示例:
+1. 移除币种标签:
+   remove_tag("data", "DOGE-USDT", "妖币")
+
+2. 移除因子分类:
+   remove_tag("factor", "Momentum_5d", "动量类")
+
+注意:
+- 移除不存在的标签会返回失败
+- 只移除指定的标签，不影响其他标签"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -127,12 +148,12 @@ class RemoveTagTool(BaseTool):
             "properties": {
                 "entity_type": {
                     "type": "string",
-                    "description": "实体类型",
-                    "enum": ["data", "factor", "strategy", "note", "research", "experience"]
+                    "enum": ["data", "factor", "strategy", "note", "research", "experience"],
+                    "description": "实体类型"
                 },
                 "entity_id": {
                     "type": "string",
-                    "description": "实体 ID"
+                    "description": "实体标识"
                 },
                 "tag": {
                     "type": "string",
@@ -148,13 +169,14 @@ class RemoveTagTool(BaseTool):
             entity_id = params.get("entity_id")
             tag = params.get("tag")
 
+            # 解析实体类型
             try:
-                entity_type = EdgeEntityType(entity_type_str)
+                entity_type = NodeType(entity_type_str)
             except ValueError:
                 return ToolResult(success=False, error=f"无效的实体类型: {entity_type_str}")
 
-            edge_store = get_edge_store()
-            success = edge_store.remove_tag(entity_type, entity_id, tag)
+            # 移除标签
+            success = self.graph_store.remove_tag(entity_type, entity_id, tag)
 
             if success:
                 return ToolResult(
@@ -163,7 +185,7 @@ class RemoveTagTool(BaseTool):
                         "entity_type": entity_type_str,
                         "entity_id": entity_id,
                         "tag": tag,
-                        "message": "移除标签成功"
+                        "message": "移除标签成功",
                     }
                 )
             else:
@@ -184,7 +206,20 @@ class GetEntityTagsTool(BaseTool):
     def description(self) -> str:
         return """获取实体的所有标签。
 
-查看币种、因子、策略等实体拥有的所有标签。"""
+查看币种、因子、策略等实体拥有的所有标签。
+
+使用示例:
+1. 查看币种标签:
+   get_entity_tags("data", "BTC-USDT")
+   返回: ["蓝筹", "主流"]
+
+2. 查看因子分类:
+   get_entity_tags("factor", "Momentum_5d")
+   返回: ["动量类", "技术指标"]
+
+返回内容:
+- tags: 标签名称列表
+- count: 标签数量"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -193,12 +228,12 @@ class GetEntityTagsTool(BaseTool):
             "properties": {
                 "entity_type": {
                     "type": "string",
-                    "description": "实体类型",
-                    "enum": ["data", "factor", "strategy", "note", "research", "experience"]
+                    "enum": ["data", "factor", "strategy", "note", "research", "experience"],
+                    "description": "实体类型"
                 },
                 "entity_id": {
                     "type": "string",
-                    "description": "实体 ID"
+                    "description": "实体标识"
                 }
             },
             "required": ["entity_type", "entity_id"]
@@ -209,13 +244,14 @@ class GetEntityTagsTool(BaseTool):
             entity_type_str = params.get("entity_type")
             entity_id = params.get("entity_id")
 
+            # 解析实体类型
             try:
-                entity_type = EdgeEntityType(entity_type_str)
+                entity_type = NodeType(entity_type_str)
             except ValueError:
                 return ToolResult(success=False, error=f"无效的实体类型: {entity_type_str}")
 
-            edge_store = get_edge_store()
-            tags = edge_store.get_entity_tags(entity_type, entity_id)
+            # 获取标签
+            tags = self.graph_store.get_entity_tags(entity_type, entity_id)
 
             return ToolResult(
                 success=True,
@@ -223,7 +259,7 @@ class GetEntityTagsTool(BaseTool):
                     "entity_type": entity_type_str,
                     "entity_id": entity_id,
                     "tags": tags,
-                    "count": len(tags)
+                    "count": len(tags),
                 }
             )
 
@@ -242,7 +278,24 @@ class GetEntitiesByTagTool(BaseTool):
     def description(self) -> str:
         return """获取拥有指定标签的所有实体。
 
-用于查询币池、因子分类等。例如获取所有"妖币"标签的币种。"""
+用于查询币池、因子分类等。例如获取所有"妖币"标签的币种。
+
+使用示例:
+1. 获取妖币池:
+   get_entities_by_tag("妖币", entity_type="data")
+   返回所有被标记为"妖币"的币种
+
+2. 获取动量类因子:
+   get_entities_by_tag("动量类", entity_type="factor")
+   返回所有被标记为"动量类"的因子
+
+3. 获取所有使用某标签的实体:
+   get_entities_by_tag("重要")
+   返回所有被标记为"重要"的实体，不限类型
+
+返回内容:
+- entities: 实体列表 [{type, id}, ...]
+- count: 实体数量"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -251,12 +304,12 @@ class GetEntitiesByTagTool(BaseTool):
             "properties": {
                 "tag": {
                     "type": "string",
-                    "description": "标签名称（如：妖币、蓝筹）"
+                    "description": "标签名称 (如: 妖币, 蓝筹)"
                 },
                 "entity_type": {
                     "type": "string",
-                    "description": "可选，筛选特定类型的实体",
-                    "enum": ["data", "factor", "strategy", "note", "research", "experience"]
+                    "enum": ["data", "factor", "strategy", "note", "research", "experience"],
+                    "description": "可选，筛选特定类型的实体。不指定则返回所有类型"
                 }
             },
             "required": ["tag"]
@@ -267,15 +320,16 @@ class GetEntitiesByTagTool(BaseTool):
             tag = params.get("tag")
             entity_type_str = params.get("entity_type")
 
+            # 解析实体类型（可选）
             entity_type = None
             if entity_type_str:
                 try:
-                    entity_type = EdgeEntityType(entity_type_str)
+                    entity_type = NodeType(entity_type_str)
                 except ValueError:
                     return ToolResult(success=False, error=f"无效的实体类型: {entity_type_str}")
 
-            edge_store = get_edge_store()
-            entities = edge_store.get_entities_by_tag(tag, entity_type)
+            # 获取实体
+            entities = self.graph_store.get_entities_by_tag(tag, entity_type)
 
             return ToolResult(
                 success=True,
@@ -283,7 +337,7 @@ class GetEntitiesByTagTool(BaseTool):
                     "tag": tag,
                     "entity_type_filter": entity_type_str,
                     "entities": entities,
-                    "count": len(entities)
+                    "count": len(entities),
                 }
             )
 
@@ -302,7 +356,18 @@ class ListAllTagsTool(BaseTool):
     def description(self) -> str:
         return """列出所有使用过的标签及其统计。
 
-查看系统中所有标签及其使用次数，用于了解标签体系。"""
+查看系统中所有标签及其使用次数，用于了解标签体系和使用情况。
+
+使用示例:
+list_all_tags()
+
+返回内容:
+- tags: 标签列表
+  - tag: 标签名称
+  - count: 使用该标签的实体数量
+- total: 标签总数
+
+返回按使用次数降序排列，便于发现最常用的标签。"""
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -313,14 +378,14 @@ class ListAllTagsTool(BaseTool):
 
     async def execute(self, **params) -> ToolResult:
         try:
-            edge_store = get_edge_store()
-            tags = edge_store.list_all_tags()
+            # 获取所有标签
+            tags = self.graph_store.list_all_tags()
 
             return ToolResult(
                 success=True,
                 data={
                     "tags": tags,
-                    "total": len(tags)
+                    "total": len(tags),
                 }
             )
 

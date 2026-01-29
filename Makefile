@@ -30,7 +30,7 @@ HEALTH_INTERVAL := 2
 HEALTH_RETRIES := 10
 
 # 所有需要清理的端口
-PORTS_TO_CLEAN := 8000 5173 6789 6790 6791 6792 6793 6794
+PORTS_TO_CLEAN := 8000 5173 6789 6790 6791 6792 6793 6794 6795
 # 生产环境额外端口
 PORTS_PROD := 80 443
 
@@ -228,6 +228,11 @@ _start_local: _ensure_deps _check_ports
 		REDIS_URL=redis://localhost:6379 LOG_LEVEL=$(LOG_LEVEL) LOG_FORMAT=$(LOG_FORMAT) \
 		nohup uv run python -m domains.experience_hub.api.mcp.server \
 		> $(PID_DIR)/mcp-experience.log 2>&1 & echo $$! > $(PID_DIR)/mcp-experience.pid
+	@PYTHONPATH=backend DATABASE_URL=postgresql://quant:quant123@localhost:5432/quant \
+		REDIS_URL=redis://localhost:6379 NEO4J_URI=bolt://localhost:7687 \
+		NEO4J_USER=neo4j NEO4J_PASSWORD=quant123 LOG_LEVEL=$(LOG_LEVEL) LOG_FORMAT=$(LOG_FORMAT) \
+		nohup uv run python -m domains.graph_hub.api.mcp.server \
+		> $(PID_DIR)/mcp-graph.log 2>&1 & echo $$! > $(PID_DIR)/mcp-graph.pid
 	@sleep 1
 	@echo "[4/6] 启动前端..."
 	@nohup sh -c 'cd frontend && exec pnpm dev' > $(PID_DIR)/frontend.log 2>&1 & echo $$! > $(PID_DIR)/frontend.pid
@@ -352,6 +357,7 @@ _stop_local:
 	@-pkill -TERM -f "domains.note_hub.api.mcp.server" 2>/dev/null || true
 	@-pkill -TERM -f "domains.research_hub.api.mcp.server" 2>/dev/null || true
 	@-pkill -TERM -f "domains.experience_hub.api.mcp.server" 2>/dev/null || true
+	@-pkill -TERM -f "domains.graph_hub.api.mcp.server" 2>/dev/null || true
 	@-pkill -TERM -f "pnpm.*dev" 2>/dev/null || true
 	@-pkill -TERM -f "vite" 2>/dev/null || true
 	@-pkill -TERM -f "esbuild" 2>/dev/null || true
@@ -365,6 +371,7 @@ _stop_local:
 	@-pkill -9 -f "domains.note_hub.api.mcp.server" 2>/dev/null || true
 	@-pkill -9 -f "domains.research_hub.api.mcp.server" 2>/dev/null || true
 	@-pkill -9 -f "domains.experience_hub.api.mcp.server" 2>/dev/null || true
+	@-pkill -9 -f "domains.graph_hub.api.mcp.server" 2>/dev/null || true
 	@-pkill -9 -f "pnpm.*dev" 2>/dev/null || true
 	@-pkill -9 -f "vite" 2>/dev/null || true
 	@-pkill -9 -f "esbuild" 2>/dev/null || true
@@ -488,6 +495,7 @@ status:
 	@if pgrep -f "domains.note_hub.api.mcp.server" > /dev/null 2>&1; then echo "  MCP Note:   运行中"; else echo "  MCP Note:   未运行"; fi
 	@if pgrep -f "domains.research_hub.api.mcp.server" > /dev/null 2>&1; then echo "  MCP Research: 运行中"; else echo "  MCP Research: 未运行"; fi
 	@if pgrep -f "domains.experience_hub.api.mcp.server" > /dev/null 2>&1; then echo "  MCP Experience: 运行中"; else echo "  MCP Experience: 未运行"; fi
+	@if pgrep -f "domains.graph_hub.api.mcp.server" > /dev/null 2>&1; then echo "  MCP Graph:    运行中"; else echo "  MCP Graph:    未运行"; fi
 	@if pgrep -f "vite.*frontend" > /dev/null 2>&1 || pgrep -f "pnpm dev" > /dev/null 2>&1; then echo "  Frontend: 运行中"; else echo "  Frontend: 未运行"; fi
 	@echo ""
 	@echo "=== Docker 容器 ==="
@@ -594,6 +602,8 @@ _healthcheck_local:
 	if lsof -ti :6793 >/dev/null 2>&1; then printf "OK\n"; else printf "FAIL\n"; failed=1; fi; \
 	printf "  MCP Experience ... "; \
 	if lsof -ti :6794 >/dev/null 2>&1; then printf "OK\n"; else printf "FAIL\n"; failed=1; fi; \
+	printf "  MCP Graph ........ "; \
+	if lsof -ti :6795 >/dev/null 2>&1; then printf "OK\n"; else printf "FAIL\n"; failed=1; fi; \
 	echo ""; \
 	if [ $$failed -eq 1 ]; then \
 		echo "  [!] 部分服务异常，查看日志: make logs local"; \

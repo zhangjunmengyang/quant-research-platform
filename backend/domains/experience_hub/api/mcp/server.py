@@ -22,8 +22,8 @@ from .tools.experience_tools import (
     QueryExperiencesTool,
     GetExperienceTool,
     ListExperiencesTool,
-    LinkExperienceTool,
     GetAllTagsTool,
+    # 注: LinkExperienceTool 已迁移至 graph-hub (端口 6795)
 )
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class ExperienceHubMCPServer(BaseMCPServer):
 
         # 修改类工具
         self.register_tool(StoreExperienceTool(), "mutation")
-        self.register_tool(LinkExperienceTool(), "mutation")
+        # 注: LinkExperienceTool 已迁移至 graph-hub (端口 6795)
 
         logger.info(f"注册了 {len(self.tool_registry)} 个经验知识库工具")
 

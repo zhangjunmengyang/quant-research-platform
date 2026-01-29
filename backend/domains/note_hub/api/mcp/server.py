@@ -40,11 +40,7 @@ from .tools.note_tools import (
     UnarchiveNoteTool,
     # 提炼为经验
     PromoteToExperienceTool,
-    # 知识边关联
-    LinkNoteTool,
-    UnlinkNoteTool,
-    GetNoteEdgesTool,
-    TraceNoteLineageTool,
+    # 注: 知识边关联工具已迁移至 graph-hub (端口 6795)
 )
 
 logger = logging.getLogger(__name__)
@@ -80,11 +76,8 @@ class NoteHubMCPServer(BaseMCPServer):
         # 提炼为经验工具
         self.register_tool(PromoteToExperienceTool(), "mutation")
 
-        # 知识边关联工具
-        self.register_tool(LinkNoteTool(), "mutation")
-        self.register_tool(UnlinkNoteTool(), "mutation")
-        self.register_tool(GetNoteEdgesTool(), "query")
-        self.register_tool(TraceNoteLineageTool(), "query")
+        # 注: 知识边关联工具已迁移至 graph-hub (端口 6795)
+        # 请使用 graph-hub 的 create_link, delete_link, get_edges, trace_lineage 工具
 
         logger.info(f"注册了 {len(self.tool_registry)} 个笔记知识库工具")
 

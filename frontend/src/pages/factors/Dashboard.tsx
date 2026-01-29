@@ -5,7 +5,7 @@
 
 import { useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Loader2, RotateCcw, Check, X } from 'lucide-react'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import {
   useFactorStats,

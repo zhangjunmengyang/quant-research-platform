@@ -40,11 +40,6 @@ from .tools.analysis_tools import (
     # 参数分析工具（支持一维柱状图和二维热力图）
     RunFactorParamAnalysisTool,
 )
-from .tools.edge_tools import (
-    LinkFactorTool,
-    GetFactorEdgesTool,
-    TraceFactorLineageTool,
-)
 from .resources.factor_resources import FactorResourceProvider
 
 logger = logging.getLogger(__name__)
@@ -90,10 +85,8 @@ class FactorHubMCPServer(BaseMCPServer):
         # 参数分析工具（支持一维柱状图和二维热力图）
         self.register_tool(RunFactorParamAnalysisTool(), "analysis")
 
-        # 关联工具
-        self.register_tool(LinkFactorTool(), "mutation")
-        self.register_tool(GetFactorEdgesTool(), "query")
-        self.register_tool(TraceFactorLineageTool(), "query")
+        # 注: 关联工具已迁移至 graph-hub (端口 6795)
+        # 请使用 graph-hub 的 create_link, get_edges, trace_lineage 工具
 
         logger.info(f"注册了 {len(self.tool_registry)} 个因子知识库工具")
 

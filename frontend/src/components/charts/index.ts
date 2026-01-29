@@ -24,3 +24,9 @@ export {
   type BarSeriesData,
 } from './BarChart'
 export { PieChart, type PieData } from './PieChart'
+export {
+  GraphChart,
+  type GraphNodeData,
+  type GraphLinkData,
+  type GraphCategoryData,
+} from './GraphChart'

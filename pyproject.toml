@@ -61,6 +61,8 @@ dependencies = [
     "llama-index-postprocessor-cohere-rerank>=0.3.0",
     "llama-index-readers-file>=0.4.0",
     "llama-index-llms-openai>=0.3.0",
+    # Neo4j 图数据库
+    "neo4j>=5.0.0",
 ]
 
 [project.optional-dependencies]

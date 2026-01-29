@@ -8,8 +8,8 @@ from .experience_tools import (
     QueryExperiencesTool,
     GetExperienceTool,
     ListExperiencesTool,
-    LinkExperienceTool,
     GetAllTagsTool,
+    # 注: LinkExperienceTool 已迁移至 graph-hub (端口 6795)
 )
 
 __all__ = [
@@ -19,6 +19,6 @@ __all__ = [
     'QueryExperiencesTool',
     'GetExperienceTool',
     'ListExperiencesTool',
-    'LinkExperienceTool',
     'GetAllTagsTool',
+    # 注: LinkExperienceTool 已迁移至 graph-hub (端口 6795)
 ]

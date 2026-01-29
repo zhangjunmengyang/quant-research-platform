@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.routes.v1 import factors, data, strategies, backtest, ws, pipeline, tasks, analysis, mcp_management, notes, logs, research, experiences
+from app.routes.v1 import factors, data, strategies, backtest, ws, pipeline, tasks, analysis, mcp_management, notes, logs, research, experiences, graph
 from app.routes.mcp import mcp_router
 
 api_router = APIRouter()
@@ -21,6 +21,7 @@ api_router.include_router(notes.router, prefix="/notes", tags=["notes"])
 api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
 api_router.include_router(research.router, prefix="/research", tags=["research"])
 api_router.include_router(experiences.router, prefix="/experiences", tags=["experiences"])
+api_router.include_router(graph.router, tags=["graph"])
 
 # Include MCP proxy routes
 api_router.include_router(mcp_router, prefix="/mcp", tags=["mcp"])

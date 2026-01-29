@@ -28,6 +28,7 @@ import {
 } from '@/features/research'
 import type { Chunk, ReportStatus, SimilarChunkItem } from '@/features/research'
 import { cn } from '@/lib/utils'
+import { EntityGraph } from '@/features/graph'
 import {
   Dialog,
   DialogContent,
@@ -228,6 +229,16 @@ export function Component() {
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
           <p className="text-sm text-destructive">{report.error_message}</p>
         </div>
+      )}
+
+      {/* 知识关联图 */}
+      {report.uuid && (
+        <EntityGraph
+          entityType="research"
+          entityId={report.uuid}
+          entityName={report.title}
+          height={200}
+        />
       )}
 
       {/* Chunks Section */}

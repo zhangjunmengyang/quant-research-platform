@@ -15,6 +15,7 @@ import { cn, stripPyExtension } from '@/lib/utils'
 import { Loader2, X, Copy, Check, Edit2, Save, Sparkles, Ban, Undo2, Trash2, BarChart3 } from 'lucide-react'
 import { toast } from '@/components/ui/toast'
 import { BaseChart } from '@/components/charts'
+import { EntityGraph } from '@/features/graph'
 
 // 可自动生成的字段
 const AUTO_FILL_FIELDS: { value: FillableField; label: string }[] = [
@@ -723,6 +724,14 @@ export function FactorDetailPanel({ factor, onClose }: FactorDetailPanelProps) {
               {displayFactor.param_analysis && (
                 <ParamAnalysisSection paramAnalysisJson={displayFactor.param_analysis} />
               )}
+
+              {/* Knowledge Graph Section */}
+              <EntityGraph
+                entityType="factor"
+                entityId={displayFactor.filename}
+                entityName={stripPyExtension(displayFactor.filename)}
+                height={250}
+              />
 
               {/* Code - Full Source */}
               {displayFactor.code_content && (

@@ -419,74 +419,8 @@ class ListExperiencesTool(BaseTool):
             return ToolResult(success=False, error=str(e))
 
 
-class LinkExperienceTool(BaseTool):
-    """关联经验工具"""
-
-    @property
-    def name(self) -> str:
-        return "link_experience"
-
-    @property
-    def description(self) -> str:
-        return """关联经验与其他实体。
-
-建立经验与因子、策略、笔记、研报的关联关系。
-方便后续通过实体查找相关经验。
-
-使用场景:
-- 关联经验与相关因子
-- 关联经验与策略回测
-- 关联经验与外部研报"""
-
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "experience_id": {
-                    "type": "integer",
-                    "description": "经验 ID"
-                },
-                "entity_type": {
-                    "type": "string",
-                    "description": "实体类型",
-                    "enum": ["factor", "strategy", "note", "research", "experience"]
-                },
-                "entity_id": {
-                    "type": "string",
-                    "description": "实体 ID（因子名、策略ID等）"
-                },
-                "relation": {
-                    "type": "string",
-                    "description": "关系类型",
-                    "enum": ["related", "derived_from", "applied_to"],
-                    "default": "related"
-                }
-            },
-            "required": ["experience_id", "entity_type", "entity_id"]
-        }
-
-    async def execute(self, **params) -> ToolResult:
-        try:
-            experience_id = params.get("experience_id")
-            entity_type = params.get("entity_type")
-            entity_id = params.get("entity_id")
-            relation = params.get("relation", "related")
-
-            success, message, data = self.experience_service.link_experience(
-                experience_id=experience_id,
-                entity_type=entity_type,
-                entity_id=entity_id,
-                relation=relation,
-            )
-
-            if success:
-                return ToolResult(success=True, data=data)
-            else:
-                return ToolResult(success=False, error=message)
-
-        except Exception as e:
-            return ToolResult(success=False, error=str(e))
+# 注: LinkExperienceTool 已迁移至 graph-hub (端口 6795)
+# 请使用 graph-hub 的 create_link 工具
 
 
 class GetAllTagsTool(BaseTool):

@@ -79,6 +79,9 @@ services:
     environment:
       - DATABASE_URL=postgresql://quant:quant123@postgres:5432/quant
       - REDIS_URL=redis://redis:6379
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=quant123
       - LOG_LEVEL=DEBUG
       - LOG_FORMAT=json
       - PYTHONPATH=/app:/app/backend
@@ -102,11 +105,40 @@ services:
       - "6792:6792"   # note-hub
       - "6793:6793"   # research-hub
       - "6794:6794"   # experience-hub
+      - "6795:6795"   # graph-hub
     depends_on:
       postgres:
         condition: service_healthy
+      neo4j:
+        condition: service_healthy
     networks:
       - dev-network
+
+  # ============================================
+  # Neo4j 图数据库
+  # ============================================
+  neo4j:
+    image: neo4j:5-community
+    container_name: quant-neo4j-dev
+    environment:
+      - NEO4J_AUTH=neo4j/quant123
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_apoc_export_file_enabled=true
+      - NEO4J_apoc_import_file_enabled=true
+      - NEO4J_apoc_import_file_use__neo4j__config=true
+    volumes:
+      - neo4j_dev_data:/data
+      - neo4j_dev_logs:/logs
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    networks:
+      - dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
   # ============================================
   # PostgreSQL
@@ -159,3 +191,5 @@ networks:
 
 volumes:
   redis_dev_data:
+  neo4j_dev_data:
+  neo4j_dev_logs:

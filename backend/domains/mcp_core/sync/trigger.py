@@ -74,8 +74,8 @@ class SyncTrigger:
 
             elif service_type == "edge":
                 from .edge_sync import EdgeSyncService
-                from domains.mcp_core.edge.store import get_edge_store
-                self._services["edge"] = EdgeSyncService(self.data_dir, get_edge_store())
+                from domains.graph_hub.core import get_graph_store
+                self._services["edge"] = EdgeSyncService(self.data_dir, get_graph_store())
 
         except Exception as e:
             logger.debug(f"sync_service_init_skipped: {service_type}, {e}")

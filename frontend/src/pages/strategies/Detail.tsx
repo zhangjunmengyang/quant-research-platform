@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useStrategy } from '@/features/strategy'
 import { EquityCurveSubplots, type EquityCurveDataPoint } from '@/components/charts'
+import { EntityGraph } from '@/features/graph'
 import { cn, formatPercent } from '@/lib/utils'
 import type { Strategy } from '@/features/strategy'
 
@@ -629,6 +630,16 @@ export function Component() {
         quarterReturn={quarterReturn}
         monthReturn={monthReturn}
       />
+
+      {/* 知识关联图 */}
+      {strategy.name && (
+        <EntityGraph
+          entityType="strategy"
+          entityId={strategy.name}
+          entityName={strategy.name}
+          height={250}
+        />
+      )}
 
       {/* Notes */}
       {strategy.notes && (

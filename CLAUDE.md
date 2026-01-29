@@ -95,8 +95,11 @@ Windows 用户请参考 README.md 中的手动启动步骤。
 | note-hub (MCP) | 6792 |
 | research-hub (MCP) | 6793 |
 | experience-hub (MCP) | 6794 |
+| graph-hub (MCP) | 6795 |
 | PostgreSQL | 5432 |
 | Redis | 6379 |
+| Neo4j Bolt | 7687 |
+| Neo4j HTTP | 7474 |
 
 ## 核心架构
 
@@ -120,6 +123,7 @@ frontend/src/features/*/    -> 前端模块
 | note_hub | domains/note_hub/ | 研究笔记 (临时记录) | Knowledge |
 | research_hub | domains/research_hub/ | 外部研报 (RAG ChatBot) | Knowledge |
 | experience_hub | domains/experience_hub/ | 经验知识库 (长期记忆) | Wisdom |
+| graph_hub | domains/graph_hub/ | 知识图谱 (Neo4j) | Meta |
 
 **知识层级说明**: Data -> Artifact -> Knowledge -> Wisdom，详见 `docs/architecture/knowledge-experience-system.md`
 

@@ -151,7 +151,7 @@ export const noteApi = {
    * @deprecated Use getVerifications instead
    * 获取关联到指定笔记的所有笔记 (legacy)
    */
-  getLinkedNotes: async (noteId: number, noteType?: string, includeArchived = false): Promise<Note[]> => {
+  getLinkedNotes: async (noteId: number, _noteType?: string, includeArchived = false): Promise<Note[]> => {
     // Redirect to verifications endpoint
     return noteApi.getVerifications(noteId, includeArchived)
   },

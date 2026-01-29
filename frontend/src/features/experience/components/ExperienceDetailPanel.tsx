@@ -10,12 +10,12 @@ import { createPortal } from 'react-dom'
 import {
   X,
   Clock,
-  Link2,
   Edit2,
   Trash2,
   Tag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { EntityGraph } from '@/features/graph'
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { useExperienceDetail, useExperienceLinks } from '../hooks'
+import { useExperienceDetail } from '../hooks'
 import { useExperienceStore } from '../store'
 import type { Experience } from '../types'
 
@@ -51,7 +51,6 @@ export function ExperienceDetailPanel({
   onEdit,
 }: ExperienceDetailPanelProps) {
   const { deleteExperience } = useExperienceDetail(experience.id)
-  const { data: links = [] } = useExperienceLinks(experience.id)
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
@@ -137,26 +136,14 @@ export function ExperienceDetailPanel({
           )}
         </div>
 
-        {/* 关联实体 */}
-        {links.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-              <Link2 className="h-4 w-4" />
-              关联实体
-            </h4>
-            <div className="space-y-2">
-              {links.map((link) => (
-                <div
-                  key={link.id}
-                  className="flex items-center gap-2 text-sm rounded-md border p-2"
-                >
-                  <span className="text-muted-foreground">{link.entity_type}:</span>
-                  <span className="font-mono text-xs">{link.entity_id}</span>
-                  <span className="text-xs text-muted-foreground">({link.relation})</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* 知识关联图 */}
+        {experience.uuid && (
+          <EntityGraph
+            entityType="experience"
+            entityId={experience.uuid}
+            entityName={experience.title}
+            height={200}
+          />
         )}
 
         {/* 时间信息 */}
