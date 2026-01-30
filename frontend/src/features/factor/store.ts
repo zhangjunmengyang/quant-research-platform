@@ -5,7 +5,6 @@
 
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Factor } from './types'
 import { DEFAULT_VISIBLE_COLUMNS, FACTOR_COLUMNS } from './types'
 
 // 默认列宽配置
@@ -15,15 +14,6 @@ FACTOR_COLUMNS.forEach((col) => {
 })
 
 interface FactorUIState {
-  // Selected factor for detail panel
-  selectedFactor: Factor | null
-  setSelectedFactor: (factor: Factor | null) => void
-
-  // Detail panel visibility
-  detailPanelOpen: boolean
-  openDetailPanel: (factor: Factor) => void
-  closeDetailPanel: () => void
-
   // View mode
   viewMode: 'table' | 'grid'
   setViewMode: (mode: 'table' | 'grid') => void
@@ -49,15 +39,6 @@ interface FactorUIState {
 export const useFactorStore = create<FactorUIState>()(
   persist(
     (set) => ({
-      // Selected factor
-      selectedFactor: null,
-      setSelectedFactor: (factor) => set({ selectedFactor: factor }),
-
-      // Detail panel
-      detailPanelOpen: false,
-      openDetailPanel: (factor) => set({ selectedFactor: factor, detailPanelOpen: true }),
-      closeDetailPanel: () => set({ detailPanelOpen: false }),
-
       // View mode
       viewMode: 'table',
       setViewMode: (mode) => set({ viewMode: mode }),

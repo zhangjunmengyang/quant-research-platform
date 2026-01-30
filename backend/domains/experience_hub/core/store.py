@@ -22,7 +22,6 @@ from .models import (
     Experience,
     ExperienceContent,
     ExperienceContext,
-    ExperienceLink,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,6 +150,9 @@ class ExperienceStore(BaseStore[Experience]):
         # 触发实时同步
         if experience_id:
             self._trigger_sync(experience_id)
+            # 同步到图数据库
+            experience.id = experience_id
+            self._sync_experience_to_graph(experience)
 
         return experience_id
 
@@ -162,6 +164,25 @@ class ExperienceStore(BaseStore[Experience]):
         except Exception as e:
             # 同步失败只记录日志，不影响主业务
             logger.debug(f"experience_sync_trigger_skipped: {experience_id}, {e}")
+
+    def _sync_experience_to_graph(self, experience: Experience) -> None:
+        """同步经验节点到 Neo4j 图数据库"""
+        try:
+            from domains.graph_hub.core import NodeType, get_graph_store
+
+            graph_store = get_graph_store()
+            success = graph_store.upsert_node(
+                node_type=NodeType.EXPERIENCE,
+                node_id=str(experience.id),
+                name=experience.title or "",
+                metadata={
+                    "source_type": experience.source_type or "",
+                }
+            )
+            if success:
+                logger.debug(f"experience_synced_to_graph: {experience.id}")
+        except Exception as e:
+            logger.warning(f"experience_graph_sync_failed: {experience.id}, {e}")
 
     def update(self, experience_id: int, **fields) -> bool:
         """更新经验字段"""
@@ -197,37 +218,30 @@ class ExperienceStore(BaseStore[Experience]):
         return updated
 
     def delete(self, experience_id: int) -> bool:
-        """删除经验（同时删除关联的边）"""
-        # 先删除关联的边
-        self._delete_experience_edges(experience_id)
+        """删除经验（同时删除图数据库中的节点和边）"""
+        # 先删除图数据库中的节点（DETACH DELETE 会同时删除关联边）
+        self._delete_experience_from_graph(experience_id)
 
         # 删除经验记录
         with self._cursor() as cursor:
-            cursor.execute(
-                'DELETE FROM experience_links WHERE experience_id = %s',
-                (experience_id,)
-            )
             cursor.execute(
                 'DELETE FROM experiences WHERE id = %s',
                 (experience_id,)
             )
             return cursor.rowcount > 0
 
-    def _delete_experience_edges(self, experience_id: int) -> None:
-        """删除经验关联的所有边 (Neo4j)"""
+    def _delete_experience_from_graph(self, experience_id: int) -> None:
+        """删除经验节点及其所有关联边 (Neo4j)"""
         try:
             from domains.graph_hub.core import NodeType, get_graph_store
 
             graph_store = get_graph_store()
-            deleted_count = graph_store.delete_edges_by_entity(
-                NodeType.EXPERIENCE,
-                str(experience_id)
-            )
-            if deleted_count > 0:
-                logger.info(f"deleted_experience_edges: experience_id={experience_id}, count={deleted_count}")
+            deleted = graph_store.delete_node(NodeType.EXPERIENCE, str(experience_id))
+            if deleted:
+                logger.info(f"deleted_experience_from_graph: experience_id={experience_id}")
         except Exception as e:
-            # 边删除失败只记录日志，不影响主业务
-            logger.warning(f"failed_to_delete_experience_edges: {experience_id}, {e}")
+            # 图删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_experience_from_graph: {experience_id}, {e}")
 
     # ==================== 查询操作 ====================
 
@@ -346,96 +360,6 @@ class ExperienceStore(BaseStore[Experience]):
         with self._cursor() as cursor:
             cursor.execute('SELECT COUNT(*) as count FROM experiences')
             return cursor.fetchone()['count']
-
-    # ==================== 关联管理 ====================
-
-    def add_link(self, link: ExperienceLink) -> int | None:
-        """添加经验关联"""
-        link.created_at = datetime.now()
-
-        try:
-            with self._cursor() as cursor:
-                cursor.execute('''
-                    INSERT INTO experience_links (
-                        experience_id, experience_uuid, entity_type, entity_id, relation, created_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING id
-                ''', (
-                    link.experience_id, link.experience_uuid,
-                    link.entity_type, link.entity_id, link.relation, link.created_at
-                ))
-                result = cursor.fetchone()
-                return result['id'] if result else None
-        except psycopg2.IntegrityError as e:
-            logger.error(f"添加经验关联失败: {e}")
-            return None
-
-    def get_links(self, experience_id: int) -> list[ExperienceLink]:
-        """获取经验的所有关联"""
-        with self._cursor() as cursor:
-            cursor.execute(
-                'SELECT * FROM experience_links WHERE experience_id = %s',
-                (experience_id,)
-            )
-            return [ExperienceLink.from_dict(dict(row)) for row in cursor.fetchall()]
-
-    def get_experiences_by_entity(
-        self,
-        entity_type: str,
-        entity_id: str
-    ) -> list[Experience]:
-        """根据关联实体获取经验"""
-        with self._cursor() as cursor:
-            cursor.execute('''
-                SELECT e.* FROM experiences e
-                JOIN experience_links l ON e.id = l.experience_id
-                WHERE l.entity_type = %s AND l.entity_id = %s
-                ORDER BY e.updated_at DESC
-            ''', (entity_type, entity_id))
-            return [self._row_to_entity(dict(row)) for row in cursor.fetchall()]
-
-    def delete_link(self, link_id: int) -> bool:
-        """删除经验关联"""
-        with self._cursor() as cursor:
-            cursor.execute(
-                'DELETE FROM experience_links WHERE id = %s',
-                (link_id,)
-            )
-            return cursor.rowcount > 0
-
-    def get_all_links(self) -> list[ExperienceLink]:
-        """获取所有经验关联"""
-        with self._cursor() as cursor:
-            cursor.execute('SELECT * FROM experience_links ORDER BY experience_id')
-            return [ExperienceLink.from_dict(dict(row)) for row in cursor.fetchall()]
-
-    def link_exists(
-        self,
-        experience_id: int,
-        entity_type: str,
-        entity_id: str,
-        relation: str = "related"
-    ) -> bool:
-        """
-        检查关联是否已存在
-
-        Args:
-            experience_id: 经验 ID
-            entity_type: 实体类型
-            entity_id: 实体 ID
-            relation: 关系类型
-
-        Returns:
-            是否存在
-        """
-        with self._cursor() as cursor:
-            cursor.execute('''
-                SELECT 1 FROM experience_links
-                WHERE experience_id = %s AND entity_type = %s
-                AND entity_id = %s AND relation = %s
-                LIMIT 1
-            ''', (experience_id, entity_type, entity_id, relation))
-            return cursor.fetchone() is not None
 
 
 # ==================== 单例管理 ====================

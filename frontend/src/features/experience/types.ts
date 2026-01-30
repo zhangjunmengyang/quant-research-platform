@@ -5,21 +5,6 @@
  * 简化版本: 以标签为核心管理
  */
 
-// ==================== 枚举定义 ====================
-
-/**
- * 关联实体类型枚举
- */
-export type EntityType = 'factor' | 'strategy' | 'note' | 'research' | 'experience'
-
-export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
-  factor: '因子',
-  strategy: '策略',
-  note: '笔记',
-  research: '研报',
-  experience: '经验',
-}
-
 // ==================== 内容接口 ====================
 
 /**
@@ -96,40 +81,6 @@ export interface ExperienceQueryParams {
   query: string
   tags?: string[]
   top_k?: number
-}
-
-// ==================== 操作响应接口 ====================
-
-/**
- * 关联经验请求
- */
-export interface ExperienceLinkRequest {
-  entity_type: EntityType
-  entity_id: string
-  relation?: string
-}
-
-/**
- * 关联经验响应
- */
-export interface ExperienceLinkResponse {
-  link_id: number
-  experience_id: number
-  entity_type: string
-  entity_id: string
-}
-
-/**
- * 经验关联记录
- */
-export interface ExperienceLink {
-  id: number
-  experience_id: number
-  experience_uuid: string
-  entity_type: string
-  entity_id: string
-  relation: string
-  created_at?: string
 }
 
 // ==================== 统计接口 ====================

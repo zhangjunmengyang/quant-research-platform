@@ -9,14 +9,19 @@ Note Hub 定位为"研究草稿/临时记录"层，MCP 工具支持：
   - observation: 观察 - 对数据或现象的客观记录
   - hypothesis: 假设 - 基于观察提出的待验证假说
   - verification: 检验 - 对假设的验证
-- 实体关联：通过 link_note 建立与任意实体的关系（Edge 系统）
 - 归档管理（archive_note, unarchive_note）
 - 提炼为经验（promote_to_experience）
+
+注意：知识边关联工具已迁移至 graph-hub (端口 6795)
+创建笔记时会自动解析内容中的实体引用，并同步关系到 graph_hub。
 """
 
+import logging
 from typing import Any
 
 from .base import BaseTool, ToolResult
+
+logger = logging.getLogger(__name__)
 
 # ==================== 基础 CRUD 工具 ====================
 
@@ -39,9 +44,10 @@ class CreateNoteTool(BaseTool):
 - hypothesis: 假设 - 基于观察提出的待验证假说
 - verification: 检验 - 对假设的验证过程和结论
 
-创建笔记后，可使用 link_note 工具建立与其他实体的关联:
-- 关联数据源: link_note(note_id, "data", "BTC-USDT", "derives", subtype="based")
-- 检验关联假设: link_note(verification_id, "note", str(hypothesis_id), "relates", subtype="validates")
+自动关系同步：
+- 笔记内容中提到的因子名（如 MomentumFactor）会自动关联
+- 提到的策略 UUID 也会自动关联
+- 如需手动管理关系，请使用 graph-hub 的 create_link 工具
 
 使用场景:
 - 记录因子在特定条件下的表现（observation）
@@ -89,6 +95,14 @@ class CreateNoteTool(BaseTool):
                 note_type=note_type,
             )
 
+            relations_synced = 0
+            if success and note_id:
+                # 自动解析内容中的实体引用，同步关系到 graph_hub
+                relations_synced = self._sync_note_relations(
+                    note_id=note_id,
+                    content=content,
+                )
+
             if success:
                 return ToolResult(
                     success=True,
@@ -96,6 +110,7 @@ class CreateNoteTool(BaseTool):
                         "id": note_id,
                         "title": title,
                         "note_type": note_type,
+                        "relations_synced": relations_synced,
                         "message": message
                     }
                 )
@@ -104,6 +119,62 @@ class CreateNoteTool(BaseTool):
 
         except Exception as e:
             return ToolResult(success=False, error=str(e))
+
+    def _sync_note_relations(self, note_id: int, content: str) -> int:
+        """
+        自动解析内容中的实体引用，同步关系到 graph_hub
+
+        Args:
+            note_id: 笔记 ID
+            content: 笔记内容
+
+        Returns:
+            同步的关系数量
+        """
+        try:
+            from domains.factor_hub.services import get_factor_service
+            from domains.graph_hub.services import get_graph_service
+            from domains.graph_hub.services.relation_extractor import (
+                RelationExtractor,
+            )
+
+            # 获取已知因子名列表用于精确匹配
+            factor_service = get_factor_service()
+            factors, _ = factor_service.query_factors()
+            known_factors = [f.filename for f in factors]
+
+            # 创建解析器并提取关系
+            extractor = RelationExtractor(known_factors)
+            relations = extractor.extract_from_text(content)
+
+            # 同步置信度 >= 0.8 的关系
+            graph_service = get_graph_service()
+            count = 0
+
+            for rel in relations:
+                if rel.confidence >= 0.8:
+                    success, _ = graph_service.create_link(
+                        source_type="note",
+                        source_id=str(note_id),
+                        target_type=rel.target_type,
+                        target_id=rel.target_id,
+                        relation=rel.relation,
+                        subtype=rel.subtype,
+                        metadata={
+                            "auto_extracted": True,
+                            "confidence": rel.confidence,
+                        },
+                    )
+                    if success:
+                        count += 1
+
+            if count > 0:
+                logger.info(f"同步笔记关系: note:{note_id} -> {count} 个实体")
+
+            return count
+        except Exception as e:
+            logger.warning(f"同步笔记关系失败: {e}")
+            return 0
 
 
 class UpdateNoteTool(BaseTool):
@@ -623,12 +694,21 @@ class PromoteToExperienceTool(BaseTool):
                 experience_id=experience_id,
             )
 
+            relation_synced = False
+            if success:
+                # 自动创建 note -> experience (derives, produces) 关系
+                relation_synced = self._sync_experience_relation(
+                    note_id=note_id,
+                    experience_id=experience_id,
+                )
+
             if success:
                 return ToolResult(
                     success=True,
                     data={
                         "note_id": note_id,
                         "experience_id": experience_id,
+                        "relation_synced": relation_synced,
                         "message": message
                     }
                 )
@@ -638,6 +718,40 @@ class PromoteToExperienceTool(BaseTool):
         except Exception as e:
             return ToolResult(success=False, error=str(e))
 
+    def _sync_experience_relation(
+        self,
+        note_id: int,
+        experience_id: int,
+    ) -> bool:
+        """
+        同步笔记与经验的关系到 graph_hub
 
-# 注: 知识边关联工具已迁移至 graph-hub (端口 6795)
-# 请使用 graph-hub 的 create_link, delete_link, get_edges, trace_lineage 工具
+        Args:
+            note_id: 笔记 ID
+            experience_id: 经验 ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            from domains.graph_hub.services import get_graph_service
+
+            graph_service = get_graph_service()
+            success, _ = graph_service.create_link(
+                source_type="note",
+                source_id=str(note_id),
+                target_type="experience",
+                target_id=str(experience_id),
+                relation="derives",
+                subtype="produces",
+            )
+
+            if success:
+                logger.info(
+                    f"同步笔记-经验关系: note:{note_id} -> experience:{experience_id}"
+                )
+
+            return success
+        except Exception as e:
+            logger.warning(f"同步笔记-经验关系失败: {e}")
+            return False

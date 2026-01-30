@@ -4,8 +4,7 @@
  */
 
 import { useRef, useEffect, useCallback } from 'react'
-import { X, ExternalLink, Maximize2, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { X, ExternalLink, Loader2 } from 'lucide-react'
 import { NODE_TYPE_CONFIG, parseNodeKey } from '../types'
 import { useEntityTags } from '../hooks'
 
@@ -15,11 +14,10 @@ interface NodePreviewCardProps {
   containerRect: DOMRect | null // 容器边界，用于计算卡片位置
   onClose: () => void
   onViewDetail: () => void
-  onExpandInGraph?: () => void // 可选，在图谱中展开
 }
 
-const CARD_WIDTH = 260
-const CARD_HEIGHT_ESTIMATE = 180 // 估算高度，用于边界检测
+const CARD_WIDTH = 240
+const CARD_HEIGHT_ESTIMATE = 140 // 估算高度，用于边界检测
 const OFFSET = 12 // 与点击位置的偏移
 
 export function NodePreviewCard({
@@ -28,7 +26,6 @@ export function NodePreviewCard({
   containerRect,
   onClose,
   onViewDetail,
-  onExpandInGraph,
 }: NodePreviewCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const { type, id } = parseNodeKey(nodeKey)
@@ -118,13 +115,24 @@ export function NodePreviewCard({
             {config?.label || type}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1 rounded hover:bg-muted transition-colors"
-        >
-          <X className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onViewDetail}
+            className="p-1 rounded hover:bg-muted transition-colors"
+            title="查看详情"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded hover:bg-muted transition-colors"
+            title="关闭"
+          >
+            <X className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* 内容 */}
@@ -133,7 +141,7 @@ export function NodePreviewCard({
         <h4 className="font-medium text-sm mb-2 break-all">{displayName}</h4>
 
         {/* 标签 */}
-        <div className="mb-3">
+        <div>
           <span className="text-xs text-muted-foreground">标签:</span>
           {isLoading ? (
             <div className="flex items-center gap-1 mt-1">
@@ -158,30 +166,6 @@ export function NodePreviewCard({
             </div>
           ) : (
             <span className="text-xs text-muted-foreground ml-1">无</span>
-          )}
-        </div>
-
-        {/* 操作按钮 */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="default"
-            size="sm"
-            className="h-7 text-xs flex-1"
-            onClick={onViewDetail}
-          >
-            <ExternalLink className="h-3 w-3 mr-1" />
-            查看详情
-          </Button>
-          {onExpandInGraph && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs flex-1"
-              onClick={onExpandInGraph}
-            >
-              <Maximize2 className="h-3 w-3 mr-1" />
-              展开
-            </Button>
           )}
         </div>
       </div>

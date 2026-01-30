@@ -135,6 +135,9 @@ class NoteStore(BaseStore[Note]):
         # 触发实时同步
         if note_id:
             self._trigger_sync(note_id)
+            # 同步到图数据库
+            note.id = note_id
+            self._sync_note_to_graph(note)
 
         return note_id
 
@@ -146,6 +149,26 @@ class NoteStore(BaseStore[Note]):
         except Exception as e:
             # 同步失败只记录日志，不影响主业务
             logger.debug(f"note_sync_trigger_skipped: {note_id}, {e}")
+
+    def _sync_note_to_graph(self, note: Note) -> None:
+        """同步笔记节点到 Neo4j 图数据库"""
+        try:
+            from domains.graph_hub.core import NodeType, get_graph_store
+
+            graph_store = get_graph_store()
+            success = graph_store.upsert_node(
+                node_type=NodeType.NOTE,
+                node_id=str(note.id),
+                name=note.title or "",
+                metadata={
+                    "note_type": note.note_type or "",
+                    "tags": note.tags or "",
+                }
+            )
+            if success:
+                logger.debug(f"note_synced_to_graph: {note.id}")
+        except Exception as e:
+            logger.warning(f"note_graph_sync_failed: {note.id}, {e}")
 
     def update(self, note_id: int, **fields) -> bool:
         """更新笔记字段"""
@@ -183,8 +206,8 @@ class NoteStore(BaseStore[Note]):
         if note is None:
             return False
 
-        # 删除关联的边
-        self._delete_note_edges(note_id)
+        # 删除图数据库中的节点（DETACH DELETE 会同时删除关联边）
+        self._delete_note_from_graph(note_id)
 
         # 删除数据库记录
         with self._cursor() as cursor:
@@ -197,21 +220,18 @@ class NoteStore(BaseStore[Note]):
 
         return deleted
 
-    def _delete_note_edges(self, note_id: int) -> None:
-        """删除笔记关联的所有边 (使用 Neo4j)"""
+    def _delete_note_from_graph(self, note_id: int) -> None:
+        """删除笔记节点及其所有关联边 (Neo4j)"""
         try:
             from domains.graph_hub.core import NodeType, get_graph_store
 
             graph_store = get_graph_store()
-            deleted_count = graph_store.delete_edges_by_entity(
-                NodeType.NOTE,
-                str(note_id)
-            )
-            if deleted_count > 0:
-                logger.info(f"deleted_note_edges: note_id={note_id}, count={deleted_count}")
+            deleted = graph_store.delete_node(NodeType.NOTE, str(note_id))
+            if deleted:
+                logger.info(f"deleted_note_from_graph: note_id={note_id}")
         except Exception as e:
-            # 边删除失败只记录日志，不影响主业务
-            logger.warning(f"failed_to_delete_note_edges: {note_id}, {e}")
+            # 图删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_note_from_graph: {note_id}, {e}")
 
     def _delete_note_file(self, note: Note) -> None:
         """删除笔记对应的文件"""

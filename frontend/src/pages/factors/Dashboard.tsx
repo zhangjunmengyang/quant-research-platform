@@ -4,7 +4,7 @@
  */
 
 import { useMemo, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Loader2, RotateCcw } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -16,7 +16,6 @@ import {
 import type { FactorListParams } from '@/features/factor/types'
 import { pipelineApi } from '@/features/factor/pipeline-api'
 import { FactorFilters } from '@/features/factor/components/FactorFilters'
-import { FactorDetailPanelWrapper } from '@/features/factor/components/FactorDetailPanel'
 import { ResizableTable, type TableColumn, type SortState } from '@/components/ui/ResizableTable'
 import { ColumnSelector } from '@/components/ui/ColumnSelector'
 import { Pagination } from '@/components/ui/pagination'
@@ -33,15 +32,25 @@ import { FactorCharts } from './components/FactorCharts'
 
 export function Component() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { data: stats, isLoading: statsLoading, isError: statsError } = useFactorStats()
   const {
-    openDetailPanel,
     visibleColumns,
     setVisibleColumns,
     columnWidths,
     setColumnWidth,
     resetColumnConfig,
   } = useFactorStore()
+
+  // 跳转到因子详情页
+  const handleFactorSelect = useCallback(
+    (factor: Factor) => {
+      // 使用不带 .py 后缀的因子名作为路由参数
+      const factorId = factor.filename.replace(/\.py$/, '')
+      navigate(`/factors/${encodeURIComponent(factorId)}`)
+    },
+    [navigate]
+  )
 
   // 从 URL 读取 filters
   const filters = useMemo(
@@ -181,7 +190,7 @@ export function Component() {
         ) : (
           <FactorTable
             factors={data?.items || []}
-            onSelect={openDetailPanel}
+            onSelect={handleFactorSelect}
             visibleColumns={visibleColumns}
             columnWidths={columnWidths}
             onColumnWidthChange={setColumnWidth}
@@ -211,9 +220,6 @@ export function Component() {
           />
         )}
       </div>
-
-      {/* Detail Panel */}
-      <FactorDetailPanelWrapper />
     </div>
   )
 }

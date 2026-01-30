@@ -11,9 +11,6 @@ import type {
   ExperienceListParams,
   ExperienceStats,
   ExperienceQueryParams,
-  ExperienceLinkRequest,
-  ExperienceLinkResponse,
-  ExperienceLink,
 } from './types'
 
 const BASE_URL = '/experiences'
@@ -94,31 +91,6 @@ export const experienceApi = {
     const { data } = await apiClient.get<ApiResponse<ExperienceStats>>(`${BASE_URL}/stats`)
     if (!data.success || !data.data) {
       throw new Error(data.error || 'Failed to fetch stats')
-    }
-    return data.data
-  },
-
-  /**
-   * Link experience to entity
-   */
-  link: async (id: number, request: ExperienceLinkRequest): Promise<ExperienceLinkResponse> => {
-    const { data } = await apiClient.post<ApiResponse<ExperienceLinkResponse>>(
-      `${BASE_URL}/${id}/link`,
-      request
-    )
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to link experience')
-    }
-    return data.data
-  },
-
-  /**
-   * Get experience links
-   */
-  getLinks: async (id: number): Promise<ExperienceLink[]> => {
-    const { data } = await apiClient.get<ApiResponse<ExperienceLink[]>>(`${BASE_URL}/${id}/links`)
-    if (!data.success || !data.data) {
-      throw new Error(data.error || 'Failed to get links')
     }
     return data.data
   },

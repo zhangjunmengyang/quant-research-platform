@@ -115,14 +115,41 @@ class GetStrategyTool(BaseTool):
             if not strategy:
                 return ToolResult.fail(f"策略不存在: {strategy_id}")
 
-            return ToolResult.ok(strategy.to_result_dict())
+            result = strategy.to_result_dict()
+
+            # 查询图谱获取关联因子
+            try:
+                from domains.graph_hub.core import NodeType, get_graph_store
+
+                graph_store = get_graph_store()
+                edges = graph_store.get_edges_by_entity(
+                    NodeType.STRATEGY, strategy_id, include_bidirectional=False
+                )
+
+                # 提取因子关系
+                related_factors = []
+                for edge in edges:
+                    if edge.target_type == NodeType.FACTOR:
+                        related_factors.append({
+                            "factor_id": edge.target_id,
+                            "relation": edge.relation.value,
+                            "subtype": edge.subtype,
+                            "role": edge.metadata.get("role", "unknown") if edge.metadata else "unknown",
+                        })
+
+                result["related_factors"] = related_factors
+            except Exception as e:
+                logger.debug(f"获取关联因子失败: {e}")
+                result["related_factors"] = []
+
+            return ToolResult.ok(result)
         except Exception as e:
             logger.exception("获取策略失败")
             return ToolResult.fail(str(e))
 
 
 class SearchStrategiesTool(BaseTool):
-    """搜索策略工具"""
+    """搜索策略工具 - 支持高级筛选"""
 
     category = "query"
 
@@ -132,7 +159,41 @@ class SearchStrategiesTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return "按名称、描述或因子搜索策略"
+        return """搜索和筛选策略，支持文本搜索和数值条件筛选。
+
+## 用法
+
+1. **文本搜索**: 使用 query 参数按名称、描述、因子模糊匹配
+2. **条件筛选**: 使用 filters 参数按数值指标精确筛选
+
+## 筛选表达式语法
+
+格式: "<字段> <运算符> <值>"
+运算符: >, <, >=, <=, =, !=
+
+## 可筛选字段
+
+| 字段 | 说明 | 示例 |
+|------|------|------|
+| annual_return | 年化收益 (如 10 = 1000%) | annual_return > 5 |
+| sharpe_ratio | 收益回撤比 | sharpe_ratio >= 2 |
+| max_drawdown | 最大回撤 (负数，如 -0.3 = 30%) | max_drawdown > -0.3 |
+| cumulative_return | 累积收益 | cumulative_return > 100 |
+| win_rate | 胜率 (0-1) | win_rate >= 0.6 |
+| profit_loss_ratio | 盈亏比 | profit_loss_ratio > 1.5 |
+| return_std | 收益波动率 | return_std < 0.1 |
+| leverage | 杠杆倍数 | leverage = 1 |
+| verified | 是否验证 | verified = true |
+
+## 示例
+
+筛选年化>500%、收益回撤比>=2、回撤<30%的已验证策略:
+```
+filters: ["annual_return > 5", "sharpe_ratio >= 2", "max_drawdown > -0.3", "verified = true"]
+```
+
+注意: max_drawdown 是负数，"max_drawdown > -0.3" 表示回撤小于 30%。
+"""
 
     @property
     def input_schema(self) -> dict[str, Any]:
@@ -141,19 +202,72 @@ class SearchStrategiesTool(BaseTool):
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "搜索关键词",
+                    "description": "文本搜索关键词（搜索名称/描述/因子）",
+                },
+                "filters": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "筛选表达式列表，格式: \"<字段> <运算符> <值>\"。"
+                        "示例: [\"annual_return > 5\", \"sharpe_ratio >= 2\"]"
+                    ),
+                },
+                "order_by": {
+                    "type": "string",
+                    "description": "排序字段",
+                    "enum": [
+                        "annual_return",
+                        "sharpe_ratio",
+                        "max_drawdown",
+                        "win_rate",
+                        "cumulative_return",
+                        "created_at",
+                    ],
+                    "default": "annual_return",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "返回数量限制",
+                    "default": 20,
                 },
             },
-            "required": ["query"],
         }
 
-    async def execute(self, query: str) -> ToolResult:
+    async def execute(
+        self,
+        query: str | None = None,
+        filters: list[str] | None = None,
+        order_by: str = "annual_return",
+        limit: int = 20,
+    ) -> ToolResult:
         try:
-            service = get_strategy_service()
-            strategies = service.search_strategies(query)
+            from domains.strategy_hub.services.filter_parser import FilterParser
+            from domains.strategy_hub.services.strategy_store import get_strategy_store
+
+            store = get_strategy_store()
+
+            # 解析筛选条件
+            parsed_filters = None
+            if filters:
+                parser = FilterParser(
+                    allowed_fields=store.FILTERABLE_FIELDS,
+                    numeric_fields=store.numeric_fields,
+                )
+                parsed_filters = parser.parse_many(filters)
+
+            # 执行高级搜索
+            strategies, total = store.advanced_search(
+                query=query,
+                filters=parsed_filters,
+                order_by=order_by,
+                order_desc=True,
+                limit=limit,
+            )
 
             return ToolResult.ok({
                 "count": len(strategies),
+                "total": total,
+                "filters_applied": len(parsed_filters) if parsed_filters else 0,
                 "strategies": [s.to_result_dict() for s in strategies],
             })
         except Exception as e:
@@ -479,6 +593,7 @@ class RunBacktestTool(BaseTool):
             )
 
             # 执行回测并等待完成
+            # 注: 关系同步已在 StrategyStore._sync_strategy_to_graph() 中自动完成
             runner = get_backtest_runner()
             strategy = await runner.run_and_wait(request)
 
@@ -499,5 +614,6 @@ class RunBacktestTool(BaseTool):
         except Exception as e:
             logger.exception("回测执行失败")
             return ToolResult.fail(str(e))
+
 
 

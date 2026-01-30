@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Loader2,
   X,
+  Terminal,
+  Tag,
 } from 'lucide-react'
 import {
   GraphChart,
@@ -28,18 +30,29 @@ import {
   type GraphLinkData,
   type GraphCategoryData,
 } from '@/components/charts/GraphChart'
-import { useEntityEdges, useLineage, useAllTags, useEntitiesByTag, useGraphOverview } from '../hooks'
+import {
+  useEntityEdges,
+  useLineage,
+  useAllTags,
+  useEntitiesByTag,
+  useGraphOverview,
+  useCypherQuery,
+} from '../hooks'
 import {
   NODE_TYPE_CONFIG,
   RELATION_TYPE_LABELS,
   type GraphNodeType,
+  type CypherQueryResponse,
   buildNodeKey,
   parseNodeKey,
 } from '../types'
 import { createNodeStyle, createLinkStyle } from '../utils/graphStyles'
 import { NodePreviewCard } from './NodePreviewCard'
+import { CypherEditor } from './CypherEditor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 
 interface GraphExplorerProps {
@@ -88,6 +101,11 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
     nodeKey: string
     position: { x: number; y: number }
   } | null>(null)
+
+  // Cypher 查询状态
+  const [cypherPanelOpen, setCypherPanelOpen] = useState(false)
+  const [cypherResult, setCypherResult] = useState<CypherQueryResponse | null>(null)
+  const cypherMutation = useCypherQuery()
 
   // 数据获取
   // 1. 全量概览 (无聚焦时使用)
@@ -288,6 +306,42 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
       }
     }
 
+    // Cypher 查询结果 (优先级最高)
+    if (cypherResult && cypherResult.nodes.length > 0) {
+      // 清空之前的数据，使用 Cypher 结果
+      nodeMap.clear()
+      linkList.length = 0
+      categorySet.clear()
+
+      for (const node of cypherResult.nodes) {
+        const key = buildNodeKey(node.type, node.id)
+        categorySet.add(node.type as GraphNodeType)
+
+        if (!nodeMap.has(key)) {
+          const nodeColor = NODE_TYPE_CONFIG[node.type as GraphNodeType]?.color || '#6b7280'
+          nodeMap.set(key, {
+            id: key,
+            name: node.id,
+            category: 0,
+            symbolSize: 35,
+            itemStyle: createNodeStyle(nodeColor),
+          })
+        }
+      }
+
+      for (const edge of cypherResult.edges) {
+        const srcKey = buildNodeKey(edge.source_type, edge.source_id)
+        const tgtKey = buildNodeKey(edge.target_type, edge.target_id)
+
+        linkList.push({
+          source: srcKey,
+          target: tgtKey,
+          relationLabel: RELATION_TYPE_LABELS[edge.relation] || edge.relation,
+          lineStyle: createLinkStyle(),
+        })
+      }
+    }
+
     // 类型筛选
     const filteredNodes = Array.from(nodeMap.values()).filter((node) => {
       const { type } = parseNodeKey(node.id)
@@ -325,7 +379,7 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
       links: filteredLinks,
       categories: categoryList,
     }
-  }, [edgesData, lineageData, tagEntities, overviewData, selectedTypes, viewMode, focusEntity, lineageDirection, tagParam])
+  }, [edgesData, lineageData, tagEntities, overviewData, selectedTypes, viewMode, focusEntity, lineageDirection, tagParam, cypherResult])
 
   // 节点点击 - 显示预览卡片
   const handleNodeClick = useCallback(
@@ -342,7 +396,11 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
   const handleNodeDblClick = useCallback(
     (node: GraphNodeData) => {
       const { type, id } = parseNodeKey(node.id)
-
+      // 检查 id 是否有效
+      if (!id) {
+        console.warn('Invalid node id for navigation:', node.id)
+        return
+      }
       const config = NODE_TYPE_CONFIG[type]
       if (config) {
         navigate(config.getRoute(id))
@@ -360,19 +418,18 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
   const handleViewDetail = useCallback(() => {
     if (!previewState) return
     const { type, id } = parseNodeKey(previewState.nodeKey)
+    // 检查 id 是否有效
+    if (!id) {
+      console.warn('Invalid node id for navigation:', previewState.nodeKey)
+      setPreviewState(null)
+      return
+    }
     const config = NODE_TYPE_CONFIG[type]
     if (config) {
       navigate(config.getRoute(id))
     }
     setPreviewState(null)
   }, [previewState, navigate])
-
-  // 从预览卡片在图谱中展开
-  const handleExpandInGraph = useCallback(() => {
-    if (!previewState) return
-    setSearchParams({ focus: previewState.nodeKey })
-    setPreviewState(null)
-  }, [previewState, setSearchParams])
 
   // 类型筛选切换
   const toggleType = (type: GraphNodeType) => {
@@ -399,7 +456,28 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
     setSearchParams(newParams)
   }
 
-  const isLoading = overviewLoading || edgesLoading || lineageLoading
+  // 清除 Cypher 结果
+  const clearCypherResult = useCallback(() => {
+    setCypherResult(null)
+  }, [])
+
+  // 执行 Cypher 查询
+  const handleCypherExecute = useCallback(
+    async (query: string) => {
+      try {
+        const result = await cypherMutation.mutateAsync({ query })
+        setCypherResult(result)
+        // 清除聚焦和标签筛选，显示 Cypher 结果
+        const newParams = new URLSearchParams()
+        setSearchParams(newParams)
+      } catch {
+        // 错误已由 mutation 处理
+      }
+    },
+    [cypherMutation, setSearchParams]
+  )
+
+  const isLoading = overviewLoading || edgesLoading || lineageLoading || cypherMutation.isPending
 
   return (
     <div className={cn('flex flex-col h-full', className)}>
@@ -514,8 +592,64 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
           </Button>
         )}
 
+        {/* 聚焦信息 - Badge 形式 */}
+        {focusEntity && (
+          <Badge variant="outline" className="gap-1.5 pl-1.5 pr-1">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: NODE_TYPE_CONFIG[focusEntity.type]?.color }}
+            />
+            <span className="text-muted-foreground text-xs">聚焦</span>
+            <span className="font-medium">{focusEntity.id}</span>
+            <button
+              className="ml-0.5 rounded-sm hover:bg-muted p-0.5"
+              onClick={clearFocus}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        )}
+
+        {/* 标签筛选 - Badge 形式 */}
+        {tagParam && (
+          <Badge variant="secondary" className="gap-1.5 pr-1">
+            <Tag className="h-3 w-3" />
+            <span>{tagParam}</span>
+            <button
+              className="ml-0.5 rounded-sm hover:bg-muted/50 p-0.5"
+              onClick={clearTag}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        )}
+
+        {/* Cypher 结果提示 */}
+        {cypherResult && (
+          <Badge variant="info" className="gap-1.5 pr-1">
+            <Terminal className="h-3 w-3" />
+            <span>Cypher: {cypherResult.record_count} 条</span>
+            <button
+              className="ml-0.5 rounded-sm hover:bg-info/20 p-0.5"
+              onClick={clearCypherResult}
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        )}
+
+        {/* Cypher 查询按钮 */}
+        <Button
+          variant={cypherPanelOpen ? 'secondary' : 'outline'}
+          size="sm"
+          onClick={() => setCypherPanelOpen(!cypherPanelOpen)}
+        >
+          <Terminal className="h-4 w-4 mr-1" />
+          Cypher
+        </Button>
+
         {/* 统计信息 */}
-        {!focusEntity && !tagParam && overviewData && (
+        {!focusEntity && !tagParam && !cypherResult && overviewData && (
           <div className="ml-auto text-xs text-muted-foreground">
             {overviewData.stats.returned_nodes} 节点 / {overviewData.stats.returned_edges} 边
             {overviewData.stats.total_nodes > overviewData.stats.returned_nodes && (
@@ -527,50 +661,19 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
         )}
       </div>
 
-      {/* 聚焦/标签信息 */}
-      {(focusEntity || tagParam) && (
-        <div className="px-4 py-2 bg-amber-50 border-b flex items-center gap-4 flex-wrap">
-          {focusEntity && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-amber-800">
-                聚焦:
-                <span
-                  className="ml-1 px-2 py-0.5 rounded text-white text-xs"
-                  style={{
-                    backgroundColor: NODE_TYPE_CONFIG[focusEntity.type]?.color,
-                  }}
-                >
-                  {NODE_TYPE_CONFIG[focusEntity.type]?.label}
-                </span>
-                <span className="ml-1 font-medium">{focusEntity.id}</span>
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={clearFocus}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-          {tagParam && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-amber-800">
-                标签: <span className="font-medium">{tagParam}</span>
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0"
-                onClick={clearTag}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Cypher 查询面板 */}
+      <Collapsible open={cypherPanelOpen}>
+        <CollapsibleContent className="border-b bg-muted/30">
+          <div className="p-4">
+            <CypherEditor
+              onExecute={handleCypherExecute}
+              isLoading={cypherMutation.isPending}
+              error={cypherMutation.error?.message}
+              executionTime={cypherResult?.execution_time_ms}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* 图表区域 */}
       <div ref={graphContainerRef} className="flex-1 relative">
@@ -618,7 +721,6 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
             containerRect={graphContainerRef.current?.getBoundingClientRect() ?? null}
             onClose={handleClosePreview}
             onViewDetail={handleViewDetail}
-            onExpandInGraph={handleExpandInGraph}
           />
         )}
       </div>
@@ -628,9 +730,9 @@ export function GraphExplorer({ className }: GraphExplorerProps) {
         <div className="absolute right-4 bottom-4 w-48 max-h-64 overflow-auto rounded-lg border bg-card shadow-lg p-3">
           <h4 className="text-xs font-medium text-muted-foreground mb-2">标签</h4>
           <div className="flex flex-wrap gap-1">
-            {allTags.slice(0, 20).map((tag) => (
+            {allTags.slice(0, 20).map((tag, index) => (
               <button
-                key={tag.name}
+                key={`${tag.name}-${index}`}
                 onClick={() => {
                   const newParams = new URLSearchParams()
                   newParams.set('tag', tag.name)

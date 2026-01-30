@@ -3,8 +3,8 @@
  * 笔记详情页 - 查看和编辑笔记
  */
 
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Navigate } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate, Navigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft,
   Save,
@@ -18,13 +18,23 @@ import {
 import { useNoteDetail, useNoteMutations, useVerifications } from '@/features/note'
 import { NoteType, NOTE_TYPE_LABELS, NOTE_TYPE_COLORS } from '@/features/note/types'
 import { Link } from 'react-router-dom'
-import { EntityGraph } from '@/features/graph'
+import { EntityGraph, RelationEditor } from '@/features/graph'
 
 export function Component() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const noteId = id ? parseInt(id, 10) : null
   const isNew = id === 'new'
+
+  // 安全的后退函数：如果没有历史记录则返回列表页
+  const handleBack = useCallback(() => {
+    if (location.key === 'default') {
+      navigate('/notes', { replace: true })
+    } else {
+      navigate(-1)
+    }
+  }, [navigate, location.key])
 
   // Redirect /notes/new to list page (create via dialog now)
   if (isNew) {
@@ -111,10 +121,10 @@ export function Component() {
         <p>加载失败</p>
         <p className="text-sm">{(error as Error)?.message}</p>
         <button
-          onClick={() => navigate('/notes')}
+          onClick={handleBack}
           className="mt-4 text-sm text-primary hover:underline"
         >
-          返回列表
+          返回
         </button>
       </div>
     )
@@ -125,11 +135,11 @@ export function Component() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate('/notes')}
+          onClick={handleBack}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回列表
+          返回
         </button>
         <div className="flex items-center gap-2">
           {isEditing ? (
@@ -257,6 +267,16 @@ export function Component() {
             entityId={String(note.id)}
             entityName={note.title}
             height={200}
+          />
+        </div>
+      )}
+
+      {/* 关联管理 */}
+      {note?.id && (
+        <div className="rounded-lg border bg-card p-6">
+          <RelationEditor
+            entityType="note"
+            entityId={String(note.id)}
           />
         </div>
       )}

@@ -291,6 +291,174 @@ class GraphService:
             result,
         )
 
+    # ==================== Cypher 查询 ====================
+
+    # 写操作关键字 (禁止)
+    FORBIDDEN_KEYWORDS = {
+        "CREATE", "MERGE", "DELETE", "DETACH", "SET",
+        "REMOVE", "DROP", "LOAD", "FOREACH",
+    }
+
+    def execute_cypher(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+    ) -> tuple[bool, str, dict | None]:
+        """
+        执行只读 Cypher 查询
+
+        安全措施：
+        - 禁止 CREATE/DELETE/SET 等写操作
+        - 自动添加 LIMIT 限制
+        - 解析结果为节点和边格式
+
+        Returns:
+            (成功, 消息, 结果数据)
+        """
+        # 1. 安全验证 - 检查禁止的写操作关键字
+        query_upper = query.upper()
+        for forbidden in self.FORBIDDEN_KEYWORDS:
+            # 检查是否作为独立关键字出现
+            if f" {forbidden} " in f" {query_upper} " or query_upper.startswith(f"{forbidden} "):
+                return False, f"不允许执行写操作: {forbidden}", None
+
+        # 2. 执行查询
+        try:
+            records, exec_time = self.store.execute_readonly_cypher(query, params)
+        except Exception as e:
+            return False, f"查询执行失败: {str(e)}", None
+
+        # 3. 解析结果为节点和边
+        nodes = []
+        edges = []
+        node_set = set()
+        edge_set = set()
+
+        for record in records:
+            for value in record.values():
+                self._extract_graph_elements(value, nodes, edges, node_set, edge_set)
+
+        return True, f"查询成功，返回 {len(records)} 条记录", {
+            "nodes": nodes,
+            "edges": edges,
+            "raw_records": self._serialize_records(records),
+            "execution_time_ms": exec_time,
+            "record_count": len(records),
+        }
+
+    def _extract_graph_elements(
+        self,
+        value: Any,
+        nodes: list,
+        edges: list,
+        node_set: set,
+        edge_set: set,
+    ) -> None:
+        """从 Neo4j 结果中提取节点和边"""
+        # 处理节点
+        if hasattr(value, "labels") and hasattr(value, "id"):
+            labels = list(value.labels)
+            node_type = labels[0].lower() if labels else "data"
+            node_id = value.get("id", str(value.element_id))
+            key = (node_type, node_id)
+            if key not in node_set:
+                node_set.add(key)
+                nodes.append({"type": node_type, "id": node_id, "degree": 0})
+
+        # 处理关系
+        elif hasattr(value, "type") and hasattr(value, "nodes"):
+            try:
+                start_node, end_node = value.nodes
+                src_labels = list(start_node.labels)
+                tgt_labels = list(end_node.labels)
+
+                src_type = src_labels[0].lower() if src_labels else "data"
+                tgt_type = tgt_labels[0].lower() if tgt_labels else "data"
+                src_id = start_node.get("id", str(start_node.element_id))
+                tgt_id = end_node.get("id", str(end_node.element_id))
+                rel_type = value.type.lower()
+
+                edge_key = (src_type, src_id, tgt_type, tgt_id, rel_type)
+                if edge_key not in edge_set:
+                    edge_set.add(edge_key)
+                    edges.append({
+                        "source_type": src_type,
+                        "source_id": src_id,
+                        "target_type": tgt_type,
+                        "target_id": tgt_id,
+                        "relation": rel_type if rel_type in ("derives", "relates") else "relates",
+                        "subtype": "",
+                        "is_bidirectional": False,
+                    })
+
+                # 同时添加关系两端的节点
+                for node, n_type, n_id in [
+                    (start_node, src_type, src_id),
+                    (end_node, tgt_type, tgt_id),
+                ]:
+                    key = (n_type, n_id)
+                    if key not in node_set:
+                        node_set.add(key)
+                        nodes.append({"type": n_type, "id": n_id, "degree": 0})
+            except Exception:
+                pass
+
+        # 处理路径
+        elif hasattr(value, "nodes") and hasattr(value, "relationships"):
+            for node in value.nodes:
+                self._extract_graph_elements(node, nodes, edges, node_set, edge_set)
+            for rel in value.relationships:
+                self._extract_graph_elements(rel, nodes, edges, node_set, edge_set)
+
+        # 处理列表
+        elif isinstance(value, list):
+            for item in value:
+                self._extract_graph_elements(item, nodes, edges, node_set, edge_set)
+
+    def _serialize_records(self, records: list[dict]) -> list[dict]:
+        """序列化记录为 JSON 可序列化格式"""
+        result = []
+        for record in records:
+            serialized = {}
+            for key, value in record.items():
+                serialized[key] = self._serialize_value(value)
+            result.append(serialized)
+        return result
+
+    def _serialize_value(self, value: Any) -> Any:
+        """序列化单个值"""
+        if value is None:
+            return None
+        if isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, list):
+            return [self._serialize_value(v) for v in value]
+        if isinstance(value, dict):
+            return {k: self._serialize_value(v) for k, v in value.items()}
+        # Neo4j 节点
+        if hasattr(value, "labels") and hasattr(value, "id"):
+            labels = list(value.labels)
+            return {
+                "_type": "node",
+                "labels": labels,
+                "id": value.get("id", str(value.element_id)),
+                "properties": dict(value),
+            }
+        # Neo4j 关系
+        if hasattr(value, "type") and hasattr(value, "nodes"):
+            return {
+                "_type": "relationship",
+                "type": value.type,
+            }
+        # Neo4j 路径
+        if hasattr(value, "nodes") and hasattr(value, "relationships"):
+            return {
+                "_type": "path",
+                "length": len(value.relationships),
+            }
+        # 其他类型转字符串
+        return str(value)
+
     # ==================== 工具方法 ====================
 
     def health_check(self) -> bool:

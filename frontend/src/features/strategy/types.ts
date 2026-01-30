@@ -140,6 +140,7 @@ export interface StrategyListParams {
   page_size?: number
   verified?: boolean
   order_by?: string
+  order_desc?: boolean
   task_status?: string
 }
 

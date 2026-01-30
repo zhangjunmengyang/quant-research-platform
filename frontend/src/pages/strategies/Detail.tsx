@@ -3,7 +3,8 @@
  * 策略详情页 - 展示完整的回测指标
  */
 
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useCallback } from 'react'
 import {
   Loader2,
   ArrowLeft,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react'
 import { useStrategy } from '@/features/strategy'
 import { EquityCurveSubplots, type EquityCurveDataPoint } from '@/components/charts'
-import { EntityGraph } from '@/features/graph'
+import { EntityGraph, RelationEditor } from '@/features/graph'
 import { cn, formatPercent } from '@/lib/utils'
 import type { Strategy } from '@/features/strategy'
 
@@ -24,6 +25,27 @@ import type { Strategy } from '@/features/strategy'
 interface PeriodReturn {
   candle_begin_time: string
   涨跌幅?: string
+  [key: string]: unknown
+}
+
+// strategy_config 中的因子/过滤器配置类型
+type FactorTuple = [string, boolean, number | number[], number]  // [name, is_sort_asc, param, weight]
+type FilterTuple = [string, number | number[], string?, boolean?]  // [name, param, method?, is_sort_asc?]
+
+interface StrategyConfigItem {
+  factor_list?: FactorTuple[]
+  long_factor_list?: FactorTuple[]
+  short_factor_list?: FactorTuple[]
+  filter_list?: FilterTuple[]
+  long_filter_list?: FilterTuple[]
+  short_filter_list?: FilterTuple[]
+  filter_list_post?: FilterTuple[]
+  hold_period?: string
+  long_select_coin_num?: number
+  short_select_coin_num?: number
+  long_cap_weight?: number
+  short_cap_weight?: number
+  market?: string
   [key: string]: unknown
 }
 
@@ -361,7 +383,18 @@ function PeriodReturnHeatmap({
 
 export function Component() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const location = useLocation()
   const { data: strategy, isLoading, error } = useStrategy(id || '')
+
+  // 安全的后退函数：如果没有历史记录则返回列表页
+  const handleBack = useCallback(() => {
+    if (location.key === 'default') {
+      navigate('/strategies', { replace: true })
+    } else {
+      navigate(-1)
+    }
+  }, [navigate, location.key])
 
   if (isLoading) {
     return (
@@ -377,13 +410,14 @@ export function Component() {
         <p className="text-destructive">
           {error ? `加载失败: ${(error as Error).message}` : '策略不存在'}
         </p>
-        <Link
-          to="/strategies"
+        <button
+          type="button"
+          onClick={handleBack}
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回策略列表
-        </Link>
+          返回
+        </button>
       </div>
     )
   }
@@ -391,6 +425,10 @@ export function Component() {
   const factorList = parseJSON<string[]>(strategy.factor_list, [])
   const factorParams = parseJSON<Record<string, unknown>>(strategy.factor_params, {})
   const sortDirections = parseJSON<Record<string, boolean>>(strategy.sort_directions, {})
+
+  // 解析 strategy_config 获取完整配置（包含过滤因子）
+  const strategyConfig = parseJSON<StrategyConfigItem[]>(strategy.strategy_config, [])
+  const firstConfig = strategyConfig[0] || {}
 
   // 解析资金曲线数据（支持完整的多子图数据）
   const equityCurve = parseJSON<EquityCurveDataPoint[]>(
@@ -414,18 +452,37 @@ export function Component() {
     }).join(', ')
   }
 
+  // 格式化过滤因子显示
+  // FilterTuple: [name, param, method?, is_sort_asc?]
+  const formatFilterDisplay = (filters: FilterTuple[] | undefined): string => {
+    if (!filters || filters.length === 0) return ''
+    return filters.map(filter => {
+      const [name, param, method] = filter
+      const paramStr = param !== undefined ? `(${Array.isArray(param) ? param.join(',') : param})` : ''
+      const methodStr = method ? ` [${method}]` : ''
+      return `${name}${paramStr}${methodStr}`
+    }).join(', ')
+  }
+
+  // 从 strategy_config 中提取过滤因子
+  const filterList = firstConfig.filter_list || []
+  const filterListPost = firstConfig.filter_list_post || []
+  const longFilterList = firstConfig.long_filter_list
+  const shortFilterList = firstConfig.short_filter_list
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <Link
-            to="/strategies"
+          <button
+            type="button"
+            onClick={handleBack}
             className="mb-2 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            返回列表
-          </Link>
+            返回
+          </button>
           <h1 className="text-2xl font-bold">{strategy.name}</h1>
           {strategy.description && (
             <p className="mt-1 text-muted-foreground">{strategy.description}</p>
@@ -498,8 +555,48 @@ export function Component() {
         {/* 因子配置 */}
         {factorList.length > 0 && (
           <div className="mt-4">
-            <p className="text-xs text-muted-foreground">因子配置 (名称/参数/排序方向)</p>
+            <p className="text-xs text-muted-foreground">选币因子 (名称/参数/排序方向)</p>
             <p className="mt-1 text-sm font-mono">{formatFactorDisplay()}</p>
+          </div>
+        )}
+
+        {/* 前置过滤因子 */}
+        {filterList.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs text-muted-foreground">前置过滤因子 (名称/参数/条件)</p>
+            <p className="mt-1 text-sm font-mono text-blue-600 dark:text-blue-400">
+              {formatFilterDisplay(filterList)}
+            </p>
+          </div>
+        )}
+
+        {/* 多头专用前置过滤（如果有） */}
+        {longFilterList && longFilterList.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs text-muted-foreground">多头前置过滤因子</p>
+            <p className="mt-1 text-sm font-mono text-green-600 dark:text-green-400">
+              {formatFilterDisplay(longFilterList)}
+            </p>
+          </div>
+        )}
+
+        {/* 空头专用前置过滤（如果有） */}
+        {shortFilterList && shortFilterList.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs text-muted-foreground">空头前置过滤因子</p>
+            <p className="mt-1 text-sm font-mono text-red-600 dark:text-red-400">
+              {formatFilterDisplay(shortFilterList)}
+            </p>
+          </div>
+        )}
+
+        {/* 后置过滤因子 */}
+        {filterListPost.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs text-muted-foreground">后置过滤因子 (名称/参数/条件)</p>
+            <p className="mt-1 text-sm font-mono text-orange-600 dark:text-orange-400">
+              {formatFilterDisplay(filterListPost)}
+            </p>
           </div>
         )}
       </div>
@@ -632,13 +729,23 @@ export function Component() {
       />
 
       {/* 知识关联图 */}
-      {strategy.name && (
+      {strategy.id && (
         <EntityGraph
           entityType="strategy"
-          entityId={strategy.name}
+          entityId={strategy.id}
           entityName={strategy.name}
           height={250}
         />
+      )}
+
+      {/* 关联管理 */}
+      {strategy.id && (
+        <div className="rounded-lg border bg-card p-4">
+          <RelationEditor
+            entityType="strategy"
+            entityId={strategy.id}
+          />
+        </div>
       )}
 
       {/* Notes */}

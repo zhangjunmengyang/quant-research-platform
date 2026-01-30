@@ -11,11 +11,9 @@ from datetime import datetime
 from typing import Any
 
 from ..core.models import (
-    EntityType,
     Experience,
     ExperienceContent,
     ExperienceContext,
-    ExperienceLink,
 )
 from ..core.store import ExperienceStore, get_experience_store
 
@@ -162,55 +160,6 @@ class ExperienceService:
     def get_all_tags(self) -> list[str]:
         """获取所有标签"""
         return self.store.get_all_tags()
-
-    # ==================== 关联管理 ====================
-
-    def link_experience(
-        self,
-        experience_id: int,
-        entity_type: str,
-        entity_id: str,
-        relation: str = "related",
-    ) -> tuple[bool, str, dict[str, Any] | None]:
-        """关联经验与其他实体"""
-        experience = self.store.get(experience_id)
-        if experience is None:
-            return False, f"经验不存在: {experience_id}", None
-
-        if entity_type not in [e.value for e in EntityType]:
-            return False, f"无效的实体类型: {entity_type}", None
-
-        link = ExperienceLink(
-            experience_id=experience_id,
-            experience_uuid=experience.uuid,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            relation=relation,
-        )
-
-        link_id = self.store.add_link(link)
-        if link_id:
-            logger.info(f"关联经验成功: {experience_id} -> {entity_type}:{entity_id}")
-            return True, "关联成功", {
-                "link_id": link_id,
-                "experience_id": experience_id,
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-            }
-        else:
-            return False, "关联失败", None
-
-    def get_experience_links(self, experience_id: int) -> list[ExperienceLink]:
-        """获取经验的所有关联"""
-        return self.store.get_links(experience_id)
-
-    def get_experiences_by_entity(
-        self,
-        entity_type: str,
-        entity_id: str
-    ) -> list[Experience]:
-        """根据关联实体获取经验"""
-        return self.store.get_experiences_by_entity(entity_type, entity_id)
 
     # ==================== 更新和删除 ====================
 

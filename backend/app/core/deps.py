@@ -123,6 +123,13 @@ async def _get_or_404_async(
     return resource
 
 
+def _normalize_factor_filename(filename: str) -> str:
+    """规范化因子文件名，移除可能的 .py 后缀。"""
+    if filename.endswith(".py"):
+        return filename[:-3]
+    return filename
+
+
 async def get_factor_or_404(
     filename: Annotated[str, Path(description="因子文件名")],
     store=Depends(get_factor_store),
@@ -131,13 +138,15 @@ async def get_factor_or_404(
     验证因子存在并返回因子对象。
 
     用作路由依赖注入，自动处理 404 错误。
+    支持带或不带 .py 后缀的文件名。
     """
+    normalized = _normalize_factor_filename(filename)
     resource = await asyncio.to_thread(
-        lambda: store.get(filename, include_excluded=True)
+        lambda: store.get(normalized, include_excluded=True)
     )
     if not resource:
         raise HTTPException(
-            status_code=404, detail=f"因子不存在: {filename}"
+            status_code=404, detail=f"因子不存在: {normalized}"
         )
     return resource
 

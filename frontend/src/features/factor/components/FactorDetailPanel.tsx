@@ -4,9 +4,8 @@
  */
 
 import { useEffect, useState, useMemo } from 'react'
-import { createPortal } from 'react-dom'
 import { useMutation } from '@tanstack/react-query'
-import { useFactorStore, useFactorMutations } from '../'
+import { useFactorMutations } from '../'
 import { factorApi } from '../api'
 import { pipelineApi, type FillableField } from '../pipeline-api'
 import type { Factor, FactorUpdate, ParamAnalysisData, StrategyConfig } from '../types'
@@ -1111,31 +1110,5 @@ function ParamAnalysisSection({ paramAnalysisJson }: { paramAnalysisJson: string
         </div>
       )}
     </section>
-  )
-}
-
-/**
- * Panel Wrapper with Backdrop
- * 使用 Portal 渲染到 body，确保遮罩层完全覆盖
- */
-export function FactorDetailPanelWrapper() {
-  const { selectedFactor, detailPanelOpen, closeDetailPanel } = useFactorStore()
-
-  if (!detailPanelOpen || !selectedFactor) {
-    return null
-  }
-
-  return createPortal(
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/50"
-        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
-        onClick={closeDetailPanel}
-      />
-      {/* Panel */}
-      <FactorDetailPanel factor={selectedFactor} onClose={closeDetailPanel} />
-    </>,
-    document.body
   )
 }

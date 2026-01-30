@@ -41,11 +41,18 @@ system: |
      - 核心逻辑：非理性的市场心理或资金博弈。
      - 判定标准：仅当代码使用衍生品数据（资金费率、持仓量、多空比等）或另类数据（搜索指数、社交媒体热度等）时才归类为情绪。
      - 只有基于资金费率、或者使用链上基本面指标的时候才归类为情绪，否则不要归为此类。
+   - 趋势
+      - 表达的是趋势性，比如布林带，比如各种通道类的因子。
   </Category>
   <Requirements>
    1. 重逻辑：需要深度理解刻画的深层逻辑，背后发生的市场行为和故事。
-   2. 仅输出分类结果，不包含任何解释。
+   2. 仅输出**唯一**分类结果，不包含任何解释。
   </Requirements>
+
+  案例：
+  - 动量：动量因子x系列、bias、mtm系列、cci、minmax、Copp_v3、QuoteVolumeRatio（变化，就是 qv 的 bias，是 bias 自然是动量）
+  - 流动性因子：流动性x系列、ILLQ 系列、NetBuyStd、QuoteVolumeEMA、QuoteVolumeMean、QuoteVolumeStd
+  - 波动：ZH_涨跌幅max、0ZfUpQ、ZscoreAbsMeanQ
 user: |
   开始分析
 output:

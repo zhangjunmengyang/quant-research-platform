@@ -23,6 +23,7 @@ async def list_strategies(
     page_size: int = Query(50, ge=1, le=100),
     verified: Optional[bool] = None,
     order_by: str = "created_at",
+    order_desc: bool = True,
     service=Depends(get_strategy_service),
 ):
     """获取策略列表"""
@@ -35,6 +36,7 @@ async def list_strategies(
             service.list_strategies,
             filters=filters if filters else None,
             order_by=order_by,
+            order_desc=order_desc,
             page=page,
             page_size=page_size,
         )

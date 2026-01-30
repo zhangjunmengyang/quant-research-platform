@@ -540,13 +540,50 @@ class Strategy:
     def to_result_dict(self) -> dict[str, Any]:
         """转换为结果字典
 
-        只返回绩效结果，供 MCP 工具返回使用。
+        返回完整的回测配置和绩效结果，供 MCP 工具返回使用。
+        包含所有能复现回测的配置参数。
         注意: equity_curve 数据量大，需要时通过 compare_equity_curves 工具获取。
         """
         return {
             # 标识
             "id": self.id,
             "name": self.name,
+            "description": self.description,
+            # 因子配置
+            "factor_list": self.factor_list,
+            "factor_params": self.factor_params,
+            "strategy_config": self.strategy_config,
+            "sort_directions": self.sort_directions,
+            # 时间配置
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            # 持仓配置
+            "hold_period": self.hold_period,
+            "offset": self.offset,
+            "market": self.market,
+            "trade_type": self.trade_type,
+            # 多空配置
+            "long_select_coin_num": self.long_select_coin_num,
+            "short_select_coin_num": self.short_select_coin_num,
+            "long_cap_weight": self.long_cap_weight,
+            "short_cap_weight": self.short_cap_weight,
+            # 账户配置
+            "account_type": self.account_type,
+            "initial_usdt": self.initial_usdt,
+            "leverage": self.leverage,
+            "margin_rate": self.margin_rate,
+            # 手续费配置
+            "swap_c_rate": self.swap_c_rate,
+            "spot_c_rate": self.spot_c_rate,
+            # 最小下单量
+            "swap_min_order_limit": self.swap_min_order_limit,
+            "spot_min_order_limit": self.spot_min_order_limit,
+            # 价格计算
+            "avg_price_col": self.avg_price_col,
+            # 币种过滤
+            "min_kline_num": self.min_kline_num,
+            "black_list": self.black_list,
+            "white_list": self.white_list,
             # 核心绩效
             "cumulative_return": self.cumulative_return,
             "annual_return": self.annual_return,
@@ -571,6 +608,10 @@ class Strategy:
             "year_return": self.year_return,
             "quarter_return": self.quarter_return,
             "month_return": self.month_return,
+            # 元数据
+            "created_at": self.created_at,
+            "verified": self.verified,
+            "tags": self.tags,
         }
 
     @classmethod

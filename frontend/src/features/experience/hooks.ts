@@ -10,7 +10,6 @@ import type {
   ExperienceUpdate,
   ExperienceListParams,
   ExperienceQueryParams,
-  ExperienceLinkRequest,
 } from './types'
 
 // Query Keys
@@ -21,7 +20,6 @@ export const experienceKeys = {
   details: () => [...experienceKeys.all, 'detail'] as const,
   detail: (id: number) => [...experienceKeys.details(), id] as const,
   stats: () => [...experienceKeys.all, 'stats'] as const,
-  links: (id: number) => [...experienceKeys.all, 'links', id] as const,
   query: (params: ExperienceQueryParams) => [...experienceKeys.all, 'query', params] as const,
 }
 
@@ -64,19 +62,7 @@ export function useExperienceStats() {
 }
 
 /**
- * Hook to fetch experience links
- */
-export function useExperienceLinks(id: number | null) {
-  return useQuery({
-    queryKey: experienceKeys.links(id ?? 0),
-    queryFn: () => experienceApi.getLinks(id!),
-    enabled: id !== null && id > 0,
-    staleTime: DEFAULT_STALE_TIME,
-  })
-}
-
-/**
- * Hook for experience mutations (create, update, delete, link)
+ * Hook for experience mutations (create, update, delete)
  */
 export function useExperienceMutations() {
   const queryClient = useQueryClient()
@@ -113,19 +99,10 @@ export function useExperienceMutations() {
     },
   })
 
-  const linkMutation = useMutation({
-    mutationFn: ({ id, request }: { id: number; request: ExperienceLinkRequest }) =>
-      experienceApi.link(id, request),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: experienceKeys.links(variables.id) })
-    },
-  })
-
   return {
     createExperience: createMutation,
     updateExperience: updateMutation,
     deleteExperience: deleteMutation,
-    linkExperience: linkMutation,
   }
 }
 
@@ -152,25 +129,5 @@ export function useExperienceDetail(id: number | null) {
     error: query.error,
     refetch: query.refetch,
     ...mutations,
-  }
-}
-
-/**
- * Hook for experience with links
- */
-export function useExperienceWithLinks(id: number | null) {
-  const experienceQuery = useExperience(id)
-  const linksQuery = useExperienceLinks(id)
-
-  return {
-    experience: experienceQuery.data,
-    links: linksQuery.data ?? [],
-    isLoading: experienceQuery.isLoading || linksQuery.isLoading,
-    isError: experienceQuery.isError || linksQuery.isError,
-    error: experienceQuery.error || linksQuery.error,
-    refetch: () => {
-      experienceQuery.refetch()
-      linksQuery.refetch()
-    },
   }
 }

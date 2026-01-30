@@ -33,6 +33,8 @@ export interface GraphNodeData {
   x?: number // 固定位置 x
   y?: number // 固定位置 y
   fixed?: boolean // 是否固定位置
+  draggable?: boolean // 是否可拖动（覆盖 series 级别设置）
+  isCenter?: boolean // 是否为中心节点
   itemStyle?: {
     color?: string | RadialGradientColor // 支持渐变
     borderColor?: string
@@ -89,6 +91,8 @@ interface GraphChartProps {
   onChartReady?: (chart: EChartsType) => void
   // 聚焦节点
   focusNodeId?: string
+  // 中心节点ID（拖动后保持固定位置）
+  centerNodeId?: string
   // 工具栏
   showToolbar?: boolean
 }
@@ -110,6 +114,7 @@ export function GraphChart({
   onNodeDblClick,
   onChartReady,
   focusNodeId,
+  centerNodeId,
   showToolbar = false,
 }: GraphChartProps) {
   const chartRef = useRef<EChartsType | null>(null)
@@ -190,10 +195,11 @@ export function GraphChart({
         position: 'bottom',
         fontSize: 11,
         color: '#374151',
+        distance: 5,
         formatter: (params) => {
           const name = (params as { name?: string }).name || ''
           // 截断过长的名称
-          return name.length > 12 ? name.slice(0, 12) + '...' : name
+          return name.length > 18 ? name.slice(0, 18) + '...' : name
         },
       },
       edgeLabel: {
@@ -232,6 +238,7 @@ export function GraphChart({
         repulsion,
         gravity,
         edgeLength,
+        friction: 0.4,
         layoutAnimation: true,
       }
     }
@@ -319,34 +326,30 @@ export function GraphChart({
         })
       }
 
-      // 节点拖动结束后固定位置，防止力导向布局将其拉回
-      // 注意：必须使用 dragend 事件而不是 mouseup，因为 mouseup 在画布拖动时也会触发
-      // 导致画布拖动功能失效
-      if (draggable) {
+      // 中心节点拖动后固定位置，周围节点会跟随飘动（蒲公英效果）
+      if (draggable && centerNodeId) {
         chart.on('dragend', (params) => {
           const p = params as {
             dataType?: string
             seriesType?: string
             data?: GraphNodeData & { x?: number; y?: number }
           }
-          // 确保是 graph 系列的节点拖动
-          if (p.seriesType === 'graph' && p.dataType === 'node' && p.data) {
-            const nodeData = p.data
-            // 通过 setOption 更新节点的 fixed 状态
+          if (p.seriesType === 'graph' && p.dataType === 'node' && p.data?.id === centerNodeId) {
+            // 固定中心节点位置
             const currentOption = chart.getOption() as { series?: Array<{ data?: GraphNodeData[] }> }
             const seriesData = currentOption.series?.[0]?.data
-            if (seriesData && nodeData.id) {
-              const nodeIndex = seriesData.findIndex((n) => n.id === nodeData.id)
+            if (seriesData) {
+              const nodeIndex = seriesData.findIndex((n) => n.id === centerNodeId)
               if (nodeIndex !== -1 && seriesData[nodeIndex]) {
                 const existingNode = seriesData[nodeIndex]
                 seriesData[nodeIndex] = {
                   ...existingNode,
-                  id: existingNode.id, // 保证 id 存在
-                  name: existingNode.name, // 保证 name 存在
-                  category: existingNode.category, // 保证 category 存在
+                  id: existingNode.id,
+                  name: existingNode.name,
+                  category: existingNode.category,
                   fixed: true,
-                  x: nodeData.x,
-                  y: nodeData.y,
+                  x: p.data.x,
+                  y: p.data.y,
                 }
                 chart.setOption({ series: [{ data: seriesData }] }, false)
               }
@@ -406,7 +409,7 @@ export function GraphChart({
 
       onChartReady?.(chart)
     },
-    [onNodeClick, onNodeDblClick, onChartReady, draggable, roam]
+    [onNodeClick, onNodeDblClick, onChartReady, draggable, roam, centerNodeId]
   )
 
   // 聚焦节点时触发高亮

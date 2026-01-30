@@ -2,18 +2,12 @@
 因子业务服务层
 
 提供因子管理的业务逻辑，包括查询、更新、验证等操作。
+
+注意：知识关系的管理统一由 graph_hub 负责，本服务不实现 link 方法。
 """
 
 import logging
 from typing import Any
-
-from domains.graph_hub.core import (
-    GraphEdge,
-    GraphStore,
-    NodeType,
-    RelationType,
-    get_graph_store,
-)
 
 from ..core.models import Factor
 from ..core.store import FactorStore, get_factor_store
@@ -28,27 +22,14 @@ class FactorService:
     封装存储层操作，提供业务逻辑处理。
     """
 
-    def __init__(
-        self,
-        store: FactorStore | None = None,
-        graph_store: GraphStore | None = None,
-    ):
+    def __init__(self, store: FactorStore | None = None):
         """
         初始化服务
 
         Args:
             store: 因子存储实例，默认使用单例
-            graph_store: 图存储层实例（Neo4j）
         """
         self.store = store or get_factor_store()
-        self._graph_store = graph_store
-
-    @property
-    def graph_store(self) -> GraphStore:
-        """延迟获取图存储层"""
-        if self._graph_store is None:
-            self._graph_store = get_graph_store()
-        return self._graph_store
 
     def list_factors(
         self,
@@ -449,13 +430,18 @@ class FactorService:
 
         config = get_config_loader()
         factors_dir = config.factors_dir
+        sections_dir = config.sections_dir
         private_dir = Path(os.environ.get('PRIVATE_DATA_DIR', 'private'))
         metadata_dir = private_dir / "metadata"
 
-        # 1. 获取代码文件列表
+        # 1. 获取代码文件列表（时序因子 + 截面因子）
         code_files = set()
         if factors_dir.exists():
             for f in factors_dir.glob("*.py"):
+                if f.name != "__init__.py":
+                    code_files.add(f.stem)
+        if sections_dir.exists():
+            for f in sections_dir.glob("*.py"):
                 if f.name != "__init__.py":
                     code_files.add(f.stem)
 
@@ -653,170 +639,6 @@ class FactorService:
         )
 
         return success, message, factor_name if success else None
-
-
-    # ==================== 知识边关联 (Neo4j) ====================
-
-    def link_factor(
-        self,
-        factor_name: str,
-        target_type: str,
-        target_id: str,
-        relation: str = "related",
-        is_bidirectional: bool = False,
-        metadata: dict[str, Any] | None = None,
-    ) -> tuple[bool, str]:
-        """
-        创建因子与其他实体的关联
-
-        Args:
-            factor_name: 因子名称
-            target_type: 目标实体类型（data/factor/strategy/note/research/experience）
-            target_id: 目标实体 ID
-            relation: 关系类型（derives/relates），可配合 subtype 细化语义
-            is_bidirectional: 是否双向关联
-            metadata: 扩展元数据
-
-        Returns:
-            (成功, 消息)
-        """
-        # 验证因子存在
-        factor = self.store.get(factor_name)
-        if factor is None:
-            return False, f"因子不存在: {factor_name}"
-
-        # 验证实体类型
-        try:
-            target_node_type = NodeType(target_type)
-        except ValueError:
-            return False, f"无效的实体类型: {target_type}"
-
-        # 验证关系类型
-        try:
-            relation_type = RelationType(relation)
-        except ValueError:
-            return False, f"无效的关系类型: {relation}"
-
-        # 创建图边
-        edge = GraphEdge(
-            source_type=NodeType.FACTOR,
-            source_id=factor_name,
-            target_type=target_node_type,
-            target_id=target_id,
-            relation=relation_type,
-            is_bidirectional=is_bidirectional,
-            metadata=metadata or {},
-        )
-
-        success = self.graph_store.create_edge(edge)
-        if success:
-            logger.info(f"创建因子关联: factor:{factor_name} -[{relation}]-> {target_type}:{target_id}")
-            return True, "关联成功"
-        else:
-            return False, "关联失败"
-
-    def get_factor_edges(
-        self,
-        factor_name: str,
-        include_bidirectional: bool = True,
-    ) -> list[dict[str, Any]]:
-        """
-        获取因子的所有关联
-
-        Args:
-            factor_name: 因子名称
-            include_bidirectional: 是否包含双向关联
-
-        Returns:
-            关联列表
-        """
-        edges = self.graph_store.get_edges_by_entity(
-            entity_type=NodeType.FACTOR,
-            entity_id=factor_name,
-            include_bidirectional=include_bidirectional,
-        )
-        return [edge.to_dict() for edge in edges]
-
-    def get_edges_to_factor(self, factor_name: str) -> list[dict[str, Any]]:
-        """
-        获取指向因子的所有关联
-
-        Args:
-            factor_name: 因子名称
-
-        Returns:
-            关联列表
-        """
-        edges = self.graph_store.get_edges_to_entity(
-            entity_type=NodeType.FACTOR,
-            entity_id=factor_name,
-        )
-        return [edge.to_dict() for edge in edges]
-
-    def trace_factor_lineage(
-        self,
-        factor_name: str,
-        direction: str = "backward",
-        max_depth: int = 5,
-    ) -> dict[str, Any]:
-        """
-        追溯因子的知识链路
-
-        Args:
-            factor_name: 因子名称
-            direction: 追溯方向
-                - "backward": 向上追溯源头（因子基于什么）
-                - "forward": 向下追溯应用（因子被什么使用/改进）
-            max_depth: 最大追溯深度
-
-        Returns:
-            链路追溯结果，包含 start_type, start_id, direction, max_depth, count, nodes
-        """
-        result = self.graph_store.trace_lineage(
-            entity_type=NodeType.FACTOR,
-            entity_id=factor_name,
-            direction=direction,
-            max_depth=max_depth,
-        )
-        return result.to_dict()
-
-    def delete_factor_edge(
-        self,
-        target_type: str,
-        target_id: str,
-        relation: str,
-        factor_name: str,
-    ) -> tuple[bool, str]:
-        """
-        删除因子关联
-
-        Args:
-            target_type: 目标实体类型
-            target_id: 目标实体 ID
-            relation: 关系类型
-            factor_name: 因子名称（作为源）
-
-        Returns:
-            (成功, 消息)
-        """
-        try:
-            target_node_type = NodeType(target_type)
-            relation_type = RelationType(relation)
-        except ValueError as e:
-            return False, f"无效的参数: {e}"
-
-        success = self.graph_store.delete_edge(
-            source_type=NodeType.FACTOR,
-            source_id=factor_name,
-            target_type=target_node_type,
-            target_id=target_id,
-            relation=relation_type,
-        )
-        if success:
-            logger.info(f"删除因子关联: factor:{factor_name} -[{relation}]-> {target_type}:{target_id}")
-            return True, "删除成功"
-        else:
-            return False, "删除失败"
 
 
 # 单例

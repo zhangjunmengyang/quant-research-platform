@@ -11,6 +11,10 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.common import ApiResponse
 from app.schemas.graph import (
+    CreateLinkRequest,
+    CreateLinkResponse,
+    CypherQueryRequest,
+    CypherQueryResponse,
     GetEdgesResponse,
     GraphEdge,
     GraphNode,
@@ -61,6 +65,63 @@ async def get_edges(
             edges=[GraphEdge(**e) for e in edges],
         )
     )
+
+
+@router.post("/links", response_model=ApiResponse[CreateLinkResponse])
+async def create_link(request: CreateLinkRequest):
+    """
+    创建实体间的关联
+
+    创建从源实体到目标实体的关系边。
+
+    关系类型:
+    - derives: 派生关系（有方向），subtype: based/inspired/uses/produces/evolves/enables
+    - relates: 关联关系（默认双向），subtype: refs/similar/validates/contrasts/temporal
+    """
+    service = get_graph_service()
+    success, message = service.create_link(
+        source_type=request.source_type.value,
+        source_id=request.source_id,
+        target_type=request.target_type.value,
+        target_id=request.target_id,
+        relation=request.relation.value,
+        subtype=request.subtype,
+        is_bidirectional=request.is_bidirectional,
+        metadata=request.metadata,
+    )
+
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    return ApiResponse(data=CreateLinkResponse(message=message))
+
+
+@router.delete("/links", response_model=ApiResponse[CreateLinkResponse])
+async def delete_link(
+    source_type: GraphNodeType = Query(..., description="源实体类型"),
+    source_id: str = Query(..., description="源实体 ID"),
+    target_type: GraphNodeType = Query(..., description="目标实体类型"),
+    target_id: str = Query(..., description="目标实体 ID"),
+    relation: GraphRelationType = Query(..., description="关系类型"),
+):
+    """
+    删除实体间的关联
+
+    删除指定的关系边。
+    """
+    service = get_graph_service()
+    success, message = service.delete_link(
+        source_type=source_type.value,
+        source_id=source_id,
+        target_type=target_type.value,
+        target_id=target_id,
+        relation=relation.value,
+    )
+
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    return ApiResponse(data=CreateLinkResponse(message=message))
 
 
 @router.get("/lineage", response_model=ApiResponse[LineageResult])
@@ -203,6 +264,38 @@ async def get_overview(
             nodes=[GraphNode(**n) for n in result["nodes"]],
             edges=[GraphOverviewEdge(**e) for e in result["edges"]],
             stats=GraphOverviewStats(**result["stats"]),
+        )
+    )
+
+
+@router.post("/cypher", response_model=ApiResponse[CypherQueryResponse])
+async def execute_cypher(request: CypherQueryRequest):
+    """
+    执行只读 Cypher 查询
+
+    仅支持只读操作 (MATCH, RETURN, WHERE 等)。
+    禁止写操作 (CREATE, DELETE, SET 等)。
+
+    示例查询:
+    - MATCH (n) RETURN n LIMIT 100
+    - MATCH (n:Factor)-[r]->(m) RETURN n, r, m
+    """
+    service = get_graph_service()
+    success, message, result = service.execute_cypher(
+        query=request.query,
+        params=request.params,
+    )
+
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+
+    return ApiResponse(
+        data=CypherQueryResponse(
+            nodes=[GraphNode(**n) for n in result["nodes"]],
+            edges=[GraphOverviewEdge(**e) for e in result["edges"]],
+            raw_records=result["raw_records"],
+            execution_time_ms=result["execution_time_ms"],
+            record_count=result["record_count"],
         )
     )
 

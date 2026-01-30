@@ -26,7 +26,10 @@ function validateEnum<T extends string>(value: string | null, validValues: reado
 const FACTOR_ORDER_BY_VALUES = ['filename', 'verification_status', 'created_at'] as const
 const FACTOR_EXCLUDED_VALUES: readonly ExcludedFilter[] = ['all', 'active', 'excluded']
 const FACTOR_TYPE_VALUES: readonly FactorType[] = ['time_series', 'cross_section']
-const STRATEGY_ORDER_BY_VALUES = ['created_at', 'updated_at', 'name'] as const
+const STRATEGY_ORDER_BY_VALUES = [
+  'created_at', 'updated_at', 'name', 'annual_return', 'max_drawdown',
+  'sharpe_ratio', 'win_rate', 'cumulative_return', 'leverage',
+] as const
 const NOTE_TYPE_VALUES: readonly NoteType[] = [NoteType.OBSERVATION, NoteType.HYPOTHESIS, NoteType.VERIFICATION]
 
 // =============================================================================
@@ -71,6 +74,7 @@ export function paramsToStrategyFilters(searchParams: URLSearchParams): Strategy
     page: Number(searchParams.get('page')) || 1,
     page_size: Number(searchParams.get('page_size')) || 50,
     order_by: validateEnum(searchParams.get('order_by'), STRATEGY_ORDER_BY_VALUES, 'created_at'),
+    order_desc: searchParams.get('order_desc') !== 'false',
     verified: searchParams.get('verified') === 'true' ? true : searchParams.get('verified') === 'false' ? false : undefined,
   }
 }
@@ -81,6 +85,7 @@ export function strategyFiltersToParams(filters: Partial<StrategyListParams>): R
   if (filters.page) params.page = String(filters.page)
   if (filters.page_size) params.page_size = String(filters.page_size)
   if (filters.order_by) params.order_by = filters.order_by
+  if (filters.order_desc !== undefined) params.order_desc = String(filters.order_desc)
   if (filters.verified !== undefined) params.verified = String(filters.verified)
   return params
 }

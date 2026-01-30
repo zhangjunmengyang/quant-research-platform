@@ -145,6 +145,111 @@ class GraphStore:
                 logger.error(f"健康检查失败: {e}")
                 return False
 
+    # ==================== 节点操作 ====================
+
+    def upsert_node(
+        self,
+        node_type: NodeType,
+        node_id: str,
+        name: str | None = None,
+        metadata: dict | None = None,
+    ) -> bool:
+        """
+        创建或更新节点
+
+        使用 MERGE 语义，如果节点已存在则更新属性。
+
+        Args:
+            node_type: 节点类型
+            node_id: 节点 ID
+            name: 节点名称（显示用）
+            metadata: 扩展元数据
+
+        Returns:
+            是否创建/更新成功
+        """
+        with self._session() as session:
+            if session is None:
+                logger.warning("Neo4j 不可用，跳过创建节点")
+                return False
+
+            try:
+                label = self._get_label(node_type)
+                metadata_json = json.dumps(metadata) if metadata else "{}"
+
+                cypher = f"""
+                MERGE (n:{label} {{id: $node_id}})
+                ON CREATE SET
+                    n.name = $name,
+                    n.metadata = $metadata,
+                    n.created_at = datetime(),
+                    n.updated_at = datetime()
+                ON MATCH SET
+                    n.name = COALESCE($name, n.name),
+                    n.metadata = CASE WHEN $metadata <> '{{}}' THEN $metadata ELSE n.metadata END,
+                    n.updated_at = datetime()
+                RETURN n
+                """
+
+                result = session.run(
+                    cypher,
+                    node_id=node_id,
+                    name=name or node_id,
+                    metadata=metadata_json,
+                )
+
+                record = result.single()
+                if record is not None:
+                    logger.info(f"节点同步成功: {label}:{node_id}")
+                    return True
+                return False
+
+            except Neo4jError as e:
+                logger.error(f"节点同步失败: {e}")
+                return False
+
+    def delete_node(
+        self,
+        node_type: NodeType,
+        node_id: str,
+    ) -> bool:
+        """
+        删除节点及其所有关联边
+
+        Args:
+            node_type: 节点类型
+            node_id: 节点 ID
+
+        Returns:
+            是否删除成功
+        """
+        with self._session() as session:
+            if session is None:
+                logger.warning("Neo4j 不可用，跳过删除节点")
+                return False
+
+            try:
+                label = self._get_label(node_type)
+
+                # DETACH DELETE 会同时删除节点和所有关联边
+                cypher = f"""
+                MATCH (n:{label} {{id: $node_id}})
+                DETACH DELETE n
+                RETURN count(n) as deleted
+                """
+
+                result = session.run(cypher, node_id=node_id)
+                record = result.single()
+                deleted = record["deleted"] if record else 0
+                if deleted > 0:
+                    logger.info(f"节点删除成功: {label}:{node_id}")
+                    return True
+                return False
+
+            except Neo4jError as e:
+                logger.error(f"节点删除失败: {e}")
+                return False
+
     # ==================== 边操作 ====================
 
     def create_edge(self, edge: GraphEdge) -> bool:
@@ -1002,6 +1107,7 @@ class GraphStore:
                         "degree": record["degree"],
                     }
                     for record in nodes_result
+                    if record["id"]  # 过滤掉 id 为空的节点
                 ]
 
                 # 获取节点 ID 集合用于过滤边
@@ -1028,13 +1134,17 @@ class GraphStore:
                     tgt_type = record["target_type"].lower() if record["target_type"] else "data"
                     # 只保留两端节点都在结果中的边
                     if (src_type, record["source_id"]) in node_ids and (tgt_type, record["target_id"]) in node_ids:
+                        # 转换旧格式关系类型
+                        relation, subtype = self._parse_relation_with_subtype(
+                            record["relation"], record.get("subtype")
+                        )
                         edges.append({
                             "source_type": src_type,
                             "source_id": record["source_id"],
                             "target_type": tgt_type,
                             "target_id": record["target_id"],
-                            "relation": record["relation"].lower() if record["relation"] else "relates",
-                            "subtype": record["subtype"] or "",
+                            "relation": relation.value,
+                            "subtype": subtype,
                             "is_bidirectional": record["is_bidirectional"] or False,
                         })
 
@@ -1283,6 +1393,49 @@ class GraphStore:
         except Exception as e:
             logger.warning(f"解析边记录失败: {e}")
             return None
+
+    # ==================== Cypher 查询 ====================
+
+    def execute_readonly_cypher(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+        limit: int = 1000,
+    ) -> tuple[list[dict], float]:
+        """
+        执行只读 Cypher 查询
+
+        Args:
+            query: Cypher 语句
+            params: 查询参数
+            limit: 结果数量限制
+
+        Returns:
+            (结果记录列表, 执行时间ms)
+        """
+        import time
+
+        with self._session() as session:
+            if session is None:
+                return [], 0.0
+
+            try:
+                start_time = time.time()
+
+                # 如果查询没有 LIMIT，自动添加
+                query_upper = query.upper().strip()
+                if "LIMIT" not in query_upper:
+                    query = f"{query.rstrip().rstrip(';')} LIMIT {limit}"
+
+                result = session.run(query, params or {})
+                records = [dict(record) for record in result]
+
+                execution_time = (time.time() - start_time) * 1000
+                return records, execution_time
+
+            except Neo4jError as e:
+                logger.error(f"Cypher 查询执行失败: {e}")
+                raise
 
 
 # ==================== 单例访问 ====================

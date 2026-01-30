@@ -32,8 +32,8 @@ import { Button } from '@/components/ui/button'
 import { NodePreviewCard } from './NodePreviewCard'
 
 // 稳定的配置常量，避免每次渲染创建新引用
-const EDGE_LENGTH_NORMAL: [number, number] = [60, 120]
-const EDGE_LENGTH_FULLSCREEN: [number, number] = [80, 180]
+const EDGE_LENGTH_NORMAL: [number, number] = [100, 200]
+const EDGE_LENGTH_FULLSCREEN: [number, number] = [150, 280]
 
 interface EntityGraphProps {
   entityType: GraphNodeType
@@ -178,17 +178,16 @@ export function EntityGraph({
   const handlePreviewViewDetail = useCallback(() => {
     if (!previewState) return
     const { type, id } = parseNodeKey(previewState.nodeKey)
+    // 检查 id 是否有效
+    if (!id) {
+      console.warn('Invalid node id for navigation:', previewState.nodeKey)
+      setPreviewState(null)
+      return
+    }
     const config = NODE_TYPE_CONFIG[type]
     if (config) {
       navigate(config.getRoute(id))
     }
-    setPreviewState(null)
-  }, [previewState, navigate])
-
-  // 从预览卡片跳转到大图查看该节点
-  const handlePreviewViewInGraph = useCallback(() => {
-    if (!previewState) return
-    navigate(`/graph?focus=${encodeURIComponent(previewState.nodeKey)}`)
     setPreviewState(null)
   }, [previewState, navigate])
 
@@ -276,9 +275,10 @@ export function EntityGraph({
             layout="force"
             roam={true}
             draggable={true}
-            repulsion={400}
-            gravity={0.08}
+            repulsion={550}
+            gravity={0.06}
             edgeLength={EDGE_LENGTH_FULLSCREEN}
+            centerNodeId={buildNodeKey(entityType, entityId)}
             onNodeClick={handleNodeClick}
             showToolbar={true}
           />
@@ -291,7 +291,6 @@ export function EntityGraph({
               containerRect={fullscreenContainerRef.current?.getBoundingClientRect() ?? null}
               onClose={handleClosePreview}
               onViewDetail={handlePreviewViewDetail}
-              onExpandInGraph={handlePreviewViewInGraph}
             />
           )}
         </div>
@@ -355,9 +354,10 @@ export function EntityGraph({
           layout="force"
           roam={true}
           draggable={true}
-          repulsion={250}
-          gravity={0.15}
+          repulsion={380}
+          gravity={0.1}
           edgeLength={EDGE_LENGTH_NORMAL}
+          centerNodeId={buildNodeKey(entityType, entityId)}
           onNodeClick={handleNodeClick}
           showToolbar={true}
         />
@@ -370,7 +370,6 @@ export function EntityGraph({
             containerRect={graphContainerRef.current?.getBoundingClientRect() ?? null}
             onClose={handleClosePreview}
             onViewDetail={handlePreviewViewDetail}
-            onExpandInGraph={handlePreviewViewInGraph}
           />
         )}
       </div>

@@ -3,8 +3,8 @@
  * MCP 服务器详情页
  */
 
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useCallback } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   Server,
   Play,
@@ -365,8 +365,18 @@ function ConfigTab({ server }: { server: NonNullable<ReturnType<typeof useMCPSer
 export function Component() {
   const { name } = useParams<{ name: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const [activeTab, setActiveTab] = useState<TabType>('info')
   const [actionPending, setActionPending] = useState(false)
+
+  // 安全的后退函数：如果没有历史记录则返回列表页
+  const handleBack = useCallback(() => {
+    if (location.key === 'default') {
+      navigate('/mcp', { replace: true })
+    } else {
+      navigate(-1)
+    }
+  }, [navigate, location.key])
 
   const { data: server, isLoading, refetch } = useMCPServer(name || '')
   const serverAction = useMCPServerAction()
@@ -400,11 +410,11 @@ export function Component() {
       <div className="flex h-64 flex-col items-center justify-center gap-4">
         <p className="text-muted-foreground">服务器不存在</p>
         <button
-          onClick={() => navigate('/mcp')}
+          onClick={handleBack}
           className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
         >
           <ArrowLeft className="h-4 w-4" />
-          返回列表
+          返回
         </button>
       </div>
     )
@@ -423,7 +433,7 @@ export function Component() {
       {/* 顶部导航 */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/mcp')}
+          onClick={handleBack}
           className="inline-flex items-center justify-center w-8 h-8 rounded-md border bg-background hover:bg-accent"
         >
           <ArrowLeft className="h-4 w-4" />

@@ -7,19 +7,12 @@ Note Hub 定位为"研究草稿/临时记录"层，支持：
 - 研究流程：观察 -> 假设 -> 检验
 - 归档管理
 - 提炼为经验（需要 experience_hub 支持）
-- 知识边关联：通过 Graph Hub (Neo4j) 管理实体间关系
+
+注意：知识关系的管理统一由 graph_hub 负责，本服务不实现 link 方法。
 """
 
 import logging
 from typing import Any
-
-from domains.graph_hub.core import (
-    GraphEdge,
-    GraphStore,
-    NodeType,
-    RelationType,
-    get_graph_store,
-)
 
 from ..core.models import Note, NoteType
 from ..core.store import NoteStore, get_note_store
@@ -34,20 +27,14 @@ class NoteService:
     封装笔记相关的业务逻辑，代理存储层操作。
     """
 
-    def __init__(
-        self,
-        store: NoteStore | None = None,
-        graph_store: GraphStore | None = None,
-    ):
+    def __init__(self, store: NoteStore | None = None):
         """
         初始化服务
 
         Args:
             store: 笔记存储层实例
-            graph_store: 图存储层实例 (Neo4j)
         """
         self._store = store
-        self._graph_store = graph_store
 
     @property
     def store(self) -> NoteStore:
@@ -55,13 +42,6 @@ class NoteService:
         if self._store is None:
             self._store = get_note_store()
         return self._store
-
-    @property
-    def graph_store(self) -> GraphStore:
-        """延迟获取图存储层"""
-        if self._graph_store is None:
-            self._graph_store = get_graph_store()
-        return self._graph_store
 
     # ==================== CRUD ====================
 
@@ -89,8 +69,7 @@ class NoteService:
             (成功, 消息, 笔记ID)
 
         Note:
-            创建笔记后，可使用 link_note() 建立与其他实体的关联。
-            例如检验关联假设：link_note(note_id, "note", str(hypothesis_id), "relates", subtype="validates")
+            创建笔记后，可使用 graph_hub 的 create_link 工具建立与其他实体的关联。
         """
         if not title.strip():
             return False, "标题不能为空", None
@@ -259,29 +238,21 @@ class NoteService:
             title: 检验标题
             content: 检验内容
             tags: 标签
-            hypothesis_id: 关联的假设笔记 ID（可选，通过 Graph Hub 关联）
+            hypothesis_id: 关联的假设笔记 ID（可选）
 
         Returns:
             (成功, 消息, 笔记ID)
+
+        Note:
+            hypothesis_id 参数仅作为返回值传递，实际的关系创建由 MCP 工具层负责。
+            调用方应在创建后使用 graph_hub 的 create_link 工具建立关联。
         """
-        success, message, note_id = self.create_note(
+        return self.create_note(
             title=title,
             content=content,
             tags=tags,
             note_type=NoteType.VERIFICATION.value,
         )
-
-        # 如果创建成功且指定了假设 ID，通过 Graph Hub 建立关联
-        if success and note_id and hypothesis_id:
-            self.link_note(
-                note_id=note_id,
-                target_type="note",
-                target_id=str(hypothesis_id),
-                relation="relates",
-                subtype="validates",
-            )
-
-        return success, message, note_id
 
     # ==================== 类型查询 ====================
 
@@ -312,7 +283,7 @@ class NoteService:
         """
         获取假设的所有验证笔记
 
-        通过 Graph Hub (Neo4j) 查找关联到指定假设的验证笔记。
+        通过 Graph Hub 查找关联到指定假设的验证笔记。
 
         Args:
             hypothesis_id: 假设笔记 ID
@@ -321,20 +292,35 @@ class NoteService:
         Returns:
             验证笔记列表
         """
+        from domains.graph_hub.services import get_graph_service
+
+        graph_service = get_graph_service()
+
         # 通过 Graph Hub 查找 validates 关系
-        edges = self.graph_store.get_edges_to_entity(
-            entity_type=NodeType.NOTE,
+        success, _, edges = graph_service.get_edges(
+            entity_type="note",
             entity_id=str(hypothesis_id),
+            include_bidirectional=True,
         )
 
-        # 筛选 validates 子类型的笔记关联
-        note_ids = [
-            int(edge.source_id)
-            for edge in edges
-            if edge.source_type == NodeType.NOTE
-            and edge.relation == RelationType.RELATES
-            and edge.subtype == "validates"
-        ]
+        if not success:
+            return []
+
+        # 筛选 validates 子类型的笔记关联（指向 hypothesis 的）
+        note_ids = []
+        for edge in edges:
+            # 找到其他笔记指向当前假设的 validates 关系
+            if (
+                edge.get("target_type") == "note"
+                and edge.get("target_id") == str(hypothesis_id)
+                and edge.get("source_type") == "note"
+                and edge.get("relation") == "relates"
+                and edge.get("subtype") == "validates"
+            ):
+                try:
+                    note_ids.append(int(edge.get("source_id")))
+                except (ValueError, TypeError):
+                    continue
 
         # 获取笔记详情
         notes = []
@@ -427,179 +413,6 @@ class NoteService:
             return True, "标记成功"
         else:
             return False, "标记失败"
-
-    # ==================== 知识边关联 ====================
-
-    def link_note(
-        self,
-        note_id: int,
-        target_type: str,
-        target_id: str,
-        relation: str = "relates",
-        subtype: str = "",
-        is_bidirectional: bool = False,
-        metadata: dict[str, Any] | None = None,
-    ) -> tuple[bool, str, int | None]:
-        """
-        创建笔记与其他实体的关联
-
-        Args:
-            note_id: 笔记 ID
-            target_type: 目标实体类型（data/factor/strategy/note/research/experience）
-            target_id: 目标实体 ID
-            relation: 关系类型（derives/relates）
-            subtype: 关系子类型（based/uses/refs/validates 等）
-            is_bidirectional: 是否双向关联
-            metadata: 扩展元数据
-
-        Returns:
-            (成功, 消息, 边ID) - 注意: Neo4j 不返回边ID，成功时返回 None
-        """
-        # 验证笔记存在
-        note = self.store.get(note_id)
-        if note is None:
-            return False, f"笔记不存在: {note_id}", None
-
-        # 验证实体类型
-        try:
-            target_node_type = NodeType(target_type)
-        except ValueError:
-            return False, f"无效的实体类型: {target_type}", None
-
-        # 验证关系类型
-        try:
-            relation_type = RelationType(relation)
-        except ValueError:
-            return False, f"无效的关系类型: {relation}", None
-
-        # 创建图边
-        edge = GraphEdge(
-            source_type=NodeType.NOTE,
-            source_id=str(note_id),
-            target_type=target_node_type,
-            target_id=target_id,
-            relation=relation_type,
-            subtype=subtype,
-            is_bidirectional=is_bidirectional,
-            metadata=metadata or {},
-        )
-
-        success = self.graph_store.create_edge(edge)
-        if success:
-            logger.info(f"创建笔记关联: note:{note_id} -[{relation}]-> {target_type}:{target_id}")
-            return True, "关联成功", None
-        else:
-            return False, "关联失败（可能已存在）", None
-
-    def get_note_edges(
-        self,
-        note_id: int,
-        include_bidirectional: bool = True,
-    ) -> list[dict[str, Any]]:
-        """
-        获取笔记的所有关联
-
-        Args:
-            note_id: 笔记 ID
-            include_bidirectional: 是否包含双向关联
-
-        Returns:
-            关联列表
-        """
-        edges = self.graph_store.get_edges_by_entity(
-            entity_type=NodeType.NOTE,
-            entity_id=str(note_id),
-            include_bidirectional=include_bidirectional,
-        )
-        return [edge.to_dict() for edge in edges]
-
-    def get_edges_to_note(self, note_id: int) -> list[dict[str, Any]]:
-        """
-        获取指向笔记的所有关联
-
-        Args:
-            note_id: 笔记 ID
-
-        Returns:
-            关联列表
-        """
-        edges = self.graph_store.get_edges_to_entity(
-            entity_type=NodeType.NOTE,
-            entity_id=str(note_id),
-        )
-        return [edge.to_dict() for edge in edges]
-
-    def trace_note_lineage(
-        self,
-        note_id: int,
-        direction: str = "backward",
-        max_depth: int = 5,
-    ) -> list[dict[str, Any]]:
-        """
-        追溯笔记的知识链路
-
-        Args:
-            note_id: 笔记 ID
-            direction: 追溯方向
-                - "backward": 向上追溯源头（笔记引用了什么）
-                - "forward": 向下追溯应用（笔记被什么引用）
-            max_depth: 最大追溯深度
-
-        Returns:
-            链路列表，每项包含 depth 和 node 信息
-        """
-        result = self.graph_store.trace_lineage(
-            entity_type=NodeType.NOTE,
-            entity_id=str(note_id),
-            direction=direction,
-            max_depth=max_depth,
-        )
-        return [node.to_dict() for node in result.nodes]
-
-    def delete_note_edge(
-        self,
-        note_id: int,
-        target_type: str,
-        target_id: str,
-        relation: str,
-    ) -> tuple[bool, str]:
-        """
-        删除笔记关联
-
-        Args:
-            note_id: 笔记 ID (源节点)
-            target_type: 目标实体类型
-            target_id: 目标实体 ID
-            relation: 关系类型
-
-        Returns:
-            (成功, 消息)
-        """
-        # 验证实体类型
-        try:
-            target_node_type = NodeType(target_type)
-        except ValueError:
-            return False, f"无效的实体类型: {target_type}"
-
-        # 验证关系类型
-        try:
-            relation_type = RelationType(relation)
-        except ValueError:
-            return False, f"无效的关系类型: {relation}"
-
-        success = self.graph_store.delete_edge(
-            source_type=NodeType.NOTE,
-            source_id=str(note_id),
-            target_type=target_node_type,
-            target_id=target_id,
-            relation=relation_type,
-        )
-        if success:
-            logger.info(f"删除笔记关联: note:{note_id} -[{relation}]-> {target_type}:{target_id}")
-            return True, "删除成功"
-        else:
-            return False, "删除失败"
-
 
 # 单例实例
 _note_service: NoteService | None = None

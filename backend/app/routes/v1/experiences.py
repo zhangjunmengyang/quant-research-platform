@@ -20,9 +20,6 @@ from app.schemas.experience import (
     ExperienceCreateRequest,
     ExperienceUpdateRequest,
     ExperienceQueryRequest,
-    ExperienceLinkRequest,
-    ExperienceLinkResponse,
-    ExperienceLinkSchema,
     ExperienceStatsResponse,
     SourceTypeEnum,
 )
@@ -239,47 +236,3 @@ async def delete_experience(
         raise HTTPException(status_code=500, detail="删除失败")
 
     return ApiResponse(message="删除成功")
-
-
-@router.post("/{experience_id}/link", response_model=ApiResponse[ExperienceLinkResponse])
-async def link_experience(
-    request: ExperienceLinkRequest,
-    experience=Depends(get_experience_or_404),
-    service=Depends(get_experience_service),
-):
-    """
-    关联经验与其他实体
-
-    建立经验与因子、策略、笔记、研报的关联关系。
-    """
-    success, message, result = await run_sync(
-        service.link_experience,
-        experience_id=experience.id,
-        entity_type=request.entity_type.value,
-        entity_id=request.entity_id,
-        relation=request.relation,
-    )
-
-    if not success or result is None:
-        raise HTTPException(status_code=400, detail=message)
-
-    return ApiResponse(
-        data=ExperienceLinkResponse(
-            link_id=result["link_id"],
-            experience_id=result["experience_id"],
-            entity_type=result["entity_type"],
-            entity_id=result["entity_id"],
-        ),
-        message="关联成功",
-    )
-
-
-@router.get("/{experience_id}/links", response_model=ApiResponse[List[ExperienceLinkSchema]])
-async def get_experience_links(
-    experience=Depends(get_experience_or_404),
-    service=Depends(get_experience_service),
-):
-    """获取经验的所有关联"""
-    links = await run_sync(service.get_experience_links, experience.id)
-    items = [ExperienceLinkSchema(**model_to_dict(link)) for link in links]
-    return ApiResponse(data=items)

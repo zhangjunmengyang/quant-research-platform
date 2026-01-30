@@ -5,6 +5,7 @@
 import { apiClient, type ApiResponse } from '@/lib/api/client'
 import type {
   GraphNodeType,
+  GraphRelationType,
   GetEdgesResponse,
   GraphOverviewResponse,
   LineageResult,
@@ -12,7 +13,34 @@ import type {
   TagInfo,
   TaggedEntity,
   EntityTagsResponse,
+  CypherQueryRequest,
+  CypherQueryResponse,
 } from './types'
+
+/**
+ * CreateLink Request
+ */
+export interface CreateLinkRequest {
+  sourceType: GraphNodeType
+  sourceId: string
+  targetType: GraphNodeType
+  targetId: string
+  relation?: GraphRelationType
+  subtype?: string
+  isBidirectional?: boolean
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * DeleteLink Request
+ */
+export interface DeleteLinkRequest {
+  sourceType: GraphNodeType
+  sourceId: string
+  targetType: GraphNodeType
+  targetId: string
+  relation: GraphRelationType
+}
 
 const BASE_URL = '/graph'
 
@@ -149,5 +177,62 @@ export const graphApi = {
       throw new Error(data.error || '获取实体失败')
     }
     return data.data
+  },
+
+  /**
+   * 执行 Cypher 查询
+   */
+  executeCypher: async (request: CypherQueryRequest): Promise<CypherQueryResponse> => {
+    const { data } = await apiClient.post<ApiResponse<CypherQueryResponse>>(
+      `${BASE_URL}/cypher`,
+      request
+    )
+    if (!data.success || !data.data) {
+      throw new Error(data.error || 'Cypher 查询执行失败')
+    }
+    return data.data
+  },
+
+  /**
+   * 创建关联
+   */
+  createLink: async (request: CreateLinkRequest): Promise<void> => {
+    const { data } = await apiClient.post<ApiResponse<{ message: string }>>(
+      `${BASE_URL}/links`,
+      {
+        source_type: request.sourceType,
+        source_id: request.sourceId,
+        target_type: request.targetType,
+        target_id: request.targetId,
+        relation: request.relation || 'relates',
+        subtype: request.subtype || '',
+        is_bidirectional: request.isBidirectional,
+        metadata: request.metadata || {},
+      }
+    )
+    if (!data.success) {
+      throw new Error(data.error || '创建关联失败')
+    }
+  },
+
+  /**
+   * 删除关联
+   */
+  deleteLink: async (request: DeleteLinkRequest): Promise<void> => {
+    const { data } = await apiClient.delete<ApiResponse<{ message: string }>>(
+      `${BASE_URL}/links`,
+      {
+        params: {
+          source_type: request.sourceType,
+          source_id: request.sourceId,
+          target_type: request.targetType,
+          target_id: request.targetId,
+          relation: request.relation,
+        },
+      }
+    )
+    if (!data.success) {
+      throw new Error(data.error || '删除关联失败')
+    }
   },
 }

@@ -2,9 +2,9 @@
  * Graph React Query Hooks
  */
 
-import { useQuery, useMutation } from '@tanstack/react-query'
-import { graphApi } from './api'
-import type { GraphNodeType } from './types'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { graphApi, type CreateLinkRequest, type DeleteLinkRequest } from './api'
+import type { GraphNodeType, CypherQueryRequest } from './types'
 
 // Query Keys
 export const graphKeys = {
@@ -129,5 +129,42 @@ export function useEntitiesByTag(tag: string | null, entityType?: GraphNodeType)
     queryFn: () => graphApi.getEntitiesByTag(tag!, entityType),
     enabled: !!tag,
     staleTime: DEFAULT_STALE_TIME,
+  })
+}
+
+/**
+ * Hook: 执行 Cypher 查询 (mutation)
+ */
+export function useCypherQuery() {
+  return useMutation({
+    mutationFn: (request: CypherQueryRequest) => graphApi.executeCypher(request),
+  })
+}
+
+/**
+ * Hook: 创建关联
+ */
+export function useCreateLink() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: CreateLinkRequest) => graphApi.createLink(request),
+    onSuccess: () => {
+      // 创建成功后，使相关的图谱查询失效
+      queryClient.invalidateQueries({ queryKey: graphKeys.all })
+    },
+  })
+}
+
+/**
+ * Hook: 删除关联
+ */
+export function useDeleteLink() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: DeleteLinkRequest) => graphApi.deleteLink(request),
+    onSuccess: () => {
+      // 删除成功后，使相关的图谱查询失效
+      queryClient.invalidateQueries({ queryKey: graphKeys.all })
+    },
   })
 }

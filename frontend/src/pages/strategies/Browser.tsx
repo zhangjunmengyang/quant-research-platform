@@ -11,7 +11,7 @@ import type { Strategy, StrategyListParams } from '@/features/strategy'
 import { StatsCard } from '@/features/factor/components/StatsCard'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Pagination } from '@/components/ui/pagination'
-import { ResizableTable } from '@/components/ui/ResizableTable'
+import { ResizableTable, type SortState } from '@/components/ui/ResizableTable'
 import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect'
 import { paramsToStrategyFilters, strategyFiltersToParams } from '@/lib/url-params'
 import { cn, formatPercent } from '@/lib/utils'
@@ -75,8 +75,9 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
       label: '策略名称',
       width: 180,
       minWidth: 120,
+      sortable: true,
       render: (_: unknown, row: Strategy) => (
-        <div className="max-w-[180px]">
+        <div>
           <Link
             to={`/strategies/${row.id}`}
             className="font-medium hover:text-primary block truncate"
@@ -138,6 +139,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
       width: 80,
       minWidth: 70,
       align: 'center' as const,
+      sortable: true,
       render: (value: unknown) => (
         <span
           className={cn(
@@ -155,6 +157,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
       width: 90,
       minWidth: 80,
       align: 'center' as const,
+      sortable: true,
       render: (value: unknown) => (
         <span
           className={cn(
@@ -172,6 +175,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
       width: 90,
       minWidth: 80,
       align: 'center' as const,
+      sortable: true,
       render: (value: unknown) => (
         <span className="text-destructive font-medium">
           {formatPercent(value as number | undefined)}
@@ -184,6 +188,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
       width: 90,
       minWidth: 80,
       align: 'center' as const,
+      sortable: true,
       render: (value: unknown) => (
         <span
           className={cn(
@@ -215,6 +220,7 @@ function getStrategyColumns(onDelete: (strategy: Strategy) => void, isDeleting: 
       width: 100,
       minWidth: 80,
       align: 'center' as const,
+      sortable: true,
       render: (value: unknown) => (
         <span className="text-xs text-muted-foreground whitespace-nowrap">
           {formatDate(value as string)}
@@ -268,6 +274,20 @@ export function Component() {
     })
     setSearchParams(params)
   }, [filters, setSearchParams])
+
+  // 排序状态
+  const sortState: SortState = useMemo(() => ({
+    field: filters.order_by || 'created_at',
+    order: filters.order_desc === false ? 'asc' : 'desc',
+  }), [filters.order_by, filters.order_desc])
+
+  const handleSortChange = useCallback((newSort: SortState) => {
+    setFilters({
+      order_by: newSort.field,
+      order_desc: newSort.order === 'desc',
+      page: 1,
+    })
+  }, [setFilters])
 
   const { data: stats } = useStrategyStats()
   const { data, isLoading, isError, error } = useStrategies(filters)
@@ -377,6 +397,8 @@ export function Component() {
           data={data?.items || []}
           rowKey="id"
           emptyText="暂无策略"
+          sortState={sortState}
+          onSortChange={handleSortChange}
         />
       )}
 

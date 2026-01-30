@@ -58,7 +58,6 @@ class ExperienceSyncService(BaseSyncService):
         """
         super().__init__(data_dir, store)
         self.experiences_dir = data_dir / "experiences" / "all"
-        self.links_file = data_dir / "experiences" / "links.yaml"
 
     def export_all(self, overwrite: bool = False) -> dict[str, int]:
         """
@@ -117,12 +116,6 @@ class ExperienceSyncService(BaseSyncService):
                 logger.error(f"experience_export_error: {exp.uuid}, {e}")
                 stats["errors"] += 1
 
-        # 导出关联关系
-        try:
-            self._export_links()
-        except Exception as e:
-            logger.error(f"experience_links_export_error: {e}")
-
         logger.info(f"experiences_exported: {stats}")
         return stats
 
@@ -150,12 +143,6 @@ class ExperienceSyncService(BaseSyncService):
             except Exception as e:
                 logger.error(f"experience_import_error: {yaml_file}, {e}")
                 stats["errors"] += 1
-
-        # 导入关联关系
-        try:
-            self._import_links()
-        except Exception as e:
-            logger.error(f"experience_links_import_error: {e}")
 
         logger.info(f"experiences_imported: {stats}")
         return stats
@@ -261,69 +248,6 @@ class ExperienceSyncService(BaseSyncService):
         self.store.add(experience)
         return "created"
 
-    def _export_links(self) -> None:
-        """导出关联关系"""
-        if self.store is None:
-            return
-
-        try:
-            links = self.store.get_all_links()
-            if not links:
-                return
-
-            links_data = {
-                'links': [link.to_dict() for link in links]
-            }
-            self.write_yaml(self.links_file, links_data)
-        except AttributeError:
-            # store 可能没有 get_all_links 方法
-            pass
-
-    def _import_links(self) -> None:
-        """
-        导入关联关系（幂等）
-
-        只导入不存在的关联，避免重复插入错误。
-        """
-        if self.store is None or not self.links_file.exists():
-            return
-
-        try:
-            data = self.read_yaml(self.links_file)
-            links = data.get('links', [])
-
-            for link_data in links:
-                # 先查找对应的经验
-                exp_uuid = link_data.get('experience_uuid')
-                if not exp_uuid:
-                    continue
-
-                experience = self.store.get_by_uuid(exp_uuid)
-                if not experience:
-                    logger.debug(f"skip_link_import_no_experience: {exp_uuid}")
-                    continue
-
-                # 检查关联是否已存在
-                entity_type = link_data.get('entity_type', '')
-                entity_id = link_data.get('entity_id', '')
-                relation = link_data.get('relation', 'related')
-
-                if self.store.link_exists(experience.id, entity_type, entity_id, relation):
-                    continue
-
-                # 导入新关联
-                from domains.experience_hub.core.models import ExperienceLink
-                link = ExperienceLink.from_dict({
-                    **link_data,
-                    'experience_id': experience.id
-                })
-                self.store.add_link(link)
-        except AttributeError as e:
-            # store 可能没有某些方法
-            logger.debug(f"experience_links_import_skipped: {e}")
-        except Exception as e:
-            logger.error(f"experience_links_import_error: {e}")
-
     def export_single(self, experience_id: int) -> bool:
         """
         导出单个经验
@@ -396,7 +320,6 @@ class ExperienceSyncService(BaseSyncService):
         status = {
             "db_count": 0,
             "file_count": 0,
-            "links_count": 0,
         }
 
         if self.store is None:
@@ -410,12 +333,5 @@ class ExperienceSyncService(BaseSyncService):
 
         if self.experiences_dir.exists():
             status["file_count"] = len(list(self.experiences_dir.glob("*.yaml")))
-
-        if self.links_file.exists():
-            try:
-                data = self.read_yaml(self.links_file)
-                status["links_count"] = len(data.get('links', []))
-            except Exception:
-                pass
 
         return status

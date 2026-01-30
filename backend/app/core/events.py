@@ -41,14 +41,15 @@ def create_start_handler() -> Callable:
             # 预热关键服务
             factor_store = registry.get("factor_store")
 
-            # Sync factor code from files to database
-            sync_stats = factor_store.sync_code_from_files()
+            # Sync factor code from files to database (cleanup orphan records)
+            sync_stats = factor_store.sync_code_from_files(cleanup_orphans=True)
             logger.info(
                 "factor_code_synced",
                 component="factor_store",
                 created=sync_stats.get("created", 0),
                 updated=sync_stats.get("updated", 0),
                 unchanged=sync_stats.get("unchanged", 0),
+                deleted=sync_stats.get("deleted", 0),
             )
 
             # Sync private data from files (factors metadata, notes, strategies, experiences, tags)

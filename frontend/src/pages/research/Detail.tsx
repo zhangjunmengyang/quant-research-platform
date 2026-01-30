@@ -3,8 +3,8 @@
  * 研报详情页 - 展示研报内容、切块、和相关功能
  */
 
-import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState, useCallback } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft,
   FileText,
@@ -28,7 +28,7 @@ import {
 } from '@/features/research'
 import type { Chunk, ReportStatus, SimilarChunkItem } from '@/features/research'
 import { cn } from '@/lib/utils'
-import { EntityGraph } from '@/features/graph'
+import { EntityGraph, RelationEditor } from '@/features/graph'
 import {
   Dialog,
   DialogContent,
@@ -50,7 +50,17 @@ const CHUNK_TYPE_COLORS: Record<string, string> = {
 export function Component() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const reportId = id ? parseInt(id, 10) : null
+
+  // 安全的后退函数：如果没有历史记录则返回列表页
+  const handleBack = useCallback(() => {
+    if (location.key === 'default') {
+      navigate('/research', { replace: true })
+    } else {
+      navigate(-1)
+    }
+  }, [navigate, location.key])
 
   const { data: report, isLoading: reportLoading, isError } = useReport(reportId)
   const [chunkParams, setChunkParams] = useState({ page: 1, page_size: 20 })
@@ -121,10 +131,10 @@ export function Component() {
       <div className="flex h-64 flex-col items-center justify-center text-destructive">
         <p>研报不存在或加载失败</p>
         <button
-          onClick={() => navigate('/research')}
+          onClick={handleBack}
           className="mt-4 text-sm text-primary hover:underline"
         >
-          返回列表
+          返回
         </button>
       </div>
     )
@@ -137,7 +147,7 @@ export function Component() {
       {/* Header */}
       <div className="flex items-center gap-4">
         <button
-          onClick={() => navigate('/research')}
+          onClick={handleBack}
           className="rounded p-2 hover:bg-muted"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -239,6 +249,16 @@ export function Component() {
           entityName={report.title}
           height={200}
         />
+      )}
+
+      {/* 关联管理 */}
+      {report.uuid && (
+        <div className="rounded-lg border bg-card p-4">
+          <RelationEditor
+            entityType="research"
+            entityId={report.uuid}
+          />
+        </div>
       )}
 
       {/* Chunks Section */}

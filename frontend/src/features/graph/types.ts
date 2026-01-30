@@ -189,6 +189,27 @@ export interface GraphOverviewResponse {
   stats: GraphOverviewStats
 }
 
+// ==================== Cypher 查询 ====================
+
+/**
+ * Cypher 查询请求
+ */
+export interface CypherQueryRequest {
+  query: string
+  params?: Record<string, unknown>
+}
+
+/**
+ * Cypher 查询响应
+ */
+export interface CypherQueryResponse {
+  nodes: GraphNode[]
+  edges: GraphOverviewEdge[]
+  raw_records: Record<string, unknown>[]
+  execution_time_ms: number
+  record_count: number
+}
+
 // ==================== UI 辅助类型 ====================
 
 /**
@@ -215,7 +236,7 @@ export const NODE_TYPE_CONFIG: Record<GraphNodeType, NodeTypeConfig> = {
     label: '因子',
     color: '#3b82f6', // blue
     icon: 'FlaskConical',
-    getRoute: (id) => `/factors?focus=${encodeURIComponent(id)}`,
+    getRoute: (id) => `/factors/${encodeURIComponent(id)}`,
   },
   strategy: {
     label: '策略',
@@ -239,7 +260,7 @@ export const NODE_TYPE_CONFIG: Record<GraphNodeType, NodeTypeConfig> = {
     label: '经验',
     color: '#ec4899', // pink
     icon: 'Lightbulb',
-    getRoute: (id) => `/experiences?focus=${encodeURIComponent(id)}`,
+    getRoute: (id) => `/experiences/${encodeURIComponent(id)}`,
   },
   tag: {
     label: '标签',

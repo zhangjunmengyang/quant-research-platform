@@ -17,8 +17,11 @@ export {
   useEntityTags,
   useAllTags,
   useEntitiesByTag,
+  useCreateLink,
+  useDeleteLink,
 } from './hooks'
 
 // Components
 export { EntityGraph } from './components/EntityGraph'
 export { GraphExplorer } from './components/GraphExplorer'
+export { RelationEditor } from './components/RelationEditor'

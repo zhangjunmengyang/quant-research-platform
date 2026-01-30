@@ -162,9 +162,32 @@ class FactorStore(BaseStore[Factor]):
                     factor.last_backtest_date, bool(factor.excluded), factor.exclude_reason,
                     factor.param_analysis
                 ))
+            # 同步到图数据库
+            self._sync_factor_to_graph(factor)
             return True
         except psycopg2.IntegrityError:
             return False
+
+    def _sync_factor_to_graph(self, factor: Factor) -> None:
+        """同步因子节点到 Neo4j 图数据库"""
+        try:
+            from domains.graph_hub.core import NodeType, get_graph_store
+
+            graph_store = get_graph_store()
+            success = graph_store.upsert_node(
+                node_type=NodeType.FACTOR,
+                node_id=factor.filename,
+                name=factor.description or factor.filename,
+                metadata={
+                    "style": factor.style or "",
+                    "factor_type": factor.factor_type or "time_series",
+                    "formula": factor.formula or "",
+                }
+            )
+            if success:
+                logger.debug(f"factor_synced_to_graph: {factor.filename}")
+        except Exception as e:
+            logger.warning(f"factor_graph_sync_failed: {factor.filename}, {e}")
 
     def update(self, filename: str, **fields) -> bool:
         """更新因子字段"""
@@ -210,30 +233,27 @@ class FactorStore(BaseStore[Factor]):
             logger.debug(f"factor_metadata_sync_trigger_skipped: {filename}, {e}")
 
     def delete(self, filename: str) -> bool:
-        """删除因子（同时删除关联的边）"""
-        # 先删除关联的边
-        self._delete_factor_edges(filename)
+        """删除因子（同时删除图数据库中的节点和边）"""
+        # 先删除图数据库中的节点（DETACH DELETE 会同时删除关联边）
+        self._delete_factor_from_graph(filename)
 
         # 删除因子记录
         with self._cursor() as cursor:
             cursor.execute('DELETE FROM factors WHERE filename = %s', (filename,))
             return cursor.rowcount > 0
 
-    def _delete_factor_edges(self, filename: str) -> None:
-        """删除因子关联的所有边（Neo4j）"""
+    def _delete_factor_from_graph(self, filename: str) -> None:
+        """删除因子节点及其所有关联边（Neo4j）"""
         try:
             from domains.graph_hub.core import NodeType, get_graph_store
 
             graph_store = get_graph_store()
-            deleted_count = graph_store.delete_edges_by_entity(
-                NodeType.FACTOR,
-                filename
-            )
-            if deleted_count > 0:
-                logger.info(f"deleted_factor_edges: factor={filename}, count={deleted_count}")
+            deleted = graph_store.delete_node(NodeType.FACTOR, filename)
+            if deleted:
+                logger.info(f"deleted_factor_from_graph: factor={filename}")
         except Exception as e:
-            # 边删除失败只记录日志，不影响主业务
-            logger.warning(f"failed_to_delete_factor_edges: {filename}, {e}")
+            # 图删除失败只记录日志，不影响主业务
+            logger.warning(f"failed_to_delete_factor_from_graph: {filename}, {e}")
 
     # ==================== 批量操作 ====================
 
@@ -513,15 +533,25 @@ class FactorStore(BaseStore[Factor]):
 
     # ==================== 代码同步 ====================
 
-    def sync_code_from_files(self) -> dict[str, int]:
-        """从 factors/ 目录同步代码到数据库"""
+    def sync_code_from_files(self, cleanup_orphans: bool = False) -> dict[str, int]:
+        """从 factors/ 目录同步代码到数据库
+
+        Args:
+            cleanup_orphans: 是否清理孤立的数据库记录（代码文件已删除但 DB 记录仍存在）
+
+        Returns:
+            同步统计 {created, updated, unchanged, deleted}
+        """
         config = get_config_loader()
-        stats = {"updated": 0, "created": 0, "unchanged": 0}
+        stats = {"updated": 0, "created": 0, "unchanged": 0, "deleted": 0}
         excluded = self.get_excluded_factors()
+        all_code_files: set[str] = set()
 
         # 同步时序因子（factors/ 目录）
         factors_dir = config.factors_dir
         if factors_dir.exists():
+            for py_file in factors_dir.glob("*.py"):
+                all_code_files.add(py_file.stem)
             self._sync_directory(
                 directory=factors_dir,
                 factor_type=FactorType.TIME_SERIES,
@@ -532,12 +562,22 @@ class FactorStore(BaseStore[Factor]):
         # 同步截面因子（private/sections/ 目录）
         sections_dir = config.sections_dir
         if sections_dir.exists():
+            for py_file in sections_dir.glob("*.py"):
+                all_code_files.add(py_file.stem)
             self._sync_directory(
                 directory=sections_dir,
                 factor_type=FactorType.CROSS_SECTION,
                 excluded=excluded,
                 stats=stats
             )
+
+        # 清理孤立的数据库记录（代码文件已删除）
+        if cleanup_orphans:
+            all_db_records = {f.filename for f in self.get_all(include_excluded=False)}
+            orphan_records = all_db_records - all_code_files
+            for filename in orphan_records:
+                if self.delete(filename):
+                    stats["deleted"] += 1
 
         return stats
 

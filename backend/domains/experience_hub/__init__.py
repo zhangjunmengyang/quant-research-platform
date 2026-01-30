@@ -7,11 +7,9 @@
 """
 
 from .core.models import (
-    EntityType,
     Experience,
     ExperienceContent,
     ExperienceContext,
-    ExperienceLink,
     SourceType,
 )
 from .core.store import ExperienceStore, get_experience_store
@@ -22,9 +20,7 @@ __all__ = [
     'Experience',
     'ExperienceContent',
     'ExperienceContext',
-    'ExperienceLink',
     'SourceType',
-    'EntityType',
     # 存储层
     'ExperienceStore',
     'get_experience_store',

@@ -10,6 +10,7 @@
 
 import json
 import logging
+import math
 import os
 import threading
 import uuid
@@ -17,6 +18,25 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
+
+
+def _sanitize_for_json(data: list[dict]) -> list[dict]:
+    """
+    清理数据中的 NaN/Inf 值，使其可以被 JavaScript JSON.parse 解析。
+
+    Python 的 json.dumps 会将 float('nan') 序列化为 NaN（无引号），
+    但这不是有效的 JSON，JavaScript 无法解析。
+    """
+    result = []
+    for row in data:
+        clean_row = {}
+        for key, value in row.items():
+            if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+                clean_row[key] = None
+            else:
+                clean_row[key] = value
+        result.append(clean_row)
+    return result
 
 from domains.mcp_core.paths import get_data_dir, setup_factor_paths
 
@@ -32,11 +52,10 @@ def _get_default_workers() -> int:
     """
     根据 CPU 核心数动态计算默认 worker 数量
 
-    回测任务是 CPU 密集型，设置为 CPU 核心数的一半（至少1，最多8）
-    避免过多任务竞争 CPU 资源导致整体变慢
+    回测任务是 CPU 密集型，设置为 CPU 核心数的一半（至少1，不设上限）
     """
     cpu_count = os.cpu_count() or 2
-    workers = max(1, min(cpu_count // 2, 8))
+    workers = max(1, cpu_count // 2)
     return workers
 
 
@@ -590,7 +609,16 @@ class BacktestRunner:
             logger.info(f"任务 {task_id}: 回测执行完成，开始解析结果")
 
             # 解析回测结果
-            return self._parse_backtest_result(conf)
+            result = self._parse_backtest_result(conf)
+
+            # 清理回测结果目录（数据已解析保存到数据库）
+            try:
+                conf.delete_cache()
+                logger.info(f"任务 {task_id}: 已清理回测结果目录")
+            except Exception as e:
+                logger.warning(f"任务 {task_id}: 清理回测结果目录失败: {e}")
+
+            return result
 
         except ImportError as e:
             logger.warning(f"任务 {task_id}: 回测引擎导入失败 ({e})，使用模拟模式")
@@ -708,6 +736,7 @@ class BacktestRunner:
         try:
             result_folder = conf.get_result_folder()
             equity_file = result_folder / "资金曲线.csv"
+            logger.info(f"读取资金曲线: {equity_file}, 存在: {equity_file.exists()}")
             if equity_file.exists():
                 import pandas as pd
                 equity_df = pd.read_csv(equity_file, encoding='utf-8-sig')
@@ -761,8 +790,11 @@ class BacktestRunner:
                     # 只选择存在的列
                     available_columns = [col for col in equity_columns if col in sample_df.columns]
                     result["equity_curve"] = sample_df[available_columns].to_dict("records")
+                    logger.info(f"读取资金曲线成功: {len(result['equity_curve'])} 条记录, 列: {available_columns}")
+            else:
+                logger.warning(f"资金曲线文件为空: {equity_file}")
         except Exception as e:
-            logger.warning(f"读取资金曲线失败: {e}")
+            logger.warning(f"读取资金曲线失败: {e}", exc_info=True)
 
         # 读取周期收益
         try:
@@ -831,7 +863,12 @@ class BacktestRunner:
         if "month_return" in result:
             strategy.month_return = json.dumps(result["month_return"], ensure_ascii=False)
         if "equity_curve" in result:
-            strategy.equity_curve = json.dumps(result["equity_curve"], ensure_ascii=False)
+            # 清理 NaN/Inf 值，确保 JavaScript 可以解析
+            clean_curve = _sanitize_for_json(result["equity_curve"])
+            strategy.equity_curve = json.dumps(clean_curve, ensure_ascii=False)
+            logger.info(f"保存资金曲线: {len(clean_curve)} 条记录")
+        else:
+            logger.warning(f"回测结果中没有 equity_curve 数据")
 
         self.store.update(strategy)
 
@@ -1004,9 +1041,11 @@ class BacktestRunner:
                 "cap_weight": stg.get("cap_weight", 1.0),
             }
 
-            # 复制其他字段（排除 strategy, cap_weight, factor_list）
+            # 复制其他字段（排除不属于 StrategyConfig 的字段）
+            # black_list, white_list 是 BacktestConfig 级别的配置，不传递给策略
+            excluded_keys = ("strategy", "cap_weight", "factor_list", "black_list", "white_list")
             for k, v in stg.items():
-                if k not in ("strategy", "cap_weight", "factor_list"):
+                if k not in excluded_keys:
                     engine_stg[k] = v
 
             # 转换 factor_list 格式

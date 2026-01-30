@@ -92,6 +92,25 @@ class StrategyStore(BaseStore[Strategy]):
         "sharpe_ratio", "win_rate", "cumulative_return", "leverage",
     }
 
+    # 允许筛选的字段白名单（用于 advanced_search）
+    FILTERABLE_FIELDS = {
+        # 核心绩效指标
+        "cumulative_return",  # 累积收益
+        "annual_return",      # 年化收益
+        "max_drawdown",       # 最大回撤 (负数)
+        "sharpe_ratio",       # 收益回撤比
+        # 交易统计
+        "win_rate",           # 胜率
+        "profit_loss_ratio",  # 盈亏比
+        "return_std",         # 收益波动率
+        "win_periods",        # 盈利周期数
+        "loss_periods",       # 亏损周期数
+        # 配置字段
+        "leverage",           # 杠杆
+        # 元数据
+        "verified",           # 验证状态
+    }
+
     def __init__(self, database_url: str | None = None):
         """
         初始化存储层
@@ -469,18 +488,116 @@ class StrategyStore(BaseStore[Strategy]):
         return strategy
 
     def _trigger_sync(self, strategy_id: str) -> None:
-        """触发策略同步到文件（不阻塞主流程）"""
+        """触发策略同步到文件和图谱（不阻塞主流程）"""
+        # 同步到文件
         try:
             from domains.mcp_core.sync.trigger import get_sync_trigger
             get_sync_trigger().sync_strategy(strategy_id)
         except Exception as e:
-            # 同步失败只记录日志，不影响主业务
             logger.debug(f"strategy_sync_trigger_skipped: {strategy_id}, {e}")
 
+        # 同步到图谱
+        self._sync_strategy_to_graph(strategy_id)
+
+    def _sync_strategy_to_graph(self, strategy_id: str) -> None:
+        """同步策略节点和关系到 Neo4j 图谱"""
+        try:
+            from domains.graph_hub.core import NodeType, get_graph_store
+
+            strategy = self.get(strategy_id)
+            if not strategy:
+                return
+
+            graph_store = get_graph_store()
+
+            # 1. 同步策略节点
+            success = graph_store.upsert_node(
+                node_type=NodeType.STRATEGY,
+                node_id=strategy_id,
+                name=strategy.name,
+                metadata={
+                    "description": strategy.description or "",
+                    "verified": strategy.verified,
+                    "annual_return": strategy.annual_return,
+                    "sharpe_ratio": strategy.sharpe_ratio,
+                },
+            )
+            if success:
+                logger.debug(f"strategy_synced_to_graph: {strategy_id}")
+
+            # 2. 同步策略与因子的关系
+            self._sync_strategy_factor_relations(strategy_id, strategy, graph_store)
+
+        except Exception as e:
+            logger.warning(f"strategy_graph_sync_failed: {strategy_id}, {e}")
+
+    def _sync_strategy_factor_relations(
+        self,
+        strategy_id: str,
+        strategy: Strategy,
+        graph_store,
+    ) -> int:
+        """
+        同步策略与因子的关系
+
+        Args:
+            strategy_id: 策略 ID
+            strategy: 策略对象
+            graph_store: 图存储实例
+
+        Returns:
+            同步的关系数量
+        """
+        import json
+
+        from domains.graph_hub.core import GraphEdge, NodeType
+        from domains.graph_hub.services.relation_extractor import RelationExtractor
+
+        # 解析 strategy_config
+        if not strategy.strategy_config:
+            return 0
+
+        try:
+            strategy_list = json.loads(strategy.strategy_config)
+        except (json.JSONDecodeError, TypeError):
+            logger.debug(f"strategy_config_parse_failed: {strategy_id}")
+            return 0
+
+        if not isinstance(strategy_list, list):
+            return 0
+
+        # 提取因子关系
+        extractor = RelationExtractor()
+        relations = extractor.extract_from_backtest(strategy_list)
+
+        count = 0
+        for rel in relations:
+            # 创建 strategy -> factor 关系边
+            edge = GraphEdge(
+                source_type=NodeType.STRATEGY,
+                source_id=strategy_id,
+                target_type=NodeType.FACTOR,
+                target_id=rel.target_id,
+                relation=rel.relation,
+                subtype=rel.subtype,
+                metadata={
+                    "role": "filter" if "filter" in rel.context else "main",
+                    "context": rel.context,
+                    "confidence": rel.confidence,
+                },
+            )
+            if graph_store.create_edge(edge):
+                count += 1
+
+        if count > 0:
+            logger.info(f"strategy_relations_synced: {strategy_id} -> {count} factors")
+
+        return count
+
     def delete(self, strategy_id: str) -> bool:
-        """删除策略（同时删除关联的边）"""
-        # 先删除关联的边
-        self._delete_strategy_edges(strategy_id)
+        """删除策略（同时删除图谱中的节点和边）"""
+        # 删除图谱中的节点（会自动删除关联的边）
+        self._delete_strategy_from_graph(strategy_id)
 
         # 删除策略记录
         with self._cursor() as cursor:
@@ -490,21 +607,17 @@ class StrategyStore(BaseStore[Strategy]):
                 logger.info(f"删除策略: {strategy_id}")
             return deleted
 
-    def _delete_strategy_edges(self, strategy_id: str) -> None:
-        """删除策略关联的所有边（使用 Neo4j 图存储）"""
+    def _delete_strategy_from_graph(self, strategy_id: str) -> None:
+        """从图谱中删除策略节点（会自动删除关联的边）"""
         try:
             from domains.graph_hub.core import NodeType, get_graph_store
 
             graph_store = get_graph_store()
-            deleted_count = graph_store.delete_edges_by_entity(
-                NodeType.STRATEGY,
-                strategy_id
-            )
-            if deleted_count > 0:
-                logger.info(f"deleted_strategy_edges: strategy={strategy_id}, count={deleted_count}")
+            success = graph_store.delete_node(NodeType.STRATEGY, strategy_id)
+            if success:
+                logger.info(f"deleted_strategy_from_graph: {strategy_id}")
         except Exception as e:
-            # 边删除失败只记录日志，不影响主业务
-            logger.warning(f"failed_to_delete_strategy_edges: {strategy_id}, {e}")
+            logger.warning(f"failed_to_delete_strategy_from_graph: {strategy_id}, {e}")
 
     # ===== 查询操作 =====
 
@@ -591,6 +704,103 @@ class StrategyStore(BaseStore[Strategy]):
                 ORDER BY created_at DESC
             """, (search_pattern, search_pattern, search_pattern))
             return [self._row_to_strategy(dict(row)) for row in cursor.fetchall()]
+
+    def advanced_search(
+        self,
+        query: str | None = None,
+        filters: list | None = None,
+        order_by: str = "annual_return",
+        order_desc: bool = True,
+        limit: int = 50,
+    ) -> tuple[list[Strategy], int]:
+        """
+        高级搜索策略
+
+        支持文本搜索和数值条件筛选的组合查询。
+
+        Args:
+            query: 文本搜索关键词（搜索名称/描述/因子）
+            filters: FilterCondition 列表，由 FilterParser 解析得到
+            order_by: 排序字段
+            order_desc: 是否降序
+            limit: 返回数量限制
+
+        Returns:
+            (策略列表, 总数)
+        """
+        from .filter_parser import FilterCondition
+
+        # 验证排序字段
+        if order_by not in self.ALLOWED_ORDER_FIELDS:
+            order_by = "annual_return"
+
+        base_query = "SELECT * FROM strategies"
+        count_query = "SELECT COUNT(*) as count FROM strategies"
+        conditions = []
+        params: list[Any] = []
+
+        # 文本搜索条件
+        if query:
+            search_pattern = f"%{query}%"
+            conditions.append(
+                "(name ILIKE %s OR description ILIKE %s OR factor_list ILIKE %s)"
+            )
+            params.extend([search_pattern, search_pattern, search_pattern])
+
+        # 数值筛选条件
+        if filters:
+            for cond in filters:
+                if not isinstance(cond, FilterCondition):
+                    continue
+                # 字段已在 FilterParser 中验证过白名单
+                if cond.field not in self.FILTERABLE_FIELDS:
+                    continue
+
+                # 运算符映射（安全）
+                op_map = {
+                    ">": ">",
+                    "<": "<",
+                    ">=": ">=",
+                    "<=": "<=",
+                    "=": "=",
+                    "!=": "!=",
+                }
+                sql_op = op_map.get(cond.operator, "=")
+
+                # 布尔值特殊处理
+                if isinstance(cond.value, bool):
+                    conditions.append(f"{cond.field} = %s")
+                    params.append(cond.value)
+                else:
+                    conditions.append(f"{cond.field} {sql_op} %s")
+                    params.append(cond.value)
+
+        # 构建 WHERE 子句
+        where_clause = ""
+        if conditions:
+            where_clause = " WHERE " + " AND ".join(conditions)
+
+        # 获取总数
+        with self._cursor() as cursor:
+            cursor.execute(count_query + where_clause, params)
+            total = cursor.fetchone()["count"]
+
+        # 构建排序和限制
+        order_dir = "DESC" if order_desc else "ASC"
+        final_query = (
+            f"{base_query}{where_clause} "
+            f"ORDER BY {order_by} {order_dir} "
+            f"LIMIT {limit}"
+        )
+
+        # 执行查询
+        with self._cursor() as cursor:
+            cursor.execute(final_query, params)
+            strategies = [
+                self._row_to_strategy(dict(row)) for row in cursor.fetchall()
+            ]
+
+        return strategies, total
 
     def get_by_factor(self, factor_name: str) -> list[Strategy]:
         """获取使用指定因子的策略"""

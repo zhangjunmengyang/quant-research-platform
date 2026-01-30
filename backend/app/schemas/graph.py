@@ -38,6 +38,25 @@ class GraphRelationType(str, Enum):
 # ==================== 边相关 ====================
 
 
+class CreateLinkRequest(BaseModel):
+    """创建关联请求"""
+
+    source_type: GraphNodeType
+    source_id: str
+    target_type: GraphNodeType
+    target_id: str
+    relation: GraphRelationType = GraphRelationType.RELATES
+    subtype: str = ""
+    is_bidirectional: bool | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class CreateLinkResponse(BaseModel):
+    """创建关联响应"""
+
+    message: str
+
+
 class GraphEdge(BaseModel):
     """图边"""
 
@@ -175,3 +194,25 @@ class GraphOverviewResponse(BaseModel):
     nodes: list[GraphNode]
     edges: list[GraphOverviewEdge]
     stats: GraphOverviewStats
+
+
+# ==================== Cypher 查询 ====================
+
+
+class CypherQueryRequest(BaseModel):
+    """Cypher 查询请求"""
+
+    query: str = Field(..., description="Cypher 查询语句")
+    params: dict[str, Any] = Field(default_factory=dict, description="查询参数")
+
+
+class CypherQueryResponse(BaseModel):
+    """Cypher 查询响应"""
+
+    nodes: list[GraphNode]
+    edges: list[GraphOverviewEdge]
+    raw_records: list[dict[str, Any]] = Field(
+        default_factory=list, description="原始记录"
+    )
+    execution_time_ms: float
+    record_count: int

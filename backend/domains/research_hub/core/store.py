@@ -117,7 +117,13 @@ class ResearchStore(BaseStore[ResearchReport]):
                     report.created_at, report.updated_at, report.parsed_at, report.indexed_at
                 ))
                 result = cursor.fetchone()
-                return result['id'] if result else None
+                report_id = result['id'] if result else None
+
+                # 同步到图谱
+                if report_id:
+                    self._sync_research_to_graph(report)
+
+                return report_id
         except psycopg2.IntegrityError as e:
             logger.error(f"添加研报失败: {e}")
             return None
@@ -142,13 +148,60 @@ class ResearchStore(BaseStore[ResearchReport]):
                 f'UPDATE {self.table_name} SET {set_clause} WHERE id = %s',
                 values
             )
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+
+        # 同步到图谱
+        if updated:
+            report = self.get(report_id)
+            if report:
+                self._sync_research_to_graph(report)
+
+        return updated
 
     def delete(self, report_id: int) -> bool:
         """删除研报"""
+        # 先获取研报信息用于删除图谱节点
+        report = self.get(report_id)
+        if report:
+            self._delete_research_from_graph(report.uuid)
         with self._cursor() as cursor:
             cursor.execute(f'DELETE FROM {self.table_name} WHERE id = %s', (report_id,))
             return cursor.rowcount > 0
+
+    # ==================== 图谱同步 ====================
+
+    def _sync_research_to_graph(self, report: ResearchReport) -> None:
+        """同步研报节点到 Neo4j 图谱"""
+        try:
+            from domains.graph_hub.core import NodeType, get_graph_store
+
+            graph_store = get_graph_store()
+            success = graph_store.upsert_node(
+                node_type=NodeType.RESEARCH,
+                node_id=report.uuid,
+                name=report.title,
+                metadata={
+                    "author": report.author or "",
+                    "category": report.category or "",
+                    "status": report.status,
+                },
+            )
+            if success:
+                logger.debug(f"research_synced_to_graph: {report.uuid}")
+        except Exception as e:
+            logger.warning(f"research_graph_sync_failed: {report.uuid}, {e}")
+
+    def _delete_research_from_graph(self, uuid: str) -> None:
+        """从图谱中删除研报节点"""
+        try:
+            from domains.graph_hub.core import NodeType, get_graph_store
+
+            graph_store = get_graph_store()
+            success = graph_store.delete_node(NodeType.RESEARCH, uuid)
+            if success:
+                logger.info(f"deleted_research_from_graph: {uuid}")
+        except Exception as e:
+            logger.warning(f"failed_to_delete_research_from_graph: {uuid}, {e}")
 
     # ==================== 查询操作 ====================
 

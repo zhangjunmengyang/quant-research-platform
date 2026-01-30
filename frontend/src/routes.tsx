@@ -4,6 +4,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react'
 
 // Lazy load pages for code splitting
 const FactorsDashboard = () => import('@/pages/factors/Dashboard')
+const FactorsDetail = () => import('@/pages/factors/Detail')
 const FactorsAnalysis = () => import('@/pages/factors/analysis')
 const FactorsPipeline = () => import('@/pages/factors/Pipeline')
 
@@ -26,6 +27,7 @@ const ResearchDetail = () => import('@/pages/research/Detail')
 const ResearchSearch = () => import('@/pages/research/Search')
 
 const ExperiencesDashboard = () => import('@/pages/experiences/Dashboard')
+const ExperiencesDetail = () => import('@/pages/experiences/Detail')
 
 const GraphExplorer = () => import('@/pages/graph/Explorer')
 
@@ -77,6 +79,7 @@ export const router = createBrowserRouter([
           { index: true, lazy: FactorsDashboard },
           { path: 'analysis', lazy: FactorsAnalysis },
           { path: 'pipeline', lazy: FactorsPipeline },
+          { path: ':id', lazy: FactorsDetail },
         ],
       },
       // Strategy Hub
@@ -117,7 +120,10 @@ export const router = createBrowserRouter([
       // Experience Hub
       {
         path: 'experiences',
-        children: [{ index: true, lazy: ExperiencesDashboard }],
+        children: [
+          { index: true, lazy: ExperiencesDashboard },
+          { path: ':id', lazy: ExperiencesDetail },
+        ],
       },
       // Graph Hub
       {

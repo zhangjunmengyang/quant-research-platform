@@ -22,15 +22,6 @@ class SourceType(str, Enum):
     MANUAL = "manual"            # 手动录入
 
 
-class EntityType(str, Enum):
-    """关联实体类型"""
-    FACTOR = "factor"            # 因子
-    STRATEGY = "strategy"        # 策略
-    NOTE = "note"                # 笔记
-    RESEARCH = "research"        # 研报
-    EXPERIENCE = "experience"    # 经验
-
-
 @dataclass
 class ExperienceContent:
     """
@@ -243,44 +234,3 @@ class Experience:
         if content_text:
             parts.append(content_text)
         return "\n".join(parts)
-
-
-@dataclass
-class ExperienceLink:
-    """
-    经验关联
-
-    建立经验与其他实体（因子、策略、笔记、研报）的关联关系。
-    """
-    id: int | None = None
-    experience_id: int | None = None
-    experience_uuid: str = ""
-    entity_type: str = ""
-    entity_id: str = ""
-    relation: str = "related"
-    created_at: datetime | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        """转换为字典"""
-        return {
-            'id': self.id,
-            'experience_id': self.experience_id,
-            'experience_uuid': self.experience_uuid,
-            'entity_type': self.entity_type,
-            'entity_id': self.entity_id,
-            'relation': self.relation,
-            'created_at': self.created_at,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> 'ExperienceLink':
-        """从字典创建"""
-        return cls(
-            id=data.get('id'),
-            experience_id=data.get('experience_id'),
-            experience_uuid=data.get('experience_uuid', ''),
-            entity_type=data.get('entity_type', ''),
-            entity_id=data.get('entity_id', ''),
-            relation=data.get('relation', 'related'),
-            created_at=data.get('created_at'),
-        )

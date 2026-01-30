@@ -23,15 +23,6 @@ class SourceTypeEnum(str, Enum):
     MANUAL = "manual"            # 手动录入
 
 
-class EntityTypeEnum(str, Enum):
-    """关联实体类型枚举"""
-    FACTOR = "factor"            # 因子
-    STRATEGY = "strategy"        # 策略
-    NOTE = "note"                # 笔记
-    RESEARCH = "research"        # 研报
-    EXPERIENCE = "experience"    # 经验（父级经验）
-
-
 # ==================== 内容 Schema ====================
 
 
@@ -106,28 +97,7 @@ class ExperienceQueryRequest(BaseModel):
     top_k: int = Field(5, ge=1, le=50, description="返回数量")
 
 
-class ExperienceLinkRequest(BaseModel):
-    """关联经验请求"""
-    entity_type: EntityTypeEnum = Field(..., description="实体类型")
-    entity_id: str = Field(..., description="实体 ID")
-    relation: str = Field("relates", description="关系类型（derives/relates）")
-
-
 # ==================== 响应 Schema ====================
-
-
-class ExperienceLinkSchema(BaseModel):
-    """经验关联 Schema"""
-    id: Optional[int] = None
-    experience_id: Optional[int] = None
-    experience_uuid: str = ""
-    entity_type: str = ""
-    entity_id: str = ""
-    relation: str = "related"
-    created_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 class ExperienceResponse(BaseModel):
@@ -167,11 +137,3 @@ class ExperienceStatsResponse(BaseModel):
     total: int = Field(..., description="经验总数")
     tags: List[str] = Field(default_factory=list, description="所有标签")
     tags_count: int = Field(0, description="标签数量")
-
-
-class ExperienceLinkResponse(BaseModel):
-    """关联经验响应"""
-    link_id: int
-    experience_id: int
-    entity_type: str
-    entity_id: str
