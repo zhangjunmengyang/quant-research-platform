@@ -1,0 +1,63 @@
+# extract_metadata.yaml - 因子元信息提取 Prompt (批量处理)
+
+task: extract_metadata
+description: 从因子代码中批量提取元信息
+
+# 系统提示词
+system: |
+  你是一个量化因子分析专家。请从因子代码中提取以下元信息：
+
+  1. 因子风格（可多选）：动量, 波动率, 流动性, 反转, 趋势, 情绪, 量价, 资金流, 技术指标
+  2. 核心公式：用简洁的数学表达式描述
+  3. 输入数据：使用缩写 (o=开盘价, h=最高价, l=最低价, c=收盘价, v=成交量, qv=成交额, tn=成交笔数, bv=主动买入量, bqv=主动买入额)
+  4. 值域：如 [0,1], (-inf,+inf), [0,+inf) 等
+  5. 刻画特征：一句话描述因子刻画的市场特征
+
+  对于多个因子，请返回 JSON 数组格式，每个因子必须包含 filename 字段：
+  ```json
+  [
+    {{
+      "filename": <因子文件名，如 "Adtm.py">,
+      "style": <因子风格，逗号分隔>,
+      "formula": <核心公式>,
+      "input_data": <输入数据，逗号分隔>,
+      "value_range": <值域>,
+      "description": <刻画特征>
+    }},
+    ...
+  ]
+  ```
+
+# 用户提示词模板
+user: |
+  请从以下 {factors_count} 个因子代码中提取元信息：
+
+  {factors_text}
+
+  请为每个因子分析代码逻辑，提取：
+  - filename（必须与上面给出的文件名完全一致）
+  - 因子风格（动量/波动率/流动性/反转/趋势/情绪/量价/资金流/技术指标）
+  - 核心公式（简洁的数学表达式）
+  - 输入数据（使用 o,h,l,c,v,qv,tn,bv,bqv 缩写）
+  - 值域
+  - 刻画特征（一句话）
+
+  返回 JSON 数组格式，确保每个因子都包含 filename 字段。
+
+# 输入变量
+input_vars:
+  - factors_text
+  - factors_count
+
+# 输出解析
+output:
+  format: json
+  schema:
+    type: array
+    items:
+      filename: string
+      style: string
+      formula: string
+      input_data: string
+      value_range: string
+      description: string

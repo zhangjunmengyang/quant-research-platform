@@ -1,0 +1,61 @@
+# update_field.yaml - 批量更新字段 Prompt
+
+task: update_field
+description: 批量更新因子的指定字段
+
+# 系统提示词
+system: |
+  你是一个量化因子分析专家。请根据因子信息生成指定字段的内容。
+
+  目标字段: {target_field}
+
+  生成要求：
+  - 语言：中文
+  - 风格：简洁专业
+  - 长度：50-150字
+
+  请直接返回生成的内容，不需要 JSON 格式（除非目标字段需要结构化数据）。
+
+# 用户提示词模板
+user: |
+  请为以下因子生成 {target_field} 字段的内容：
+
+  因子名称: {filename}
+  因子风格: {style}
+  核心公式: {formula}
+  输入数据: {input_data}
+  值域: {value_range}
+  刻画特征: {description}
+  当前因子分析: {analysis}
+
+  {% if code %}
+  代码内容:
+  ```python
+  {code}
+  ```
+  {% endif %}
+
+  {% if verified %}
+  【用户验证信息】
+  验证备注: {verify_note}
+  {% endif %}
+
+  请生成 {target_field} 字段的内容。
+
+# 输入变量
+input_vars:
+  - filename
+  - style
+  - formula
+  - input_data
+  - value_range
+  - description
+  - analysis
+  - code
+  - verified
+  - verify_note
+  - target_field
+
+# 输出解析
+output:
+  format: text
