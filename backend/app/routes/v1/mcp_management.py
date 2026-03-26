@@ -91,6 +91,14 @@ MCP_SERVERS = {
         "port": 6794,
         "module": "domains.experience_hub.api.mcp.server",
     },
+    "stock-hub": {
+        "name": "stock-hub",
+        "display_name": "A股千因子",
+        "description": "A股因子库浏览、IC分析和双因子分析服务",
+        "host": "localhost",
+        "port": 6795,
+        "module": "domains.stock_hub.api.mcp.server",
+    },
 }
 
 # 进程管理器（存储启动的进程）
