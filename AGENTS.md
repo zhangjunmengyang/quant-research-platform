@@ -81,7 +81,14 @@ make test            # 运行测试
 
 ### Windows (PowerShell)
 
-Windows 用户请参考 README.md 中的手动启动步骤。
+```powershell
+uv run python scripts/dev.py start   # 启动（自动安装依赖）
+uv run python scripts/dev.py stop    # 停止
+uv run python scripts/dev.py status  # 状态
+uv run python scripts/dev.py logs    # 日志
+```
+
+> `scripts/dev.py` 也可在 macOS/Linux 上使用，等价于 `make start local`。
 
 ## 服务端口
 
