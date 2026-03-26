@@ -1,6 +1,6 @@
 """Stock Hub MCP 工具。"""
 
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseTool, ToolResult
 
@@ -25,7 +25,7 @@ class StockFactorListTool(BaseTool):
 - 按分类筛选因子"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -51,7 +51,7 @@ class StockFactorListTool(BaseTool):
             },
         }
 
-    async def execute(self, arguments: Dict[str, Any]) -> ToolResult:
+    async def execute(self, arguments: dict[str, Any]) -> ToolResult:
         svc = self._get_service()
         items, total = svc.list_factors(
             page=arguments.get("page", 1),
@@ -75,12 +75,12 @@ class StockFactorDetailTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return """查看A股因子的详情和源码。
+        return """查看A股因子的详情和元数据。
 
-返回因子的分类、描述、参数、Python 源码等信息。"""
+返回因子的分类、描述、参数等信息。"""
 
     @property
-    def input_schema(self) -> Dict[str, Any]:
+    def input_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -92,7 +92,7 @@ class StockFactorDetailTool(BaseTool):
             "required": ["name"],
         }
 
-    async def execute(self, arguments: Dict[str, Any]) -> ToolResult:
+    async def execute(self, arguments: dict[str, Any]) -> ToolResult:
         svc = self._get_service()
         detail = svc.get_factor_detail(arguments["name"])
         if not detail:
@@ -102,7 +102,10 @@ class StockFactorDetailTool(BaseTool):
             f"分类: {detail.get('category', '')}",
             f"描述: {detail.get('description', '')}",
         ]
-        code = detail.get("source_code", "")
-        if code:
-            lines.append(f"\n源码:\n```python\n{code[:2000]}\n```")
+        fin_cols = detail.get("fin_cols", [])
+        ov_cols = detail.get("ov_cols", [])
+        if fin_cols:
+            lines.append(f"财务列: {', '.join(fin_cols)}")
+        if ov_cols:
+            lines.append(f"行情列: {', '.join(ov_cols)}")
         return ToolResult(content="\n".join(lines), metadata=detail)

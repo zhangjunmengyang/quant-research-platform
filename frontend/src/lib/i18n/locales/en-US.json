@@ -187,6 +187,7 @@
     "rebalanceTime": "Rebalance Time",
     "groupCount": "Group Count",
     "startAnalysis": "Start Analysis",
+    "analysisRunning": "Analysis task is running, please wait for the result",
     "analysisResult": "Analysis Result",
     "icWinRate": "IC Win Rate",
     "factorScore": "Factor Score",

@@ -13,7 +13,6 @@ import {
   PERIOD_PRESETS,
   REBALANCE_TIMES,
 } from '@/features/stock-hub'
-import type { DualAnalysisResult } from '@/features/stock-hub'
 
 export function Component() {
   const { t } = useTranslation()
@@ -26,10 +25,9 @@ export function Component() {
   const [periodPreset, setPeriodPreset] = useState<keyof typeof PERIOD_PRESETS>('5日单offset')
   const [rebalanceTime, setRebalanceTime] = useState('0955')
   const [bins, setBins] = useState(5)
-  const [result, setResult] = useState<DualAnalysisResult | null>(null)
 
   const { data: cachedFactors } = useCachedFactors(backtestName || undefined)
-  const dualMutation = useDualAnalysis()
+  const dualTask = useDualAnalysis()
 
   if (statusLoading) {
     return (
@@ -39,7 +37,7 @@ export function Component() {
     )
   }
 
-  if (!status?.available) {
+  if (!status?.analysis_ready) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-4 text-muted-foreground">
         <p className="text-lg font-medium">{t('stockHub.notConfigured')}</p>
@@ -53,20 +51,18 @@ export function Component() {
 
   const handleAnalysis = () => {
     if (!mainFactor || !subFactor || mainFactor === subFactor) return
-    dualMutation.mutate(
-      {
-        main_factor: mainFactor,
-        sub_factor: subFactor,
-        period_offset_list: [...PERIOD_PRESETS[periodPreset]],
-        rebalance_time: rebalanceTime,
-        bins,
-        backtest_name: backtestName || undefined,
-      },
-      {
-        onSuccess: (data) => setResult(data),
-      }
-    )
+    dualTask.submit({
+      main_factor: mainFactor,
+      sub_factor: subFactor,
+      period_offset_list: [...PERIOD_PRESETS[periodPreset]],
+      rebalance_time: rebalanceTime,
+      bins,
+      backtest_name: backtestName || undefined,
+    })
   }
+
+  const isRunning = dualTask.isSubmitting || dualTask.isRunning
+  const result = dualTask.result
 
   return (
     <div className="space-y-6">
@@ -168,10 +164,10 @@ export function Component() {
         {/* 执行按钮 */}
         <button
           onClick={handleAnalysis}
-          disabled={!mainFactor || !subFactor || mainFactor === subFactor || dualMutation.isPending}
+          disabled={!mainFactor || !subFactor || mainFactor === subFactor || isRunning}
           className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {dualMutation.isPending ? (
+          {isRunning ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Play className="h-4 w-4" />
@@ -179,8 +175,12 @@ export function Component() {
           {t('stockHub.startAnalysis')}
         </button>
 
-        {dualMutation.isError && (
-          <p className="text-sm text-destructive">{dualMutation.error.message}</p>
+        {dualTask.isRunning && (
+          <p className="text-sm text-muted-foreground">{t('stockHub.analysisRunning')}</p>
+        )}
+
+        {dualTask.error && (
+          <p className="text-sm text-destructive">{dualTask.error.message}</p>
         )}
       </div>
 

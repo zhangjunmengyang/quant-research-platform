@@ -244,13 +244,12 @@ experience_hub/
 
 ### 5.8 stock_hub - A股千因子分析
 
-集成外部选股框架 (select-stock-pro)，提供因子库浏览、回测执行、IC 分析、双因子分析和 AI 评估。
+集成外部选股框架 (select-stock-pro)，提供因子库浏览、缓存因子查询，以及异步单因子/双因子分析任务。
 
 ```
 stock_hub/
   config.py            # 环境变量配置 (框架路径、超时)
-  services/            # 因子查询、分析、回测服务
-  routes/              # REST 路由
+  services/            # 因子查询、分析服务、分析任务执行器
   models/              # 数据模型
   api/mcp/             # MCP 服务器 + 工具 (端口 6795)
 ```
@@ -262,9 +261,10 @@ stock_hub/
 
 **设计约束**:
 - 所有路径通过环境变量配置，不硬编码本机路径
-- 长任务 (回测/批量分析) 使用异步任务模式，不阻塞 HTTP
+- 因子分析任务通过 `task_id + status/result` 模式异步执行，不阻塞 HTTP
 - 数据文件加载使用路径白名单校验，仅允许 `运行缓存/` 子目录
-- 未配置外部依赖时，API 返回 `available: false`，前端显示未配置提示
+- 对外仅暴露因子元数据，不返回私有源码内容
+- 未配置外部依赖时，API 返回 `available: false`；分析页额外依赖 `analysis_ready: true`
 
 ### 5.9 知识图谱模块
 

@@ -187,6 +187,7 @@
     "rebalanceTime": "换仓时间",
     "groupCount": "分组数",
     "startAnalysis": "开始分析",
+    "analysisRunning": "分析任务执行中，请等待结果返回",
     "analysisResult": "分析结果",
     "icWinRate": "IC胜率",
     "factorScore": "因子得分",

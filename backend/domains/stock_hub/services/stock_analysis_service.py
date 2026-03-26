@@ -2,8 +2,8 @@
 
 提供因子分析、双因子分析等能力。
 安全约束:
-- 使用 pd.read_pickle + 路径白名单，禁止 pickle.load
-- 长任务异步执行，返回 task_id
+- 使用路径白名单，禁止跨出运行缓存目录
+- 长任务由 StockAnalysisRunner 异步调度
 """
 
 import logging
@@ -11,7 +11,6 @@ import os
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
 
 from domains.stock_hub.config import (
     ANALYSIS_TIMEOUT,
@@ -56,12 +55,19 @@ def _get_backtest_dir(
                     val = line.split("=", 1)[1].strip().strip("'\"")
                     if val:
                         target = cache_root / val
-                        if target.is_dir():
+                        if target.is_dir() and _validate_data_path(target, framework):
                             return target
         except Exception:
             pass
 
     return None
+
+
+def _sanitize_analysis_result(result: dict) -> dict:
+    """移除不应对外暴露的路径字段。"""
+    cleaned = dict(result)
+    cleaned.pop("html_path", None)
+    return cleaned
 
 
 class StockAnalysisService:
@@ -182,7 +188,7 @@ class StockAnalysisService:
                 )
                 return {"error": f"分析失败: {proc.stderr[:200]}"}
 
-            result = json.loads(proc.stdout)
+            result = _sanitize_analysis_result(json.loads(proc.stdout))
             result["elapsed_seconds"] = round(elapsed, 1)
             return result
 
@@ -249,7 +255,7 @@ class StockAnalysisService:
             if proc.returncode != 0:
                 return {"error": f"双因子分析失败: {proc.stderr[:200]}"}
 
-            result = json.loads(proc.stdout)
+            result = _sanitize_analysis_result(json.loads(proc.stdout))
             result["elapsed_seconds"] = round(elapsed, 1)
             return result
 
@@ -264,18 +270,45 @@ class StockAnalysisService:
     def get_status(self) -> dict:
         """检查 stock_hub 配置状态。不暴露路径信息。"""
         framework = get_framework_path()
-        available = framework is not None and get_fuel_python() is not None
+        fuel_python = get_fuel_python()
+        framework_configured = framework is not None
+        fuel_python_configured = fuel_python is not None
+        available = framework_configured and fuel_python_configured
 
         factor_lib = False
         section_lib = False
+        cache_root_exists = False
+        enhanced_script_exists = False
+        dual_script_exists = False
+        available_backtests_count = 0
         if framework:
             factor_lib = (framework / "因子库").is_dir()
             section_lib = (framework / "截面因子库").is_dir()
+            cache_root = framework / "data" / "运行缓存"
+            cache_root_exists = cache_root.is_dir()
+            enhanced_script_exists = (framework / "run_enhanced_analysis.py").is_file()
+            dual_script_exists = (framework / "run_dual_analysis.py").is_file()
+            available_backtests_count = len(self.list_available_backtests())
+
+        analysis_ready = (
+            available
+            and cache_root_exists
+            and enhanced_script_exists
+            and dual_script_exists
+            and available_backtests_count > 0
+        )
 
         return {
             "available": available,
+            "analysis_ready": analysis_ready,
+            "framework_configured": framework_configured,
+            "fuel_python_configured": fuel_python_configured,
             "factor_lib_exists": factor_lib,
             "section_factor_lib_exists": section_lib,
+            "cache_root_exists": cache_root_exists,
+            "enhanced_script_exists": enhanced_script_exists,
+            "dual_script_exists": dual_script_exists,
+            "available_backtests_count": available_backtests_count,
         }
 
 

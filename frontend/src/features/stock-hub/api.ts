@@ -11,6 +11,9 @@ import type {
   CachedFactorInfo,
   EnhancedAnalysisRequest,
   AnalysisResult,
+  AnalysisTaskResult,
+  AnalysisTaskStatus,
+  AnalysisTaskSubmit,
   DualAnalysisRequest,
   DualAnalysisResult,
   StockFactorListParams,
@@ -77,23 +80,39 @@ export const stockApi = {
     return data.data
   },
 
-  runEnhancedAnalysis: async (req: EnhancedAnalysisRequest): Promise<AnalysisResult> => {
-    const { data } = await apiClient.post<ApiResponse<AnalysisResult>>(
+  runEnhancedAnalysis: async (req: EnhancedAnalysisRequest): Promise<AnalysisTaskSubmit> => {
+    const { data } = await apiClient.post<ApiResponse<AnalysisTaskSubmit>>(
       `${BASE}/analysis/enhanced`,
-      req,
-      { timeout: 600000 }
+      req
     )
     if (!data.success || !data.data) throw new Error(data.error || 'Analysis failed')
     return data.data
   },
 
-  runDualAnalysis: async (req: DualAnalysisRequest): Promise<DualAnalysisResult> => {
-    const { data } = await apiClient.post<ApiResponse<DualAnalysisResult>>(
+  runDualAnalysis: async (req: DualAnalysisRequest): Promise<AnalysisTaskSubmit> => {
+    const { data } = await apiClient.post<ApiResponse<AnalysisTaskSubmit>>(
       `${BASE}/analysis/dual`,
-      req,
-      { timeout: 600000 }
+      req
     )
     if (!data.success || !data.data) throw new Error(data.error || 'Dual analysis failed')
+    return data.data
+  },
+
+  getAnalysisTaskStatus: async (taskId: string): Promise<AnalysisTaskStatus> => {
+    const { data } = await apiClient.get<ApiResponse<AnalysisTaskStatus>>(
+      `${BASE}/analysis/tasks/${encodeURIComponent(taskId)}/status`
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Failed to get task status')
+    return data.data
+  },
+
+  getAnalysisTaskResult: async <T extends AnalysisResult | DualAnalysisResult>(
+    taskId: string
+  ): Promise<AnalysisTaskResult<T>> => {
+    const { data } = await apiClient.get<ApiResponse<AnalysisTaskResult<T>>>(
+      `${BASE}/analysis/tasks/${encodeURIComponent(taskId)}/result`
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Failed to get task result')
     return data.data
   },
 }

@@ -3,14 +3,13 @@
 import os
 from unittest.mock import patch
 
-import pytest
-
 
 def test_is_available_returns_false_when_not_configured():
     """未配置环境变量时返回 False。"""
     with patch.dict(os.environ, {}, clear=True):
         # 需要重新导入以让模块重新读取环境变量
         import importlib
+
         import domains.stock_hub.config as cfg
 
         importlib.reload(cfg)
@@ -27,6 +26,7 @@ def test_is_available_returns_false_with_nonexistent_path():
         },
     ):
         import importlib
+
         import domains.stock_hub.config as cfg
 
         importlib.reload(cfg)
@@ -37,7 +37,7 @@ def test_is_available_returns_false_with_nonexistent_path():
 
 def test_default_timeout_values():
     """默认超时配置。"""
-    from domains.stock_hub.config import BACKTEST_TIMEOUT, ANALYSIS_TIMEOUT, MCP_PORT
+    from domains.stock_hub.config import ANALYSIS_TIMEOUT, BACKTEST_TIMEOUT, MCP_PORT
 
     assert BACKTEST_TIMEOUT == 1800
     assert ANALYSIS_TIMEOUT == 600
@@ -51,6 +51,7 @@ def test_custom_timeout_from_env():
         {"STOCK_HUB_BACKTEST_TIMEOUT": "3600", "STOCK_HUB_MCP_PORT": "7000"},
     ):
         import importlib
+
         import domains.stock_hub.config as cfg
 
         importlib.reload(cfg)

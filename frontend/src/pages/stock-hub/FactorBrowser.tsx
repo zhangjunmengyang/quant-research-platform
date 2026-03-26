@@ -4,7 +4,7 @@
 
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Search, RefreshCw } from 'lucide-react'
+import { Loader2, Search } from 'lucide-react'
 import { useStockStatus, useStockFactors, useStockCategories } from '@/features/stock-hub'
 import type { StockFactorListParams } from '@/features/stock-hub'
 

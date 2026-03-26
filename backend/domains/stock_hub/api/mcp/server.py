@@ -4,7 +4,7 @@
 """
 
 import logging
-from typing import Optional
+import os
 
 from domains.mcp_core import (
     BaseMCPServer,
@@ -13,9 +13,12 @@ from domains.mcp_core import (
     run_streamable_http_server,
 )
 
-from .tools.stock_tools import StockFactorListTool, StockFactorDetailTool
+from .tools.stock_tools import StockFactorDetailTool, StockFactorListTool
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_HOST = os.environ.get("STOCK_HUB_MCP_HOST", "127.0.0.1")
+DEFAULT_PORT = int(os.environ.get("STOCK_HUB_MCP_PORT", "6795"))
 
 
 class StockHubMCPServer(BaseMCPServer):
@@ -31,11 +34,11 @@ class StockHubMCPServer(BaseMCPServer):
 
 
 def create_stock_hub_config(
-    host: str = "0.0.0.0",
-    port: int = 6795,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
     log_level: str = "INFO",
     auth_enabled: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
 ) -> MCPConfig:
     return MCPConfig(
         host=host,
@@ -51,7 +54,7 @@ def create_stock_hub_config(
     )
 
 
-def create_mcp_server(config: Optional[MCPConfig] = None):
+def create_mcp_server(config: MCPConfig | None = None):
     if config is None:
         config = create_stock_hub_config()
     server = StockHubMCPServer(config)
@@ -59,8 +62,8 @@ def create_mcp_server(config: Optional[MCPConfig] = None):
 
 
 def run_server(
-    host: str = "0.0.0.0",
-    port: int = 6795,
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
     log_level: str = "info",
     reload: bool = False,
 ):

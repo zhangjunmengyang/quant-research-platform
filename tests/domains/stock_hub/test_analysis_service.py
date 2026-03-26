@@ -4,9 +4,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
 from domains.stock_hub.services.stock_analysis_service import (
     StockAnalysisService,
+    _get_backtest_dir,
     _validate_data_path,
 )
 
@@ -115,8 +115,41 @@ def test_get_status_configured(mock_framework_with_cache):
         status = svc.get_status()
 
         assert status["available"] is True
+        assert status["analysis_ready"] is False
         assert status["factor_lib_exists"] is True
         assert status["section_factor_lib_exists"] is False
+        assert status["available_backtests_count"] == 1
+
+
+def test_get_status_analysis_ready_when_scripts_exist(mock_framework_with_cache):
+    """脚本和回测数据齐全时，analysis_ready=True。"""
+    (mock_framework_with_cache / "因子库").mkdir()
+    (mock_framework_with_cache / "run_enhanced_analysis.py").write_text("", encoding="utf-8")
+    (mock_framework_with_cache / "run_dual_analysis.py").write_text("", encoding="utf-8")
+
+    with patch(
+        "domains.stock_hub.services.stock_analysis_service.get_framework_path",
+        return_value=mock_framework_with_cache,
+    ), patch(
+        "domains.stock_hub.services.stock_analysis_service.get_fuel_python",
+        return_value=Path("/some/python"),
+    ):
+        svc = StockAnalysisService()
+        status = svc.get_status()
+
+        assert status["analysis_ready"] is True
+        assert status["cache_root_exists"] is True
+        assert status["enhanced_script_exists"] is True
+        assert status["dual_script_exists"] is True
+
+
+def test_get_backtest_dir_rejects_default_path_outside_cache(tmp_path):
+    """默认 backtest_name 也必须受白名单限制。"""
+    cache_root = tmp_path / "data" / "运行缓存"
+    cache_root.mkdir(parents=True)
+    (tmp_path / "config.py").write_text("backtest_name = '../escape'", encoding="utf-8")
+
+    assert _get_backtest_dir(tmp_path) is None
 
 
 def test_run_enhanced_analysis_not_configured():

@@ -96,7 +96,7 @@ help:
 	@echo "  前端:     http://localhost:5173 (local/dev) | http://localhost (prod)"
 	@echo "  API:      http://localhost:8000"
 	@echo "  API Docs: http://localhost:8000/docs"
-	@echo "  MCP:      localhost:6789-6794"
+	@echo "  MCP:      localhost:6789-6795"
 
 # ============================================
 # 伪目标（模式标记）

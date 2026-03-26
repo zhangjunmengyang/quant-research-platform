@@ -7,7 +7,6 @@ import ast
 import logging
 import re
 from pathlib import Path
-from typing import Optional
 
 from domains.stock_hub.config import get_framework_path
 
@@ -52,7 +51,6 @@ class StockFactorService:
             "category": default_category,
             "description": "",
             "has_add_factor": False,
-            "source_code": "",
             "fin_cols": [],
             "ov_cols": [],
             "example_select": "",
@@ -60,7 +58,6 @@ class StockFactorService:
         }
         try:
             source = path.read_text(encoding="utf-8", errors="replace")
-            meta["source_code"] = source
 
             # 检测 H财务 分类
             if source.startswith("# H") or "H财务" in source[:200]:

@@ -13,7 +13,6 @@ import {
   PERIOD_PRESETS,
   REBALANCE_TIMES,
 } from '@/features/stock-hub'
-import type { AnalysisResult } from '@/features/stock-hub'
 
 export function Component() {
   const { t } = useTranslation()
@@ -25,10 +24,9 @@ export function Component() {
   const [periodPreset, setPeriodPreset] = useState<keyof typeof PERIOD_PRESETS>('5日单offset')
   const [rebalanceTime, setRebalanceTime] = useState('0955')
   const [bins, setBins] = useState(10)
-  const [result, setResult] = useState<AnalysisResult | null>(null)
 
   const { data: cachedFactors } = useCachedFactors(backtestName || undefined)
-  const analysisMutation = useEnhancedAnalysis()
+  const analysisTask = useEnhancedAnalysis()
 
   if (statusLoading) {
     return (
@@ -38,7 +36,7 @@ export function Component() {
     )
   }
 
-  if (!status?.available) {
+  if (!status?.analysis_ready) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-4 text-muted-foreground">
         <p className="text-lg font-medium">{t('stockHub.notConfigured')}</p>
@@ -52,19 +50,17 @@ export function Component() {
 
   const handleAnalysis = () => {
     if (!selectedFactor) return
-    analysisMutation.mutate(
-      {
-        factor_name: selectedFactor,
-        period_offset_list: [...PERIOD_PRESETS[periodPreset]],
-        rebalance_time: rebalanceTime,
-        bins,
-        backtest_name: backtestName || undefined,
-      },
-      {
-        onSuccess: (data) => setResult(data),
-      }
-    )
+    analysisTask.submit({
+      factor_name: selectedFactor,
+      period_offset_list: [...PERIOD_PRESETS[periodPreset]],
+      rebalance_time: rebalanceTime,
+      bins,
+      backtest_name: backtestName || undefined,
+    })
   }
+
+  const isRunning = analysisTask.isSubmitting || analysisTask.isRunning
+  const result = analysisTask.result
 
   return (
     <div className="space-y-6">
@@ -148,10 +144,10 @@ export function Component() {
         {/* 执行按钮 */}
         <button
           onClick={handleAnalysis}
-          disabled={!selectedFactor || analysisMutation.isPending}
+          disabled={!selectedFactor || isRunning}
           className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {analysisMutation.isPending ? (
+          {isRunning ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Play className="h-4 w-4" />
@@ -159,8 +155,12 @@ export function Component() {
           {t('stockHub.startAnalysis')}
         </button>
 
-        {analysisMutation.isError && (
-          <p className="text-sm text-destructive">{analysisMutation.error.message}</p>
+        {analysisTask.isRunning && (
+          <p className="text-sm text-muted-foreground">{t('stockHub.analysisRunning')}</p>
+        )}
+
+        {analysisTask.error && (
+          <p className="text-sm text-destructive">{analysisTask.error.message}</p>
         )}
       </div>
 

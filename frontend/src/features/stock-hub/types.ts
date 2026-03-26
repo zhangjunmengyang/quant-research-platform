@@ -4,8 +4,15 @@
 
 export interface StockStatus {
   available: boolean
+  analysis_ready: boolean
+  framework_configured: boolean
+  fuel_python_configured: boolean
   factor_lib_exists: boolean
   section_factor_lib_exists: boolean
+  cache_root_exists: boolean
+  enhanced_script_exists: boolean
+  dual_script_exists: boolean
+  available_backtests_count: number
 }
 
 export interface StockFactorSummary {
@@ -16,7 +23,6 @@ export interface StockFactorSummary {
 }
 
 export interface StockFactorDetail extends StockFactorSummary {
-  source_code: string
   fin_cols: string[]
   ov_cols: string[]
   example_select: string
@@ -62,8 +68,33 @@ export interface AnalysisResult {
   rebalance_time: string
   group_values: Record<string, number>
   style_exposure: Record<string, number>
-  html_path: string
   elapsed_seconds: number
+}
+
+export interface AnalysisTaskSubmit {
+  task_id: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  task_type: 'enhanced' | 'dual'
+  message: string
+}
+
+export interface AnalysisTaskStatus {
+  task_id: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  task_type: 'enhanced' | 'dual'
+  message: string
+  created_at: string
+  started_at?: string | null
+  completed_at?: string | null
+  error_message?: string | null
+}
+
+export interface AnalysisTaskResult<T> {
+  task_id: string
+  status: 'completed' | 'failed'
+  task_type: 'enhanced' | 'dual'
+  result?: T | null
+  error_message?: string | null
 }
 
 export interface DualAnalysisRequest {

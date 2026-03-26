@@ -1,11 +1,8 @@
 """stock_hub.services.stock_factor_service 单元测试。"""
 
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
 from domains.stock_hub.services.stock_factor_service import StockFactorService
 
 
@@ -113,7 +110,8 @@ def test_get_factor_detail(mock_framework):
         detail = svc.get_factor_detail("市值")
         assert detail is not None
         assert detail["name"] == "市值"
-        assert "add_factor" in detail["source_code"]
+        assert detail["has_add_factor"] is True
+        assert "source_code" not in detail
 
         assert svc.get_factor_detail("不存在") is None
 
