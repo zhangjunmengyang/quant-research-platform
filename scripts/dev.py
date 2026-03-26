@@ -208,11 +208,12 @@ def spawn_background(name: str, cmd: list[str], cwd: Path, env: dict) -> int:
     }
 
     if IS_WIN:
+        # CREATE_NO_WINDOW 避免弹出控制台窗口
         # CREATE_NEW_PROCESS_GROUP 让子进程独立于父进程
         kwargs["creationflags"] = (
-            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
         )
-        # Windows 上 pnpm/uv 等是 .cmd 文件，需要 shell=True 或显式找到 .cmd
+        # Windows 上 pnpm/uv 等是 .cmd 文件，需要 shell=True
         kwargs["shell"] = True
     else:
         kwargs["start_new_session"] = True
