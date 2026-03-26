@@ -7,7 +7,6 @@
 import os
 from pathlib import Path
 
-
 # 外部依赖路径 (全部通过环境变量配置)
 STOCK_FRAMEWORK_PATH: str | None = os.environ.get("STOCK_FRAMEWORK_PATH")
 FUEL_PYTHON_PATH: str | None = os.environ.get("FUEL_PYTHON_PATH")

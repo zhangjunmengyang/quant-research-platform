@@ -54,7 +54,11 @@
     "experienceOverview": "Experience Overview",
     "system": "System",
     "mcpService": "MCP Service",
-    "logBrowser": "Log Browser"
+    "logBrowser": "Log Browser",
+    "stockHub": "Stock Hub",
+    "stockFactorBrowser": "Factor Browser",
+    "stockAnalysis": "Factor Analysis",
+    "stockDualAnalysis": "Dual Analysis"
   },
   "header": {
     "theme": "Theme",
@@ -77,7 +81,10 @@
     "researchOverview": "Research Overview",
     "noteOverview": "Note Overview",
     "experienceOverview": "Experience Overview",
-    "quantPlatform": "Quant Platform"
+    "quantPlatform": "Quant Platform",
+    "stockFactorBrowser": "Factor Browser",
+    "stockAnalysis": "Factor Analysis",
+    "stockDualAnalysis": "Dual Analysis"
   },
   "factor": {
     "title": "Factor Library",
@@ -161,6 +168,36 @@
     "editExperience": "Edit Experience",
     "deleteExperience": "Delete Experience",
     "noData": "No experiences"
+  },
+  "stockHub": {
+    "title": "Stock Hub",
+    "factorBrowser": "Factor Browser",
+    "analysis": "Factor Analysis",
+    "dualAnalysis": "Dual Factor Analysis",
+    "notConfigured": "Stock Hub Not Configured",
+    "notConfiguredHint": "Please set STOCK_FRAMEWORK_PATH and FUEL_PYTHON_PATH environment variables",
+    "totalFactors": "{{count}} factors total",
+    "noFactors": "No factor data",
+    "backtestSource": "Backtest Source",
+    "defaultSource": "Default (framework config.py)",
+    "selectFactor": "Select Factor",
+    "pleaseSelect": "Please select...",
+    "factorUnit": " factors",
+    "periodPreset": "Analysis Period",
+    "rebalanceTime": "Rebalance Time",
+    "groupCount": "Group Count",
+    "startAnalysis": "Start Analysis",
+    "analysisRunning": "Analysis task is running, please wait for the result",
+    "analysisResult": "Analysis Result",
+    "icWinRate": "IC Win Rate",
+    "factorScore": "Factor Score",
+    "groupReturns": "Group Returns",
+    "styleExposure": "Style Exposure",
+    "elapsed": "Elapsed {{seconds}}s",
+    "mainFactor": "Main Factor",
+    "subFactor": "Sub Factor",
+    "sameFactor": "Main and sub factor cannot be the same",
+    "dualResult": "{{main}} x {{sub}} Dual Analysis Result"
   },
   "mcp": {
     "title": "MCP Service",
