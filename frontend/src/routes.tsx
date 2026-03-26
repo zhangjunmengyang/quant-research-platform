@@ -27,6 +27,10 @@ const ResearchSearch = () => import('@/pages/research/Search')
 
 const ExperiencesDashboard = () => import('@/pages/experiences/Dashboard')
 
+const StockFactorBrowser = () => import('@/pages/stock-hub/FactorBrowser')
+const StockAnalysisView = () => import('@/pages/stock-hub/AnalysisView')
+const StockDualAnalysisView = () => import('@/pages/stock-hub/DualAnalysisView')
+
 const LogsExplorer = () => import('@/pages/logs/Explorer')
 
 // Error element for routes
@@ -116,6 +120,15 @@ export const router = createBrowserRouter([
       {
         path: 'experiences',
         children: [{ index: true, lazy: ExperiencesDashboard }],
+      },
+      // Stock Hub
+      {
+        path: 'stock-hub',
+        children: [
+          { index: true, lazy: StockFactorBrowser },
+          { path: 'analysis', lazy: StockAnalysisView },
+          { path: 'dual-analysis', lazy: StockDualAnalysisView },
+        ],
       },
       // Logs Hub
       {

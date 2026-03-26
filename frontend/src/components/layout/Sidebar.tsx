@@ -24,6 +24,7 @@ import {
   Server,
   Sparkles,
   Target,
+  TrendingUp,
 } from 'lucide-react'
 
 interface NavItem {
@@ -59,6 +60,16 @@ const navigation: NavGroup[] = [
       { labelKey: 'nav.factorPipeline', href: '/factors/pipeline', icon: Sparkles },
       { labelKey: 'nav.strategyOverview', href: '/strategies', icon: Target },
       { labelKey: 'nav.strategyAnalysis', href: '/strategies/analysis', icon: BarChart3 },
+    ],
+  },
+  // Stock Hub (A股千因子)
+  {
+    titleKey: 'nav.stockHub',
+    defaultOpen: true,
+    items: [
+      { labelKey: 'nav.stockFactorBrowser', href: '/stock-hub', icon: TrendingUp },
+      { labelKey: 'nav.stockAnalysis', href: '/stock-hub/analysis', icon: BarChart3 },
+      { labelKey: 'nav.stockDualAnalysis', href: '/stock-hub/dual-analysis', icon: BarChart3 },
     ],
   },
   // Knowledge Layer

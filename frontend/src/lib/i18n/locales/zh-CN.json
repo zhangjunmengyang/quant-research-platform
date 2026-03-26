@@ -54,7 +54,11 @@
     "experienceOverview": "经验概览",
     "system": "系统",
     "mcpService": "MCP 服务",
-    "logBrowser": "日志浏览"
+    "logBrowser": "日志浏览",
+    "stockHub": "A股千因子",
+    "stockFactorBrowser": "A股因子库",
+    "stockAnalysis": "因子分析",
+    "stockDualAnalysis": "双因子分析"
   },
   "header": {
     "theme": "主题",
@@ -77,7 +81,10 @@
     "researchOverview": "研报概览",
     "noteOverview": "笔记概览",
     "experienceOverview": "经验概览",
-    "quantPlatform": "量化研究管理平台"
+    "quantPlatform": "量化研究管理平台",
+    "stockFactorBrowser": "A股因子库",
+    "stockAnalysis": "因子分析",
+    "stockDualAnalysis": "双因子分析"
   },
   "factor": {
     "title": "因子库",
@@ -161,6 +168,35 @@
     "editExperience": "编辑经验",
     "deleteExperience": "删除经验",
     "noData": "暂无经验"
+  },
+  "stockHub": {
+    "title": "A股千因子",
+    "factorBrowser": "A股因子库",
+    "analysis": "因子分析",
+    "dualAnalysis": "双因子分析",
+    "notConfigured": "Stock Hub 未配置",
+    "notConfiguredHint": "请设置 STOCK_FRAMEWORK_PATH 和 FUEL_PYTHON_PATH 环境变量",
+    "totalFactors": "共 {{count}} 个因子",
+    "noFactors": "暂无因子数据",
+    "backtestSource": "回测数据源",
+    "defaultSource": "默认（框架config.py）",
+    "selectFactor": "选择因子",
+    "pleaseSelect": "请选择...",
+    "factorUnit": "个因子",
+    "periodPreset": "分析周期",
+    "rebalanceTime": "换仓时间",
+    "groupCount": "分组数",
+    "startAnalysis": "开始分析",
+    "analysisResult": "分析结果",
+    "icWinRate": "IC胜率",
+    "factorScore": "因子得分",
+    "groupReturns": "分组收益",
+    "styleExposure": "风格暴露",
+    "elapsed": "耗时 {{seconds}} 秒",
+    "mainFactor": "主因子",
+    "subFactor": "次因子",
+    "sameFactor": "主因子和次因子不能相同",
+    "dualResult": "{{main}} x {{sub}} 双因子分析结果"
   },
   "mcp": {
     "title": "MCP 服务",
