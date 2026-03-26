@@ -32,6 +32,7 @@ backend/
     note_hub/             # 笔记知识库
     research_hub/         # 研报知识库 (RAG ChatBot)
     experience_hub/       # 经验知识库 (长期记忆)
+    stock_hub/            # A股千因子分析 (外部框架集成)
 ```
 
 ### 依赖方向
@@ -51,6 +52,8 @@ note_hub (仅依赖 mcp_core)
 research_hub (依赖 mcp_core, 使用 pgvector)
 
 experience_hub (依赖 mcp_core, 使用 pgvector, 知识图谱)
+
+stock_hub (依赖 mcp_core, 集成外部选股框架 select-stock-pro)
 ```
 
 ### 知识层级架构
@@ -65,7 +68,7 @@ experience_hub (依赖 mcp_core, 使用 pgvector, 知识图谱)
           note_hub + research_hub
                     |
          Artifact Layer (产出层)
-        factor_hub + strategy_hub
+        factor_hub + strategy_hub + stock_hub
                     |
            Data Layer (数据层)
               data_hub
@@ -75,7 +78,7 @@ experience_hub (依赖 mcp_core, 使用 pgvector, 知识图谱)
 |------|-------|------|---------|
 | Wisdom | experience_hub | 可迁移的研究智慧 | 抽象、经验证、长期有效 |
 | Knowledge | note_hub, research_hub | 研究过程记录、外部输入 | 临时、待整理 |
-| Artifact | factor_hub, strategy_hub | 研究产出 | 结构化、可执行 |
+| Artifact | factor_hub, strategy_hub, stock_hub | 研究产出 | 结构化、可执行 |
 | Data | data_hub | 市场原始数据 | 事实、客观 |
 
 详见 [知识与经验体系设计](knowledge-experience-system.md)
@@ -92,6 +95,7 @@ experience_hub (依赖 mcp_core, 使用 pgvector, 知识图谱)
 | note-hub | 6792 | 笔记管理 |
 | research-hub | 6793 | 研报 RAG 对话 |
 | experience-hub | 6794 | 经验知识库 |
+| stock-hub | 6795 | A股千因子分析 |
 | PostgreSQL | 5432 | 持久化存储 |
 | Redis | 6379 | 任务队列 + 缓存 |
 
@@ -238,7 +242,31 @@ experience_hub/
 | link_experience | 关联经验与其他实体 |
 | curate_experience | 从低层经验提炼高层经验 |
 
-### 5.8 知识图谱模块
+### 5.8 stock_hub - A股千因子分析
+
+集成外部选股框架 (select-stock-pro)，提供因子库浏览、回测执行、IC 分析、双因子分析和 AI 评估。
+
+```
+stock_hub/
+  config.py            # 环境变量配置 (框架路径、超时)
+  services/            # 因子查询、分析、回测服务
+  routes/              # REST 路由
+  models/              # 数据模型
+  api/mcp/             # MCP 服务器 + 工具 (端口 6795)
+```
+
+**外部依赖** (通过环境变量配置):
+- `STOCK_FRAMEWORK_PATH`: 选股框架目录
+- `FUEL_PYTHON_PATH`: 框架专用 Python 环境
+- `DATA_CENTER_PATH`: A股行情数据目录
+
+**设计约束**:
+- 所有路径通过环境变量配置，不硬编码本机路径
+- 长任务 (回测/批量分析) 使用异步任务模式，不阻塞 HTTP
+- 数据文件加载使用路径白名单校验，仅允许 `运行缓存/` 子目录
+- 未配置外部依赖时，API 返回 `available: false`，前端显示未配置提示
+
+### 5.9 知识图谱模块
 
 知识图谱用于存储实体和关系，支持语义搜索和图遍历。
 
