@@ -176,11 +176,13 @@ def is_alive(pid: int) -> bool:
 
 
 def kill_pid(pid: int, force: bool = False) -> None:
-    """终止进程。"""
+    """终止进程（含子进程树）。"""
     if IS_WIN:
-        flag = "/F" if force else ""
-        cmd = f"taskkill /PID {pid} /T {flag}"
-        subprocess.run(cmd, shell=True, capture_output=True, timeout=10)
+        # /T = 终止进程树, /F = 强制
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            capture_output=True, timeout=10,
+        )
     else:
         sig = signal.SIGKILL if force else signal.SIGTERM
         try:
@@ -210,6 +212,8 @@ def spawn_background(name: str, cmd: list[str], cwd: Path, env: dict) -> int:
         kwargs["creationflags"] = (
             subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
         )
+        # Windows 上 pnpm/uv 等是 .cmd 文件，需要 shell=True 或显式找到 .cmd
+        kwargs["shell"] = True
     else:
         kwargs["start_new_session"] = True
 
@@ -433,13 +437,14 @@ def cmd_stop() -> int:
     )
 
     print()
-    # 验证端口释放
+    # 验证端口释放（等待 TIME_WAIT 状态消散）
+    time.sleep(2)
     still_occupied = []
     for name, port in PORTS.items():
         if port_in_use(port):
             still_occupied.append(f"{name}:{port}")
     if still_occupied:
-        info(f"WARNING: ports still in use: {', '.join(still_occupied)}")
+        info(f"Ports in TIME_WAIT (will clear soon): {', '.join(still_occupied)}")
     else:
         info("All ports released")
 
