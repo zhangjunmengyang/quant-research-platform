@@ -17,3 +17,4 @@
 | 主题 | 文档 |
 |------|------|
 | 架构全景 | [reference.md](reference.md) |
+| PR 规范 | [pr-guidelines.md](pr-guidelines.md) |
