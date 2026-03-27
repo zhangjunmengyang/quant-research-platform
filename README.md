@@ -66,53 +66,24 @@ make stop local
 
 **Windows (PowerShell):**
 
-Windows 用户推荐使用**生产构建模式**，页面响应更快（毫秒级）。
-
 ```powershell
-# 0. 首次运行 - 安装依赖
-uv sync --dev
-cd frontend && pnpm install && cd ..
+# 一键启动（自动安装依赖、启动所有服务、打开浏览器）
+uv run python scripts/dev.py start
 
-# 1. 启动 PostgreSQL + Redis（保持运行）
-docker compose -f docker/compose/docker-compose.infra.yml up -d
+# 停止所有服务
+uv run python scripts/dev.py stop
 
-# 2. 新终端 - 启动后端 API
-cd backend; $env:PYTHONPATH=".;.."; $env:PYTHONUTF8="1"; ..\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# 查看服务状态
+uv run python scripts/dev.py status
 
-# 3. 新终端 - 构建并启动前端（生产模式，推荐）
-cd frontend; npm run preview
+# 查看日志
+uv run python scripts/dev.py logs              # 全部服务
+uv run python scripts/dev.py logs api           # 仅 API
+uv run python scripts/dev.py logs -n 100 mcp-factor  # 最近 100 行
 ```
 
-> **重要**: Windows 下 Vite 开发模式首次加载很慢（10-30秒），因此默认使用生产构建模式。
-> `npm run preview` 会先构建再启动，首次构建约 5 秒，之后页面切换是毫秒级响应。
-
-**Windows 前端命令说明：**
-| 命令 | 说明 |
-|------|------|
-| `npm run preview` | 构建 + 启动（推荐日常使用） |
-| `npm run dev` | Vite 热更新模式（macOS 推荐） |
-| `npm run build` | 仅构建 |
-| `npm run start` | 仅启动预览服务器（需先 build） |
-
-**Windows 启动 MCP 服务（可选）：**
-```powershell
-# 每个 MCP 服务需要单独终端
-cd backend; $env:PYTHONPATH=".;.."; $env:PYTHONUTF8="1"
-
-..\.venv\Scripts\python -m domains.factor_hub.api.mcp.server      # Factor Hub MCP
-..\.venv\Scripts\python -m domains.data_hub.api.mcp.server        # Data Hub MCP
-..\.venv\Scripts\python -m domains.strategy_hub.api.mcp.server    # Strategy Hub MCP
-..\.venv\Scripts\python -m domains.note_hub.api.mcp.server        # Note Hub MCP
-..\.venv\Scripts\python -m domains.research_hub.api.mcp.server    # Research Hub MCP
-..\.venv\Scripts\python -m domains.experience_hub.api.mcp.server  # Experience Hub MCP
-```
-
-**Windows 停止服务：**
-```powershell
-# 关闭各终端窗口，或执行：
-Get-Process python, node -ErrorAction SilentlyContinue | Stop-Process -Force
-docker compose -f docker/compose/docker-compose.infra.yml down
-```
+> `scripts/dev.py` 是跨平台任务运行器，也可在 macOS/Linux 上使用，等价于 `make start local`。
+> 该脚本会自动启动 PostgreSQL、Redis、API、7 个 MCP 服务和前端，无需手动开多个终端。
 
 ### 4. 访问服务
 

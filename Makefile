@@ -170,7 +170,11 @@ _ensure_deps: _check_local_tools
 # ============================================
 start:
 ifeq ($(MODE),local)
+ifeq ($(OS),Windows_NT)
+	@uv run python scripts/dev.py start
+else
 	@$(MAKE) _start_local
+endif
 else ifeq ($(MODE),dev)
 	@$(MAKE) _start_dev
 else
@@ -346,6 +350,9 @@ else
 endif
 
 _stop_local:
+ifeq ($(OS),Windows_NT)
+	@uv run python scripts/dev.py stop
+else
 	@echo "停止本机服务..."
 	@echo "[1/4] 优雅终止进程 (SIGTERM)..."
 	@-pkill -TERM -f "uvicorn app.main:app" 2>/dev/null || true
@@ -398,6 +405,7 @@ _stop_local:
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_INFRA) down 2>/dev/null || true
 	@echo ""
 	@echo "本地开发环境已停止"
+endif
 
 _stop_dev:
 	@echo "停止 Docker 开发环境..."
@@ -471,11 +479,15 @@ restart:
 # ============================================
 logs:
 ifeq ($(MODE),local)
+ifeq ($(OS),Windows_NT)
+	@uv run python scripts/dev.py logs
+else
 	@echo "=== API ===" && tail -30 $(PID_DIR)/api.log 2>/dev/null || echo "(无日志)"
 	@echo "" && echo "=== MCP ===" && tail -10 $(PID_DIR)/mcp-factor.log 2>/dev/null || echo "(无日志)"
 	@echo "" && echo "=== Frontend ===" && tail -10 $(PID_DIR)/frontend.log 2>/dev/null || echo "(无日志)"
 	@echo ""
 	@echo "实时日志: tail -f .pids/*.log"
+endif
 else ifeq ($(MODE),dev)
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_DEV) logs -f
 else
@@ -486,6 +498,9 @@ endif
 # 状态查看
 # ============================================
 status:
+ifeq ($(OS),Windows_NT)
+	@uv run python scripts/dev.py status
+else
 	@echo "=== 本机服务 ==="
 	@if pgrep -f "uvicorn app.main:app" > /dev/null 2>&1; then echo "  API:      运行中"; else echo "  API:      未运行"; fi
 	@if pgrep -f "domains.factor_hub.api.mcp.server" > /dev/null 2>&1; then echo "  MCP Factor: 运行中"; else echo "  MCP Factor: 未运行"; fi
@@ -501,6 +516,7 @@ status:
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_INFRA) ps 2>/dev/null || echo "(无)"
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_DEV) ps 2>/dev/null || true
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_PROD) ps 2>/dev/null || true
+endif
 
 # ============================================
 # 健康检查
@@ -567,6 +583,9 @@ _healthcheck_docker:
 	fi
 
 _healthcheck_local:
+ifeq ($(OS),Windows_NT)
+	@uv run python scripts/dev.py status
+else
 	@failed=0; \
 	printf "  API .............. "; \
 	api_ok=0; \
@@ -610,6 +629,7 @@ _healthcheck_local:
 	else \
 		uv run python scripts/banner.py 2>/dev/null || true; \
 	fi
+endif
 
 # ============================================
 # 清理
