@@ -21,6 +21,8 @@ import subprocess
 import sys
 import time
 import webbrowser
+import gzip
+import shutil
 from pathlib import Path
 
 # ============================================
@@ -32,6 +34,8 @@ IS_WIN = sys.platform == "win32"
 ROOT = Path(__file__).resolve().parent.parent
 PID_DIR = ROOT / ".pids"
 COMPOSE_INFRA = ROOT / "docker" / "compose" / "docker-compose.infra.yml"
+BACKUP_DIR = ROOT / "backups"
+BACKUP_FILE = BACKUP_DIR / "quant_backup.sql.gz"
 
 KILL_TIMEOUT = 5
 HEALTH_RETRIES = 15
@@ -132,6 +136,15 @@ def port_in_use(port: int) -> bool:
         return s.connect_ex(("127.0.0.1", port)) == 0
 
 
+def find_occupied_ports() -> list[str]:
+    """列出当前已被占用的业务端口。"""
+    return [
+        f"{name}:{port}"
+        for name, port in PORTS.items()
+        if port_in_use(port)
+    ]
+
+
 def which(cmd: str) -> bool:
     """检查命令是否可用。"""
     import shutil
@@ -186,7 +199,7 @@ def kill_pid(pid: int, force: bool = False) -> None:
     else:
         sig = signal.SIGKILL if force else signal.SIGTERM
         try:
-            os.kill(pid, sig)
+            os.killpg(os.getpgid(pid), sig)
         except OSError:
             pass
 
@@ -215,10 +228,12 @@ def spawn_background(name: str, cmd: list[str], cwd: Path, env: dict) -> int:
         )
         # Windows 上 pnpm/uv 等是 .cmd 文件，需要 shell=True
         kwargs["shell"] = True
+        popen_cmd: str | list[str] = subprocess.list2cmdline(cmd)
     else:
         kwargs["start_new_session"] = True
+        popen_cmd = cmd
 
-    proc = subprocess.Popen(cmd, **kwargs)
+    proc = subprocess.Popen(popen_cmd, **kwargs)
     write_pid(name, proc.pid)
     return proc.pid
 
@@ -238,6 +253,53 @@ def tail_file(path: Path, lines: int = 50) -> str:
 def run_cmd(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     """运行命令并返回结果。"""
     return subprocess.run(cmd, capture_output=True, text=True, **kwargs)
+
+
+def run_auto_backup() -> None:
+    """在基础设施就绪后自动备份数据库。"""
+    pg = run_cmd(["docker", "exec", "quant-postgres", "pg_isready", "-U", "quant"])
+    if pg.returncode != 0:
+        info("Skipping auto backup: PostgreSQL is not ready")
+        return
+
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    proc = subprocess.Popen(
+        [
+            "docker",
+            "exec",
+            "quant-postgres",
+            "pg_dump",
+            "-U",
+            "quant",
+            "-d",
+            "quant",
+            "--no-owner",
+            "--no-acl",
+        ],
+        cwd=str(ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    try:
+        with gzip.open(BACKUP_FILE, "wb") as gz:
+            assert proc.stdout is not None
+            shutil.copyfileobj(proc.stdout, gz)
+        stderr = ""
+        if proc.stderr is not None:
+            stderr = proc.stderr.read().decode("utf-8", errors="replace").strip()
+        if proc.wait() != 0:
+            BACKUP_FILE.unlink(missing_ok=True)
+            info(f"Auto backup skipped: {stderr or 'pg_dump failed'}")
+            return
+    finally:
+        if proc.stdout is not None:
+            proc.stdout.close()
+        if proc.stderr is not None:
+            proc.stderr.close()
+
+    size_kib = BACKUP_FILE.stat().st_size / 1024
+    info(f"Auto backup saved: {BACKUP_FILE} ({size_kib:.1f} KiB)")
 
 
 # ============================================
@@ -288,28 +350,41 @@ def cmd_start() -> int:
         info("Fix the above issues and try again.")
         return 1
 
+    occupied = find_occupied_ports()
+    if occupied:
+        print()
+        info(f"Ports already in use: {', '.join(occupied)}")
+        info("Stop the existing services first:")
+        info("  uv run python scripts/dev.py stop")
+        return 1
+
     # 2. 依赖安装
     step(2, total, "Ensuring dependencies ...")
-    venv = ROOT / ".venv"
-    if not venv.exists():
-        info("Installing Python dependencies ...")
-        subprocess.run(["uv", "sync", "--dev"], cwd=str(ROOT))
-    else:
-        info("Python deps OK")
+    info("Syncing Python dependencies ...")
+    py_sync = subprocess.run(["uv", "sync", "--dev"], cwd=str(ROOT))
+    if py_sync.returncode != 0:
+        info("Python dependency sync failed")
+        return py_sync.returncode
 
     fe_modules = ROOT / "frontend" / "node_modules"
     if not fe_modules.exists():
         info("Installing frontend dependencies ...")
-        subprocess.run(["pnpm", "install"], cwd=str(ROOT / "frontend"))
+        fe_install = subprocess.run(["pnpm", "install"], cwd=str(ROOT / "frontend"))
+        if fe_install.returncode != 0:
+            info("Frontend dependency installation failed")
+            return fe_install.returncode
     else:
         info("Frontend deps OK")
 
     # 3. Docker 基础设施
     step(3, total, "Starting infrastructure (PostgreSQL + Redis) ...")
-    subprocess.run(
+    infra_up = subprocess.run(
         ["docker", "compose", "-f", str(COMPOSE_INFRA), "up", "-d"],
         cwd=str(ROOT),
     )
+    if infra_up.returncode != 0:
+        info("Infrastructure startup failed")
+        return infra_up.returncode
 
     # 4. 等待基础设施就绪
     step(4, total, "Waiting for infrastructure ...")
@@ -324,6 +399,8 @@ def cmd_start() -> int:
         time.sleep(HEALTH_INTERVAL)
     else:
         info("Infrastructure may not be fully ready, continuing ...")
+
+    run_auto_backup()
 
     # 5. 启动后端服务
     step(5, total, "Starting backend services ...")
@@ -431,11 +508,14 @@ def cmd_stop() -> int:
 
     # 4. 停止 Docker 基础设施
     step(4, total, "Stopping infrastructure (PostgreSQL + Redis) ...")
-    subprocess.run(
-        ["docker", "compose", "-f", str(COMPOSE_INFRA), "down"],
-        cwd=str(ROOT),
-        capture_output=True,
-    )
+    if which("docker"):
+        subprocess.run(
+            ["docker", "compose", "-f", str(COMPOSE_INFRA), "down"],
+            cwd=str(ROOT),
+            capture_output=True,
+        )
+    else:
+        info("Skipping infrastructure shutdown: docker is not installed")
 
     print()
     # 验证端口释放（等待 TIME_WAIT 状态消散）
@@ -488,10 +568,13 @@ def cmd_status() -> int:
     print()
     info("=== Docker Containers ===")
     print()
-    subprocess.run(
-        ["docker", "compose", "-f", str(COMPOSE_INFRA), "ps"],
-        cwd=str(ROOT),
-    )
+    if which("docker"):
+        subprocess.run(
+            ["docker", "compose", "-f", str(COMPOSE_INFRA), "ps"],
+            cwd=str(ROOT),
+        )
+    else:
+        info("docker is not installed")
     print()
     return 0
 
@@ -506,11 +589,20 @@ def cmd_logs() -> int:
     lines = 30
     service_filter = None
     args = sys.argv[2:]
-    for i, arg in enumerate(args):
+    i = 0
+    while i < len(args):
+        arg = args[i]
         if arg in ("-n", "--lines") and i + 1 < len(args):
-            lines = int(args[i + 1])
+            try:
+                lines = int(args[i + 1])
+            except ValueError:
+                print("Invalid value for --lines")
+                return 1
+            i += 2
+            continue
         elif not arg.startswith("-"):
             service_filter = arg
+        i += 1
 
     all_services = [s[0] for s in BACKEND_SERVICES] + [FRONTEND_SERVICE[0]]
     if service_filter:

@@ -170,7 +170,11 @@ _ensure_deps: _check_local_tools
 # ============================================
 start:
 ifeq ($(MODE),local)
+ifeq ($(OS),Windows_NT)
+	@uv run python scripts/dev.py start
+else
 	@$(MAKE) _start_local
+endif
 else ifeq ($(MODE),dev)
 	@$(MAKE) _start_dev
 else
@@ -178,9 +182,6 @@ else
 endif
 
 _start_local: _ensure_deps _check_ports
-ifeq ($(OS),Windows_NT)
-	@uv run python scripts/dev.py start
-else
 	@echo ""
 	@echo "=========================================="
 	@echo "        启动本地开发环境"
@@ -242,7 +243,6 @@ else
 	@echo "[5/6] 验证服务状态..."
 	@$(MAKE) _healthcheck_local || echo "  [!] 部分服务可能仍在启动中，请稍后运行 make healthcheck local"
 	@echo "[6/6] 完成"
-endif
 
 _start_dev: _check_tools _check_docker_ports
 	@echo "========== 启动 Docker 开发环境 =========="
@@ -479,11 +479,15 @@ restart:
 # ============================================
 logs:
 ifeq ($(MODE),local)
+ifeq ($(OS),Windows_NT)
+	@uv run python scripts/dev.py logs
+else
 	@echo "=== API ===" && tail -30 $(PID_DIR)/api.log 2>/dev/null || echo "(无日志)"
 	@echo "" && echo "=== MCP ===" && tail -10 $(PID_DIR)/mcp-factor.log 2>/dev/null || echo "(无日志)"
 	@echo "" && echo "=== Frontend ===" && tail -10 $(PID_DIR)/frontend.log 2>/dev/null || echo "(无日志)"
 	@echo ""
 	@echo "实时日志: tail -f .pids/*.log"
+endif
 else ifeq ($(MODE),dev)
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_DEV) logs -f
 else
