@@ -14,4 +14,6 @@ export {
   useCachedFactors,
   useEnhancedAnalysis,
   useDualAnalysis,
+  useEvaluation,
+  useAccumulatedEvaluations,
 } from './hooks'

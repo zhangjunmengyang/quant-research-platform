@@ -193,6 +193,13 @@ export function Component() {
           <p className="text-xs text-muted-foreground">
             {t('stockHub.elapsed', { seconds: result.elapsed_seconds })}
           </p>
+
+          {result.corr_summary && (
+            <div className="rounded-lg border p-3">
+              <h3 className="text-sm font-medium mb-1">{t('stockHub.corrSummary')}</h3>
+              <p className="text-sm font-mono text-muted-foreground">{result.corr_summary}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
