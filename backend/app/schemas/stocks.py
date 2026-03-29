@@ -182,3 +182,68 @@ class BatchAnalysisRequest(BaseModel):
     max_workers: int = Field(3, ge=1, le=10)
     skip_existing: bool = Field(True)
     backtest_name: str | None = None
+
+
+# ── 因子评估库 ──
+
+
+class PromptReadResponse(BaseModel):
+    """评估提示词详情。"""
+
+    eval_type: str = Field(description="评估类型")
+    description: str = Field("", description="评估描述")
+    system: str = Field(description="系统提示词")
+    user: str = Field(description="用户提示词")
+    model: dict[str, Any] = Field(default_factory=dict, description="模型配置")
+
+
+class PromptUpdateRequest(BaseModel):
+    """评估提示词更新请求。"""
+
+    system: str = Field(description="系统提示词")
+    user: str = Field(description="用户提示词")
+
+
+class FactorEvaluationCreate(BaseModel):
+    """创建因子评估记录。"""
+
+    factor_name: str = Field(description="因子名称")
+    title: str = Field(description="评估标题")
+    evaluations: dict[str, str] = Field(
+        default_factory=dict,
+        description="各项评估文本 {eval_type: text}",
+    )
+    analysis_snapshot: dict[str, Any] = Field(
+        default_factory=dict,
+        description="分析结果快照",
+    )
+    tags: list[str] = Field(default_factory=list, description="标签列表")
+
+
+class FactorEvaluationUpdate(BaseModel):
+    """更新因子评估记录。"""
+
+    title: str | None = Field(None, description="评估标题")
+    evaluations: dict[str, str] | None = Field(None, description="各项评估文本")
+    tags: list[str] | None = Field(None, description="标签列表")
+
+
+class FactorEvaluationResponse(BaseModel):
+    """因子评估记录响应。"""
+
+    id: int
+    uuid: str
+    factor_name: str
+    title: str
+    evaluations: dict[str, str] = Field(default_factory=dict)
+    analysis_snapshot: dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class FactorEvaluationListResponse(BaseModel):
+    """因子评估列表响应。"""
+
+    items: list[FactorEvaluationResponse] = Field(default_factory=list)
+    total: int = 0

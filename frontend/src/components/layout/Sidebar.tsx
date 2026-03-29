@@ -70,6 +70,7 @@ const navigation: NavGroup[] = [
       { labelKey: 'nav.stockFactorBrowser', href: '/stock-hub', icon: TrendingUp },
       { labelKey: 'nav.stockAnalysis', href: '/stock-hub/analysis', icon: BarChart3 },
       { labelKey: 'nav.stockDualAnalysis', href: '/stock-hub/dual-analysis', icon: BarChart3 },
+      { labelKey: 'nav.stockEvaluationLibrary', href: '/stock-hub/evaluations', icon: FileText },
     ],
   },
   // Knowledge Layer

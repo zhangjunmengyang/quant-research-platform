@@ -173,6 +173,34 @@ export type EvaluationType =
   | 'style_profile'
   | 'market_cap'
 
+/** 提示词配置 */
+export interface PromptConfig {
+  eval_type: string
+  description: string
+  system: string
+  user: string
+  model: Record<string, unknown>
+}
+
+/** 因子评估库记录 */
+export interface FactorEvaluationItem {
+  id: number
+  uuid: string
+  factor_name: string
+  title: string
+  evaluations: Record<string, string>
+  analysis_snapshot: Record<string, unknown>
+  tags: string[]
+  created_at: string
+  updated_at: string
+}
+
+/** 因子评估列表响应 */
+export interface FactorEvaluationListResponse {
+  items: FactorEvaluationItem[]
+  total: number
+}
+
 /** 分析周期预设 */
 export const PERIOD_PRESETS = {
   '5日单offset': ['5_0'],

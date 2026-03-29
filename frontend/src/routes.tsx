@@ -30,6 +30,8 @@ const ExperiencesDashboard = () => import('@/pages/experiences/Dashboard')
 const StockFactorBrowser = () => import('@/pages/stock-hub/FactorBrowser')
 const StockAnalysisView = () => import('@/pages/stock-hub/AnalysisView')
 const StockDualAnalysisView = () => import('@/pages/stock-hub/DualAnalysisView')
+const StockEvaluationLibrary = () => import('@/pages/stock-hub/EvaluationLibrary')
+const StockEvaluationDetail = () => import('@/pages/stock-hub/EvaluationDetail')
 
 const LogsExplorer = () => import('@/pages/logs/Explorer')
 
@@ -128,6 +130,8 @@ export const router = createBrowserRouter([
           { index: true, lazy: StockFactorBrowser },
           { path: 'analysis', lazy: StockAnalysisView },
           { path: 'dual-analysis', lazy: StockDualAnalysisView },
+          { path: 'evaluations', lazy: StockEvaluationLibrary },
+          { path: 'evaluations/:uuid', lazy: StockEvaluationDetail },
         ],
       },
       // Logs Hub
