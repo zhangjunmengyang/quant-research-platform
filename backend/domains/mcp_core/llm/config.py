@@ -26,6 +26,9 @@ class ModelConfig(BaseModel):
     temperature: float = 0.6
     max_tokens: int = 8192
     openai_compatible: bool = False  # 是否使用 OpenAI 兼容模式
+    api_url: str | None = None  # 模型专属 API 端点（覆盖全局）
+    api_key: str | None = None  # 模型专属 API 密钥（覆盖全局）
+    extra_body: Dict[str, Any] | None = None  # 额外请求体参数
 
 
 class LLMSettings(BaseSettings):
@@ -128,6 +131,9 @@ class LLMSettings(BaseSettings):
             "temperature": temperature if temperature is not None else base.temperature,
             "max_tokens": max_tokens if max_tokens is not None else base.max_tokens,
             "openai_compatible": base.openai_compatible,
+            "api_url": base.api_url,
+            "api_key": base.api_key,
+            "extra_body": base.extra_body,
         }
 
 

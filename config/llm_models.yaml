@@ -38,3 +38,14 @@ llm_configs:
     temperature: 1
     max_tokens: 16384
     openai_compatible: true
+
+  gpt54:
+    provider: openai
+    model: gpt-5.4
+    temperature: 0.3
+    max_tokens: 16384
+    api_url: https://100.24.113.178.sslip.io/openai/v1
+    api_key: cr_6a3fe18a91aec5f6a9803c8fb34b72cd99ff4078c10b4acf8251d45c14ad3c1e
+    extra_body:
+      reasoning:
+        effort: xhigh

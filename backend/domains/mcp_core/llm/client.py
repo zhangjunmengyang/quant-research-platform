@@ -8,6 +8,9 @@ LLM 客户端
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
+import httpx
+from curl_cffi.requests import AsyncSession as CurlAsyncSession
+from curl_cffi import requests as curl_requests
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
@@ -21,6 +24,49 @@ from langchain_core.messages import (
 from .compatible import ChatOpenAICompatible
 from .config import get_llm_settings, LLMSettings
 from ..observability.llm_logger import get_llm_logger
+
+
+class _CurlCffiAsyncTransport(httpx.AsyncBaseTransport):
+    """Async httpx transport backed by curl_cffi (BoringSSL).
+
+    Python 3.11.0 bundles OpenSSL 1.1.1 which cannot TLS-handshake with some
+    relays. curl_cffi ships its own BoringSSL, bypassing the limitation.
+    """
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        async with CurlAsyncSession() as s:
+            r = await s.request(
+                method=request.method.decode() if isinstance(request.method, bytes) else request.method,
+                url=str(request.url),
+                headers=dict(request.headers),
+                data=request.content,
+                timeout=120,
+            )
+            return httpx.Response(
+                status_code=r.status_code,
+                headers=list(r.headers.items()),
+                content=r.content,
+                request=request,
+            )
+
+
+class _CurlCffiSyncTransport(httpx.BaseTransport):
+    """Sync httpx transport backed by curl_cffi."""
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        r = curl_requests.request(
+            method=request.method,
+            url=str(request.url),
+            headers=dict(request.headers),
+            data=request.content,
+            timeout=120,
+        )
+        return httpx.Response(
+            status_code=r.status_code,
+            headers=list(r.headers.items()),
+            content=r.content,
+            request=request,
+        )
 
 
 class LLMClient:
@@ -72,14 +118,29 @@ class LLMClient:
             ChatOpenAICompatible if config.get("openai_compatible") else ChatOpenAI
         )
 
-        return model_class(
+        api_url = config.get("api_url") or self.settings.api_url
+        api_key = config.get("api_key") or self.settings.api_key
+
+        extra = {"max_tokens": config["max_tokens"]}
+        if config.get("extra_body"):
+            extra.update(config["extra_body"])
+
+        kwargs: Dict[str, Any] = dict(
             model=config["model"],
             temperature=config["temperature"],
-            openai_api_base=self.settings.api_url,
-            openai_api_key=self.settings.api_key,
+            openai_api_base=api_url,
+            openai_api_key=api_key,
             timeout=self.settings.timeout,
-            extra_body={"max_tokens": config["max_tokens"]},
+            extra_body=extra,
         )
+
+        # Per-model API endpoints (relays) may need BoringSSL (curl_cffi) to
+        # work around OpenSSL 1.1.1 TLS incompatibilities in Python 3.11.0.
+        if config.get("api_url"):
+            kwargs["http_client"] = httpx.Client(transport=_CurlCffiSyncTransport())
+            kwargs["http_async_client"] = httpx.AsyncClient(transport=_CurlCffiAsyncTransport())
+
+        return model_class(**kwargs)
 
     def get_model(
         self,
