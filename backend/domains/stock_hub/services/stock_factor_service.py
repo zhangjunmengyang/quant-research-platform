@@ -66,14 +66,22 @@ class StockFactorService:
             # 检测 add_factor 方法
             meta["has_add_factor"] = "def add_factor" in source
 
-            # 提取描述 (第一个三引号 docstring)
-            tree = ast.parse(source)
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
-                    ds = ast.get_docstring(node)
-                    if ds:
-                        meta["description"] = ds[:300]
-                        break
+            # 提取配置方法说明（优先），回退到 docstring
+            config_match = re.search(
+                r"----->>>.*?配置方法.*?<<<-----\s*\n(.*?)\"\"\"",
+                source,
+                re.DOTALL,
+            )
+            if config_match:
+                meta["description"] = config_match.group(1).strip()
+            else:
+                tree = ast.parse(source)
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                        ds = ast.get_docstring(node)
+                        if ds:
+                            meta["description"] = ds[:500]
+                            break
 
             # 提取 fin_cols / ov_cols
             for match in re.finditer(

@@ -96,6 +96,25 @@ class StockAnalysisRunner:
             backtest_name=backtest_name,
         )
 
+    def submit_factor_backtest(
+        self,
+        factor_name: str,
+        start_date: str,
+        end_date: str,
+        factor_config: str = "",
+        backtest_name: str | None = None,
+    ) -> str:
+        """提交因子回测任务。"""
+        return self._submit(
+            "factor_backtest",
+            self._service.run_factor_backtest,
+            factor_name=factor_name,
+            start_date=start_date,
+            end_date=end_date,
+            factor_config=factor_config,
+            backtest_name=backtest_name,
+        )
+
     def _submit(
         self,
         task_type: str,

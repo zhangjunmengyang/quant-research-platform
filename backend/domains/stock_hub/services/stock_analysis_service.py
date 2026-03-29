@@ -14,6 +14,8 @@ from pathlib import Path
 
 from domains.stock_hub.config import (
     ANALYSIS_TIMEOUT,
+    BACKTEST_TIMEOUT,
+    DATA_CENTER_PATH,
     get_framework_path,
     get_fuel_python,
 )
@@ -45,7 +47,12 @@ def _get_backtest_dir(
             return target
         return None
 
-    # 默认: 尝试从 config.py 读取
+    # 默认: 优先使用 factor_hub（因子库统一回测目录）
+    factor_hub_dir = cache_root / "factor_hub"
+    if factor_hub_dir.is_dir() and list(factor_hub_dir.glob("factor_*.pkl")):
+        return factor_hub_dir
+
+    # 回退: 从框架 config.py 读取
     config_file = framework / "config.py"
     if config_file.exists():
         try:
@@ -265,6 +272,79 @@ class StockAnalysisService:
             return {"error": "分析输出格式错误"}
         except Exception as e:
             logger.exception("双因子分析异常")
+            return {"error": str(e)}
+
+    def run_factor_backtest(
+        self,
+        factor_name: str,
+        start_date: str,
+        end_date: str,
+        factor_config: str = "",
+        backtest_name: str | None = None,
+    ) -> dict:
+        """通过 Fuel Python 执行因子回测，生成 factor_*.pkl。"""
+        framework = get_framework_path()
+        fuel_python = get_fuel_python()
+        if not framework or not fuel_python:
+            return {"error": "stock_hub 未配置"}
+
+        if not DATA_CENTER_PATH:
+            return {"error": "DATA_CENTER_PATH 未配置"}
+
+        script = Path(__file__).resolve().parent.parent / "scripts" / "run_factor_backtest.py"
+        if not script.exists():
+            return {"error": "回测脚本不存在"}
+
+        if not backtest_name:
+            backtest_name = "factor_hub"
+
+        import json
+
+        args = [
+            str(fuel_python),
+            str(script),
+            "--factor", factor_name,
+            "--start", start_date,
+            "--end", end_date,
+            "--name", backtest_name,
+            "--data-path", DATA_CENTER_PATH,
+            "--framework-path", str(framework),
+            "--factor-config", factor_config,
+        ]
+
+        start = time.time()
+        try:
+            proc = subprocess.run(
+                args,
+                cwd=str(framework),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=BACKTEST_TIMEOUT,
+                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            )
+            elapsed = time.time() - start
+
+            if proc.returncode != 0:
+                logger.warning(
+                    "因子回测失败 factor=%s rc=%d stderr=%s",
+                    factor_name,
+                    proc.returncode,
+                    proc.stderr[:500],
+                )
+                return {"error": f"因子回测失败: {proc.stderr[:200]}"}
+
+            result = json.loads(proc.stdout)
+            result["elapsed_seconds"] = round(elapsed, 1)
+            return result
+
+        except subprocess.TimeoutExpired:
+            return {"error": f"因子回测超时 ({BACKTEST_TIMEOUT}s)"}
+        except json.JSONDecodeError:
+            return {"error": "回测输出格式错误"}
+        except Exception as e:
+            logger.exception("因子回测异常 factor=%s", factor_name)
             return {"error": str(e)}
 
     def get_status(self) -> dict:

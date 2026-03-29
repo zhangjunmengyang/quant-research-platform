@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-AnalysisTaskType = Literal["enhanced", "dual"]
+AnalysisTaskType = Literal["enhanced", "dual", "factor_backtest"]
 
 
 class StockStatusResponse(BaseModel):
@@ -152,6 +152,16 @@ class DualAnalysisResultResponse(BaseModel):
     heatmaps: dict[str, Any] = Field(default_factory=dict, description="热力图数据")
     style_exposure: dict[str, Any] = Field(default_factory=dict, description="风格暴露对比")
     elapsed_seconds: float = 0.0
+
+
+class FactorBacktestRequest(BaseModel):
+    """因子回测请求 — 生成 factor_*.pkl。"""
+
+    factor_name: str = Field(description="因子名称")
+    start_date: str = Field(description="回测开始日期 (YYYY-MM-DD)")
+    end_date: str = Field(description="回测结束日期 (YYYY-MM-DD)")
+    factor_config: str = Field("", description="因子配置元组，如 (\"换手率Sum\", True, 20, 1)")
+    backtest_name: str | None = Field(None, description="缓存目录名，默认自动生成")
 
 
 class BatchAnalysisRequest(BaseModel):
