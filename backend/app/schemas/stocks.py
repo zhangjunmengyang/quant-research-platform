@@ -129,6 +129,14 @@ class AnalysisResultResponse(BaseModel):
     group_values: dict[str, float] = Field(default_factory=dict)
     style_exposure: dict[str, float] = Field(default_factory=dict)
     elapsed_seconds: float = 0.0
+    # 扩展图表数据（可选，兼容旧版脚本）
+    ic_summary: str | None = None
+    ic_series: list[dict[str, Any]] | None = None
+    ic_heatmap: dict[str, Any] | None = None
+    group_nav: list[dict[str, Any]] | None = None
+    group_holding: list[dict[str, Any]] | None = None
+    industry_ic: list[dict[str, Any]] | None = None
+    market_cap_ic: list[dict[str, Any]] | None = None
 
 
 class DualAnalysisRequest(BaseModel):
@@ -151,7 +159,18 @@ class DualAnalysisResultResponse(BaseModel):
     sub_factor: str
     heatmaps: dict[str, Any] = Field(default_factory=dict, description="热力图数据")
     style_exposure: dict[str, Any] = Field(default_factory=dict, description="风格暴露对比")
+    corr_summary: str | None = None
     elapsed_seconds: float = 0.0
+
+
+class EvaluationRequest(BaseModel):
+    """AI 评估请求。"""
+
+    evaluation_type: Literal[
+        "ic_performance", "grouping_ability", "style_profile", "market_cap", "comprehensive"
+    ] = Field(description="评估类型")
+    analysis_result: dict[str, Any] = Field(description="单因子分析结果 JSON")
+    model_key: str | None = Field(None, description="LLM 模型 key，默认使用提示词配置")
 
 
 class FactorBacktestRequest(BaseModel):
@@ -160,7 +179,10 @@ class FactorBacktestRequest(BaseModel):
     factor_name: str = Field(description="因子名称")
     start_date: str = Field(description="回测开始日期 (YYYY-MM-DD)")
     end_date: str = Field(description="回测结束日期 (YYYY-MM-DD)")
-    factor_config: str = Field("", description="因子配置元组，如 (\"换手率Sum\", True, 20, 1)")
+    factor_config: str = Field(
+        "",
+        description='因子配置元组，如 ("换手率Sum", True, 20, 1)',
+    )
     backtest_name: str | None = Field(None, description="缓存目录名，默认自动生成")
 
 
@@ -173,3 +195,68 @@ class BatchAnalysisRequest(BaseModel):
     max_workers: int = Field(3, ge=1, le=10)
     skip_existing: bool = Field(True)
     backtest_name: str | None = None
+
+
+# ── 因子评估库 ──
+
+
+class PromptReadResponse(BaseModel):
+    """评估提示词详情。"""
+
+    eval_type: str = Field(description="评估类型")
+    description: str = Field("", description="评估描述")
+    system: str = Field(description="系统提示词")
+    user: str = Field(description="用户提示词")
+    model: dict[str, Any] = Field(default_factory=dict, description="模型配置")
+
+
+class PromptUpdateRequest(BaseModel):
+    """评估提示词更新请求。"""
+
+    system: str = Field(description="系统提示词")
+    user: str = Field(description="用户提示词")
+
+
+class FactorEvaluationCreate(BaseModel):
+    """创建因子评估记录。"""
+
+    factor_name: str = Field(description="因子名称")
+    title: str = Field(description="评估标题")
+    evaluations: dict[str, str] = Field(
+        default_factory=dict,
+        description="各项评估文本 {eval_type: text}",
+    )
+    analysis_snapshot: dict[str, Any] = Field(
+        default_factory=dict,
+        description="分析结果快照",
+    )
+    tags: list[str] = Field(default_factory=list, description="标签列表")
+
+
+class FactorEvaluationUpdate(BaseModel):
+    """更新因子评估记录。"""
+
+    title: str | None = Field(None, description="评估标题")
+    evaluations: dict[str, str] | None = Field(None, description="各项评估文本")
+    tags: list[str] | None = Field(None, description="标签列表")
+
+
+class FactorEvaluationResponse(BaseModel):
+    """因子评估记录响应。"""
+
+    id: int
+    uuid: str
+    factor_name: str
+    title: str
+    evaluations: dict[str, str] = Field(default_factory=dict)
+    analysis_snapshot: dict[str, Any] = Field(default_factory=dict)
+    tags: list[str] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+class FactorEvaluationListResponse(BaseModel):
+    """因子评估列表响应。"""
+
+    items: list[FactorEvaluationResponse] = Field(default_factory=list)
+    total: int = 0

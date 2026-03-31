@@ -12,6 +12,8 @@ import type {
   DualAnalysisResult,
   EnhancedAnalysisRequest,
   DualAnalysisRequest,
+  EvaluationEntry,
+  EvaluationType,
   StockFactorListParams,
 } from './types'
 
@@ -185,4 +187,144 @@ export function useDualAnalysis() {
   return useStockAnalysisTask<DualAnalysisRequest, DualAnalysisResult>((req) =>
     stockApi.runDualAnalysis(req)
   )
+}
+
+export function useEvaluation() {
+  const [text, setText] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+  const [activeType, setActiveType] = useState<EvaluationType | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const evaluate = useCallback(
+    async (evalType: EvaluationType, analysisResult: AnalysisResult) => {
+      if (abortRef.current) abortRef.current.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      setText('')
+      setError(null)
+      setIsStreaming(true)
+      setActiveType(evalType)
+
+      try {
+        await stockApi.evaluateAnalysis(
+          evalType,
+          analysisResult,
+          (chunk) => setText((prev) => prev + chunk),
+          controller.signal,
+        )
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          setError(err instanceof Error ? err : new Error('Evaluation failed'))
+        }
+      } finally {
+        setIsStreaming(false)
+      }
+    },
+    [],
+  )
+
+  const cancel = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort()
+    setIsStreaming(false)
+  }, [])
+
+  return { text, isStreaming, error, activeType, evaluate, cancel }
+}
+
+export function useAccumulatedEvaluations() {
+  const [evaluations, setEvaluations] = useState<Record<string, EvaluationEntry>>({})
+  const [activeType, setActiveType] = useState<EvaluationType | null>(null)
+  const [error, setError] = useState<Error | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const evaluate = useCallback(
+    async (evalType: EvaluationType, analysisResult: AnalysisResult) => {
+      if (abortRef.current) abortRef.current.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      setError(null)
+      setActiveType(evalType)
+      // Initialize or reset this eval type entry
+      setEvaluations((prev) => ({
+        ...prev,
+        [evalType]: { text: '', isStreaming: true, isEdited: false },
+      }))
+
+      try {
+        await stockApi.evaluateAnalysis(
+          evalType,
+          analysisResult,
+          (chunk) =>
+            setEvaluations((prev) => {
+              const cur = prev[evalType] ?? { text: '', isStreaming: true, isEdited: false }
+              return {
+                ...prev,
+                [evalType]: { ...cur, text: cur.text + chunk },
+              }
+            }),
+          controller.signal,
+        )
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          setError(err instanceof Error ? err : new Error('Evaluation failed'))
+        }
+      } finally {
+        setEvaluations((prev) => {
+          const cur = prev[evalType] ?? { text: '', isStreaming: true, isEdited: false }
+          return { ...prev, [evalType]: { ...cur, isStreaming: false } }
+        })
+      }
+    },
+    [],
+  )
+
+  const updateText = useCallback((evalType: EvaluationType, newText: string) => {
+    setEvaluations((prev) => {
+      const cur = prev[evalType] ?? { text: '', isStreaming: false, isEdited: false }
+      return { ...prev, [evalType]: { ...cur, text: newText, isEdited: true } }
+    })
+  }, [])
+
+  const cancel = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort()
+    if (activeType) {
+      setEvaluations((prev) => {
+        const cur = prev[activeType] ?? { text: '', isStreaming: true, isEdited: false }
+        return { ...prev, [activeType]: { ...cur, isStreaming: false } }
+      })
+    }
+  }, [activeType])
+
+  const reset = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort()
+    setEvaluations({})
+    setActiveType(null)
+    setError(null)
+  }, [])
+
+  // Convenience: check if any eval is currently streaming
+  const isAnyStreaming = Object.values(evaluations).some((e) => e.isStreaming)
+
+  // Get all completed evaluation texts (for saving)
+  const completedTexts = Object.entries(evaluations)
+    .filter(([, e]) => !e.isStreaming && e.text)
+    .reduce<Record<string, string>>((acc, [type, e]) => {
+      acc[type] = e.text
+      return acc
+    }, {})
+
+  return {
+    evaluations,
+    activeType,
+    error,
+    evaluate,
+    updateText,
+    cancel,
+    reset,
+    isAnyStreaming,
+    completedTexts,
+  }
 }

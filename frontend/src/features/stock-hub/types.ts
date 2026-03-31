@@ -54,6 +54,32 @@ export interface EnhancedAnalysisRequest {
   backtest_name?: string
 }
 
+export interface ICSeriesPoint {
+  date: string
+  rank_ic: number
+  cum_rank_ic: number
+}
+
+export interface ICHeatmap {
+  years: string[]
+  months: string[]
+  values: (number | null)[][]
+}
+
+export interface IndustryICEntry {
+  name: string
+  rank_ic: number
+  top_pct: number
+  bottom_pct: number
+}
+
+export interface MarketCapICEntry {
+  group: number
+  rank_ic: number
+  top_pct: number
+  bottom_pct: number
+}
+
 export interface AnalysisResult {
   factor_name: string
   score: number
@@ -69,6 +95,16 @@ export interface AnalysisResult {
   group_values: Record<string, number>
   style_exposure: Record<string, number>
   elapsed_seconds: number
+  // 扩展图表数据（可选，兼容旧版脚本）
+  ic_summary?: string | null
+  ic_series?: ICSeriesPoint[] | null
+  ic_heatmap?: ICHeatmap | null
+  group_nav?: Record<string, unknown>[] | null
+  group_holding?: Record<string, unknown>[] | null
+  industry_ic?: IndustryICEntry[] | null
+  market_cap_ic?: MarketCapICEntry[] | null
+  // 多周期分析时，各周期明细
+  periods?: AnalysisResult[] | null
 }
 
 export interface AnalysisTaskSubmit {
@@ -111,6 +147,7 @@ export interface DualAnalysisResult {
   sub_factor: string
   heatmaps: Record<string, unknown>
   style_exposure: Record<string, unknown>
+  corr_summary?: string | null
   elapsed_seconds: number
 }
 
@@ -119,6 +156,49 @@ export interface StockFactorListParams {
   page_size?: number
   search?: string
   category?: string
+}
+
+/** 单条评估条目 */
+export interface EvaluationEntry {
+  text: string
+  isStreaming: boolean
+  isEdited: boolean
+}
+
+/** AI 评估类型 */
+export type EvaluationType =
+  | 'comprehensive'
+  | 'ic_performance'
+  | 'grouping_ability'
+  | 'style_profile'
+  | 'market_cap'
+
+/** 提示词配置 */
+export interface PromptConfig {
+  eval_type: string
+  description: string
+  system: string
+  user: string
+  model: Record<string, unknown>
+}
+
+/** 因子评估库记录 */
+export interface FactorEvaluationItem {
+  id: number
+  uuid: string
+  factor_name: string
+  title: string
+  evaluations: Record<string, string>
+  analysis_snapshot: Record<string, unknown>
+  tags: string[]
+  created_at: string
+  updated_at: string
+}
+
+/** 因子评估列表响应 */
+export interface FactorEvaluationListResponse {
+  items: FactorEvaluationItem[]
+  total: number
 }
 
 /** 分析周期预设 */

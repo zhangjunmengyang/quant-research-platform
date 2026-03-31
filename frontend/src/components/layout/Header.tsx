@@ -97,13 +97,13 @@ export function Header() {
           aria-label={t('header.theme')}
           title={getThemeTitle()}
         >
-          <div className="relative">
+          <div className="relative h-4 w-4">
             {theme === 'system' ? (
               <Monitor className="h-4 w-4" />
             ) : (
               <>
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute left-0 h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <Sun className="absolute inset-0 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute inset-0 h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               </>
             )}
           </div>

@@ -1,8 +1,10 @@
 """Stock Hub REST API 路由。"""
 
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
+from starlette.responses import StreamingResponse
 
 from app.core.async_utils import run_sync
 from app.schemas.common import ApiResponse, PaginatedResponse
@@ -15,7 +17,14 @@ from app.schemas.stocks import (
     CachedFactorInfo,
     DualAnalysisRequest,
     EnhancedAnalysisRequest,
+    EvaluationRequest,
     FactorBacktestRequest,
+    FactorEvaluationCreate,
+    FactorEvaluationListResponse,
+    FactorEvaluationResponse,
+    FactorEvaluationUpdate,
+    PromptReadResponse,
+    PromptUpdateRequest,
     StockFactorDetail,
     StockFactorSummary,
     StockStatusResponse,
@@ -46,6 +55,21 @@ def _get_analysis_runner():
     )
 
     return get_stock_analysis_runner()
+
+
+def _get_evaluate_service():
+    from domains.stock_hub.services.stock_evaluate_service import (
+        get_stock_evaluate_service,
+    )
+
+    return get_stock_evaluate_service()
+
+
+def _get_evaluation_library_service():
+    from domains.stock_hub.services.factor_evaluation_library_service import (
+        get_factor_evaluation_library_service,
+    )
+    return get_factor_evaluation_library_service()
 
 
 # ---- 状态 ----
@@ -286,3 +310,208 @@ async def run_factor_backtest(req: FactorBacktestRequest):
             message="因子回测任务已提交",
         )
     )
+
+
+# ---- AI 评估 ----
+
+
+@router.post("/analysis/evaluate")
+async def evaluate_analysis(req: EvaluationRequest):
+    """AI 评估因子分析结果（SSE 流式返回）。"""
+    svc = _get_evaluate_service()
+
+    async def event_generator():
+        try:
+            async for chunk in svc.evaluate_stream(
+                eval_type=req.evaluation_type,
+                analysis_result=req.analysis_result,
+                model_key=req.model_key,
+            ):
+                yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.exception("evaluate_stream_error")
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+# ---- 提示词管理 ----
+
+
+@router.get(
+    "/prompts/{eval_type}",
+    response_model=ApiResponse[PromptReadResponse],
+)
+async def get_prompt(eval_type: str):
+    """获取评估提示词配置。"""
+    svc = _get_evaluate_service()
+    try:
+        data = await run_sync(svc.get_prompt_config, eval_type)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return ApiResponse(data=PromptReadResponse(**data))
+
+
+@router.put(
+    "/prompts/{eval_type}",
+    response_model=ApiResponse[dict],
+)
+async def update_prompt(eval_type: str, req: PromptUpdateRequest):
+    """更新评估提示词配置。"""
+    svc = _get_evaluate_service()
+    try:
+        await run_sync(svc.update_prompt_config, eval_type, req.system, req.user)
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return ApiResponse(data={"updated": True}, message="提示词已更新")
+
+
+# ---- 因子评估库 ----
+
+
+@router.post(
+    "/evaluations",
+    response_model=ApiResponse[FactorEvaluationResponse],
+)
+async def save_evaluation(req: FactorEvaluationCreate):
+    """保存因子评估到库。"""
+    svc = _get_evaluation_library_service()
+    ev = await run_sync(
+        svc.save,
+        factor_name=req.factor_name,
+        title=req.title,
+        evaluations=req.evaluations,
+        analysis_snapshot=req.analysis_snapshot,
+        tags=req.tags,
+    )
+    return ApiResponse(
+        data=FactorEvaluationResponse(
+            id=ev.id,
+            uuid=ev.uuid,
+            factor_name=ev.factor_name,
+            title=ev.title,
+            evaluations=ev.content.evaluations,
+            analysis_snapshot=ev.content.analysis_snapshot,
+            tags=ev.tags,
+            created_at=ev.created_at,
+            updated_at=ev.updated_at,
+        ),
+        message="因子评估已保存",
+    )
+
+
+@router.get(
+    "/evaluations",
+    response_model=ApiResponse[FactorEvaluationListResponse],
+)
+async def list_evaluations(
+    factor_name: str | None = Query(None),
+    tags: str | None = Query(None, description="逗号分隔的标签"),
+    search: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """查询因子评估列表。"""
+    svc = _get_evaluation_library_service()
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    items, total = await run_sync(
+        svc.list,
+        factor_name=factor_name,
+        tags=tag_list,
+        search=search,
+        page=page,
+        page_size=page_size,
+    )
+    return ApiResponse(
+        data=FactorEvaluationListResponse(
+            items=[
+                FactorEvaluationResponse(
+                    id=ev.id,
+                    uuid=ev.uuid,
+                    factor_name=ev.factor_name,
+                    title=ev.title,
+                    evaluations=ev.content.evaluations,
+                    analysis_snapshot=ev.content.analysis_snapshot,
+                    tags=ev.tags,
+                    created_at=ev.created_at,
+                    updated_at=ev.updated_at,
+                )
+                for ev in items
+            ],
+            total=total,
+        )
+    )
+
+
+@router.get(
+    "/evaluations/tags",
+    response_model=ApiResponse[list[str]],
+)
+async def get_evaluation_tags():
+    """获取所有评估标签。"""
+    svc = _get_evaluation_library_service()
+    tags = await run_sync(svc.get_all_tags)
+    return ApiResponse(data=tags)
+
+
+@router.get(
+    "/evaluations/{uuid}",
+    response_model=ApiResponse[FactorEvaluationResponse],
+)
+async def get_evaluation(uuid: str):
+    """获取单条因子评估详情。"""
+    svc = _get_evaluation_library_service()
+    ev = await run_sync(svc.get, uuid)
+    if not ev:
+        raise HTTPException(status_code=404, detail=f"评估记录不存在: {uuid}")
+    return ApiResponse(
+        data=FactorEvaluationResponse(
+            id=ev.id,
+            uuid=ev.uuid,
+            factor_name=ev.factor_name,
+            title=ev.title,
+            evaluations=ev.content.evaluations,
+            analysis_snapshot=ev.content.analysis_snapshot,
+            tags=ev.tags,
+            created_at=ev.created_at,
+            updated_at=ev.updated_at,
+        )
+    )
+
+
+@router.put(
+    "/evaluations/{uuid}",
+    response_model=ApiResponse[dict],
+)
+async def update_evaluation(uuid: str, req: FactorEvaluationUpdate):
+    """更新因子评估记录。"""
+    svc = _get_evaluation_library_service()
+    fields = req.model_dump(exclude_none=True)
+    if not fields:
+        raise HTTPException(status_code=400, detail="无更新字段")
+    ok = await run_sync(svc.update, uuid, **fields)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"评估记录不存在: {uuid}")
+    return ApiResponse(data={"updated": True}, message="评估记录已更新")
+
+
+@router.delete(
+    "/evaluations/{uuid}",
+    response_model=ApiResponse[dict],
+)
+async def delete_evaluation(uuid: str):
+    """删除因子评估记录。"""
+    svc = _get_evaluation_library_service()
+    ok = await run_sync(svc.delete, uuid)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"评估记录不存在: {uuid}")
+    return ApiResponse(data={"deleted": True}, message="评估记录已删除")

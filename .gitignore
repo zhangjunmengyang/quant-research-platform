@@ -97,3 +97,7 @@ update_min_qty.py
 # 临时研究脚本（个人探索性代码）
 scripts/research/
 scripts/research2/
+
+# 本地启停脚本
+start.bat
+stop.bat
