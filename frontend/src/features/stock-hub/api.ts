@@ -18,6 +18,9 @@ import type {
   DualAnalysisResult,
   StockFactorListParams,
   EvaluationType,
+  PromptConfig,
+  FactorEvaluationItem,
+  FactorEvaluationListResponse,
 } from './types'
 
 const BASE = '/stock'
@@ -165,5 +168,90 @@ export const stockApi = {
         if (parsed.content) onChunk(parsed.content)
       }
     }
+  },
+
+  // ── 提示词管理 ──
+
+  getPrompt: async (evalType: EvaluationType): Promise<PromptConfig> => {
+    const { data } = await apiClient.get<ApiResponse<PromptConfig>>(
+      `${BASE}/prompts/${encodeURIComponent(evalType)}`
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Failed to get prompt')
+    return data.data
+  },
+
+  updatePrompt: async (evalType: EvaluationType, system: string, user: string): Promise<void> => {
+    const { data } = await apiClient.put<ApiResponse<{ updated: boolean }>>(
+      `${BASE}/prompts/${encodeURIComponent(evalType)}`,
+      { system, user }
+    )
+    if (!data.success) throw new Error(data.error || 'Failed to update prompt')
+  },
+
+  // ── 因子评估库 ──
+
+  saveEvaluation: async (params: {
+    factor_name: string
+    title: string
+    evaluations: Record<string, string>
+    analysis_snapshot: Record<string, unknown>
+    tags: string[]
+  }): Promise<FactorEvaluationItem> => {
+    const { data } = await apiClient.post<ApiResponse<FactorEvaluationItem>>(
+      `${BASE}/evaluations`,
+      params
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Failed to save evaluation')
+    return data.data
+  },
+
+  listEvaluations: async (params: {
+    factor_name?: string
+    tags?: string
+    search?: string
+    page?: number
+    page_size?: number
+  } = {}): Promise<FactorEvaluationListResponse> => {
+    const { data } = await apiClient.get<ApiResponse<FactorEvaluationListResponse>>(
+      `${BASE}/evaluations`,
+      { params }
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Failed to list evaluations')
+    return data.data
+  },
+
+  getEvaluation: async (uuid: string): Promise<FactorEvaluationItem> => {
+    const { data } = await apiClient.get<ApiResponse<FactorEvaluationItem>>(
+      `${BASE}/evaluations/${encodeURIComponent(uuid)}`
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Failed to get evaluation')
+    return data.data
+  },
+
+  updateEvaluation: async (uuid: string, params: {
+    title?: string
+    evaluations?: Record<string, string>
+    tags?: string[]
+  }): Promise<void> => {
+    const { data } = await apiClient.put<ApiResponse<{ updated: boolean }>>(
+      `${BASE}/evaluations/${encodeURIComponent(uuid)}`,
+      params
+    )
+    if (!data.success) throw new Error(data.error || 'Failed to update evaluation')
+  },
+
+  deleteEvaluation: async (uuid: string): Promise<void> => {
+    const { data } = await apiClient.delete<ApiResponse<{ deleted: boolean }>>(
+      `${BASE}/evaluations/${encodeURIComponent(uuid)}`
+    )
+    if (!data.success) throw new Error(data.error || 'Failed to delete evaluation')
+  },
+
+  getEvaluationTags: async (): Promise<string[]> => {
+    const { data } = await apiClient.get<ApiResponse<string[]>>(
+      `${BASE}/evaluations/tags`
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Failed to get tags')
+    return data.data
   },
 }

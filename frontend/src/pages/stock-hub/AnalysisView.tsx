@@ -7,7 +7,8 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Play, Brain, ChevronDown, ChevronRight } from 'lucide-react'
+import { Loader2, Play, Brain, Save, ChevronDown, ChevronRight, Edit3, Settings } from 'lucide-react'
+import { PromptEditor } from '@/components/stock-hub/PromptEditor'
 import {
   useStockStatus,
   useAvailableBacktests,
@@ -16,6 +17,7 @@ import {
   useAccumulatedEvaluations,
   PERIOD_PRESETS,
   REBALANCE_TIMES,
+  stockApi,
 } from '@/features/stock-hub'
 import type { EvaluationType, AnalysisResult } from '@/features/stock-hub'
 import { BaseChart, echarts } from '@/components/charts'
@@ -585,6 +587,9 @@ export function Component() {
   const analysisTask = useEnhancedAnalysis()
   const evaluation = useAccumulatedEvaluations()
   const [expandedEvals, setExpandedEvals] = useState<Set<string>>(new Set())
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [editingPromptType, setEditingPromptType] = useState<EvaluationType | null>(null)
 
   const result = analysisTask.result
 
@@ -606,6 +611,27 @@ export function Component() {
       return next
     })
   }, [])
+
+  const handleSave = useCallback(async () => {
+    if (!result) return
+    setIsSaving(true)
+    setSaveSuccess(false)
+    try {
+      await stockApi.saveEvaluation({
+        factor_name: result.factor_name,
+        title: `${result.factor_name} 评估 ${new Date().toLocaleDateString()}`,
+        evaluations: evaluation.completedTexts,
+        analysis_snapshot: result as unknown as Record<string, unknown>,
+        tags: [],
+      })
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (err) {
+      console.error('Save evaluation failed:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [result, evaluation.completedTexts])
 
   if (statusLoading) {
     return (
@@ -782,7 +808,23 @@ export function Component() {
                 <Brain className="h-4 w-4" />
                 <h3 className="text-sm font-medium">{t('stockHub.aiEvaluation')}</h3>
               </div>
+              <div className="flex items-center gap-2">
+                {Object.keys(evaluation.completedTexts).length > 0 && (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving || evaluation.isAnyStreaming}
+                    className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                    {t('stockHub.saveToLibrary')}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {saveSuccess && (
+              <p className="text-xs text-green-600">{t('stockHub.saveSuccess')}</p>
+            )}
 
             <div className="flex flex-wrap gap-2">
               {EVAL_BUTTONS.map(({ type, labelKey }) => {
@@ -803,6 +845,13 @@ export function Component() {
                     >
                       {t(labelKey)}
                       {isDone && ' \u2713'}
+                    </button>
+                    <button
+                      onClick={() => setEditingPromptType(type)}
+                      className="rounded-r-md border-l px-1.5 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 bg-muted"
+                      title={t('stockHub.editPrompt')}
+                    >
+                      <Settings className="h-3 w-3" />
                     </button>
                   </div>
                 )
@@ -831,6 +880,7 @@ export function Component() {
                       {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                       {t(labelKey)}
                       {entry.isStreaming && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {entry.isEdited && <Edit3 className="h-3 w-3 text-amber-500" />}
                     </span>
                     {!entry.isStreaming && entry.text && (
                       <span className="text-xs text-muted-foreground">
@@ -859,6 +909,10 @@ export function Component() {
         </div>
       )}
 
+      <PromptEditor
+        evalType={editingPromptType}
+        onClose={() => setEditingPromptType(null)}
+      />
     </div>
   )
 }
