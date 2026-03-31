@@ -10,6 +10,7 @@ Usage:
 """
 
 import argparse
+import ast
 import io
 import json
 import os
@@ -46,6 +47,43 @@ def _write_json(obj: dict):
         out.detach()  # don't close underlying buffer
 
 
+def _is_safe_literal(value: object) -> bool:
+    """递归校验配置参数是安全字面量。"""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return True
+    if isinstance(value, (list, tuple)):
+        return all(_is_safe_literal(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(key, str) and _is_safe_literal(item)
+            for key, item in value.items()
+        )
+    return False
+
+
+def _normalize_factor_config(raw_config: str, factor_name: str) -> str:
+    """将输入配置标准化为安全的 Python 字面量字符串。"""
+    config_text = raw_config.strip()
+    if not config_text:
+        return repr((factor_name, True, "", 1))
+
+    parsed = ast.literal_eval(config_text)
+    if not isinstance(parsed, (list, tuple)) or len(parsed) != 4:
+        raise ValueError("factor_config must be a 4-item tuple")
+
+    config_factor_name, is_ascending, parameter, weight = parsed
+    if config_factor_name != factor_name:
+        raise ValueError("factor_config factor name does not match selected factor")
+    if not isinstance(is_ascending, bool):
+        raise ValueError("factor_config sort flag must be bool")
+    if not _is_safe_literal(parameter):
+        raise ValueError("factor_config parameter contains unsafe literal")
+    if not isinstance(weight, (int, float)):
+        raise ValueError("factor_config weight must be numeric")
+
+    return repr((config_factor_name, is_ascending, parameter, weight))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run factor backtest")
     parser.add_argument("--factor", required=True, help="Factor name")
@@ -59,9 +97,7 @@ def main():
 
     fw = args.framework_path
 
-    # Use user-provided factor config tuple, or fall back to default
-    _fc = args.factor_config.strip()
-    factor_config_repr = _fc if _fc else f'("{args.factor}", True, "", 1)'
+    factor_config_repr = _normalize_factor_config(args.factor_config, args.factor)
 
     # Generate temporary config.py that will be picked up by `import config`
     config_content = f'''\

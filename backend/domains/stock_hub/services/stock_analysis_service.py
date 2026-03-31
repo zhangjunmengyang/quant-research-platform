@@ -6,6 +6,7 @@
 - 长任务由 StockAnalysisRunner 异步调度
 """
 
+import ast
 import logging
 import os
 import subprocess
@@ -21,6 +22,49 @@ from domains.stock_hub.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_safe_literal(value: object) -> bool:
+    """递归校验 factor_config 中允许的字面量类型。"""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return True
+    if isinstance(value, (list, tuple)):
+        return all(_is_safe_literal(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(key, str) and _is_safe_literal(item)
+            for key, item in value.items()
+        )
+    return False
+
+
+def _normalize_factor_config(raw_config: str, factor_name: str) -> str:
+    """将用户输入的因子配置解析为安全、规范的 Python 字面量字符串。"""
+    config_text = raw_config.strip()
+    if not config_text:
+        return repr((factor_name, True, "", 1))
+
+    try:
+        parsed = ast.literal_eval(config_text)
+    except (SyntaxError, ValueError) as exc:
+        raise ValueError("因子配置格式错误，应为 Python 字面量元组") from exc
+
+    if not isinstance(parsed, (list, tuple)) or len(parsed) != 4:
+        raise ValueError("因子配置必须是长度为 4 的元组")
+
+    config_factor_name, is_ascending, parameter, weight = parsed
+    if not isinstance(config_factor_name, str) or not config_factor_name:
+        raise ValueError("因子配置中的因子名必须是非空字符串")
+    if config_factor_name != factor_name:
+        raise ValueError("因子配置中的因子名必须与当前选择的因子一致")
+    if not isinstance(is_ascending, bool):
+        raise ValueError("因子配置中的排序方向必须是布尔值")
+    if not _is_safe_literal(parameter):
+        raise ValueError("因子配置中的参数仅支持安全字面量")
+    if not isinstance(weight, (int, float)):
+        raise ValueError("因子配置中的权重必须是数值")
+
+    return repr((config_factor_name, is_ascending, parameter, weight))
 
 
 def _validate_data_path(path: Path, framework: Path) -> bool:
@@ -300,6 +344,14 @@ class StockAnalysisService:
 
         import json
 
+        try:
+            normalized_factor_config = _normalize_factor_config(
+                factor_config,
+                factor_name,
+            )
+        except ValueError as exc:
+            return {"error": str(exc)}
+
         args = [
             str(fuel_python),
             str(script),
@@ -309,7 +361,7 @@ class StockAnalysisService:
             "--name", backtest_name,
             "--data-path", DATA_CENTER_PATH,
             "--framework-path", str(framework),
-            "--factor-config", factor_config,
+            "--factor-config", normalized_factor_config,
         ]
 
         start = time.time()

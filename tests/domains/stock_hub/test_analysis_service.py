@@ -7,6 +7,7 @@ import pytest
 from domains.stock_hub.services.stock_analysis_service import (
     StockAnalysisService,
     _get_backtest_dir,
+    _normalize_factor_config,
     _validate_data_path,
 )
 
@@ -164,3 +165,28 @@ def test_run_enhanced_analysis_not_configured():
         svc = StockAnalysisService()
         result = svc.run_enhanced_analysis("factor_市值", ["5_0"])
         assert "error" in result
+
+
+def test_normalize_factor_config_accepts_safe_literal():
+    """合法配置会被标准化为安全字面量。"""
+    normalized = _normalize_factor_config(
+        '("换手率Sum", True, [5, 10], 1.5)',
+        "换手率Sum",
+    )
+
+    assert normalized == "('换手率Sum', True, [5, 10], 1.5)"
+
+
+def test_normalize_factor_config_rejects_non_literal_code():
+    """恶意表达式应被拒绝。"""
+    with pytest.raises(ValueError, match="Python 字面量元组"):
+        _normalize_factor_config(
+            '__import__("os").system("echo hacked")',
+            "换手率Sum",
+        )
+
+
+def test_normalize_factor_config_requires_matching_factor_name():
+    """配置中的因子名必须与当前选中因子一致。"""
+    with pytest.raises(ValueError, match="当前选择的因子一致"):
+        _normalize_factor_config('("别的因子", True, "", 1)', "换手率Sum")
