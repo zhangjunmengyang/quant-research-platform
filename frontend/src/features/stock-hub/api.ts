@@ -17,6 +17,7 @@ import type {
   DualAnalysisRequest,
   DualAnalysisResult,
   StockFactorListParams,
+  EvaluationType,
 } from './types'
 
 const BASE = '/stock'
@@ -114,5 +115,55 @@ export const stockApi = {
     )
     if (!data.success || !data.data) throw new Error(data.error || 'Failed to get task result')
     return data.data
+  },
+
+  evaluateAnalysis: async (
+    evalType: EvaluationType,
+    analysisResult: AnalysisResult,
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+    modelKey?: string,
+  ): Promise<void> => {
+    const baseUrl = apiClient.defaults.baseURL || '/api/v1'
+    const response = await fetch(`${baseUrl}${BASE}/analysis/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        evaluation_type: evalType,
+        analysis_result: analysisResult,
+        model_key: modelKey,
+      }),
+      signal,
+    })
+
+    if (!response.ok) throw new Error(`Evaluation request failed: ${response.status}`)
+    if (!response.body) throw new Error('No response body')
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        const payload = line.slice(6).trim()
+        if (payload === '[DONE]') return
+        let parsed: { content?: string; error?: string }
+        try {
+          parsed = JSON.parse(payload)
+        } catch {
+          continue // skip malformed SSE lines
+        }
+        if (parsed.error) throw new Error(parsed.error)
+        if (parsed.content) onChunk(parsed.content)
+      }
+    }
   },
 }

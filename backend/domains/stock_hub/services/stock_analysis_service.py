@@ -174,6 +174,8 @@ class StockAnalysisService:
                 cwd=str(framework),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=ANALYSIS_TIMEOUT,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )
@@ -247,6 +249,8 @@ class StockAnalysisService:
                 cwd=str(framework),
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=ANALYSIS_TIMEOUT,
                 env={**os.environ, "PYTHONIOENCODING": "utf-8"},
             )

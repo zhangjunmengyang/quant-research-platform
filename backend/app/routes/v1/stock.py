@@ -1,8 +1,10 @@
 """Stock Hub REST API 路由。"""
 
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
+from starlette.responses import StreamingResponse
 
 from app.core.async_utils import run_sync
 from app.schemas.common import ApiResponse, PaginatedResponse
@@ -15,6 +17,7 @@ from app.schemas.stocks import (
     CachedFactorInfo,
     DualAnalysisRequest,
     EnhancedAnalysisRequest,
+    EvaluationRequest,
     StockFactorDetail,
     StockFactorSummary,
     StockStatusResponse,
@@ -45,6 +48,14 @@ def _get_analysis_runner():
     )
 
     return get_stock_analysis_runner()
+
+
+def _get_evaluate_service():
+    from domains.stock_hub.services.stock_evaluate_service import (
+        get_stock_evaluate_service,
+    )
+
+    return get_stock_evaluate_service()
 
 
 # ---- 状态 ----
@@ -256,4 +267,36 @@ async def get_analysis_task_result(task_id: str):
             result=await run_sync(runner.get_result, task_id),
             error_message=task.error_message,
         )
+    )
+
+
+# ---- AI 评估 ----
+
+
+@router.post("/analysis/evaluate")
+async def evaluate_analysis(req: EvaluationRequest):
+    """AI 评估因子分析结果（SSE 流式返回）。"""
+    svc = _get_evaluate_service()
+
+    async def event_generator():
+        try:
+            async for chunk in svc.evaluate_stream(
+                eval_type=req.evaluation_type,
+                analysis_result=req.analysis_result,
+                model_key=req.model_key,
+            ):
+                yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.exception("evaluate_stream_error")
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

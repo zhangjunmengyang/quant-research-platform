@@ -129,6 +129,14 @@ class AnalysisResultResponse(BaseModel):
     group_values: dict[str, float] = Field(default_factory=dict)
     style_exposure: dict[str, float] = Field(default_factory=dict)
     elapsed_seconds: float = 0.0
+    # 扩展图表数据（可选，兼容旧版脚本）
+    ic_summary: str | None = None
+    ic_series: list[dict[str, Any]] | None = None
+    ic_heatmap: dict[str, Any] | None = None
+    group_nav: list[dict[str, Any]] | None = None
+    group_holding: list[dict[str, Any]] | None = None
+    industry_ic: list[dict[str, Any]] | None = None
+    market_cap_ic: list[dict[str, Any]] | None = None
 
 
 class DualAnalysisRequest(BaseModel):
@@ -151,7 +159,18 @@ class DualAnalysisResultResponse(BaseModel):
     sub_factor: str
     heatmaps: dict[str, Any] = Field(default_factory=dict, description="热力图数据")
     style_exposure: dict[str, Any] = Field(default_factory=dict, description="风格暴露对比")
+    corr_summary: str | None = None
     elapsed_seconds: float = 0.0
+
+
+class EvaluationRequest(BaseModel):
+    """AI 评估请求。"""
+
+    evaluation_type: Literal[
+        "ic_performance", "grouping_ability", "style_profile", "market_cap", "comprehensive"
+    ] = Field(description="评估类型")
+    analysis_result: dict[str, Any] = Field(description="单因子分析结果 JSON")
+    model_key: str | None = Field(None, description="LLM 模型 key，默认使用提示词配置")
 
 
 class BatchAnalysisRequest(BaseModel):
