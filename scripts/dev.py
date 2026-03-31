@@ -238,6 +238,16 @@ def spawn_background(name: str, cmd: list[str], cwd: Path, env: dict) -> int:
     return proc.pid
 
 
+def clean_pycache(directory: Path) -> int:
+    """递归清理 __pycache__ 目录，返回清理数量。"""
+    count = 0
+    for cache_dir in directory.rglob("__pycache__"):
+        if cache_dir.is_dir():
+            shutil.rmtree(cache_dir, ignore_errors=True)
+            count += 1
+    return count
+
+
 def tail_file(path: Path, lines: int = 50) -> str:
     """读取文件最后 N 行。"""
     if not path.exists():
@@ -331,12 +341,40 @@ def cmd_start() -> int:
             info(f"  {tool:8s} MISSING - {hint}")
             errors.append(tool)
 
-    # docker 是否在运行
+    # docker 是否在运行，未运行则自动启动
     if which("docker"):
         r = run_cmd(["docker", "info"])
         if r.returncode != 0:
-            info("  docker   NOT RUNNING - Please start Docker Desktop")
-            errors.append("docker-running")
+            info("  docker   NOT RUNNING - Starting Docker ...")
+            if IS_WIN:
+                candidates = [
+                    Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Docker" / "Docker" / "Docker Desktop.exe",
+                    Path(os.environ.get("LOCALAPPDATA", "")) / "Docker" / "Docker Desktop.exe",
+                ]
+                docker_exe = next((p for p in candidates if p.exists()), None)
+                if docker_exe:
+                    subprocess.Popen([str(docker_exe)], creationflags=subprocess.CREATE_NO_WINDOW)
+                else:
+                    subprocess.Popen("start \"\" \"Docker Desktop\"", shell=True)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-a", "Docker"])
+            else:
+                r = subprocess.run(
+                    ["systemctl", "start", "docker"],
+                    capture_output=True, timeout=10,
+                )
+                if r.returncode != 0:
+                    info("  docker   Failed to start (try: sudo systemctl start docker)")
+                    errors.append("docker-running")
+            if "docker-running" not in errors:
+                for i in range(30):
+                    time.sleep(2)
+                    if run_cmd(["docker", "info"]).returncode == 0:
+                        info("  docker   OK (auto-started)")
+                        break
+                else:
+                    info("  docker   TIMEOUT - failed to start within 60s")
+                    errors.append("docker-running")
 
     # .env
     if (ROOT / ".env").exists():
@@ -375,6 +413,11 @@ def cmd_start() -> int:
             return fe_install.returncode
     else:
         info("Frontend deps OK")
+
+    # 清理 __pycache__，防止 git pull 后旧字节码缓存导致运行旧代码
+    cleaned = clean_pycache(ROOT / "backend")
+    if cleaned:
+        info(f"Cleaned {cleaned} __pycache__ directories")
 
     # 3. Docker 基础设施
     step(3, total, "Starting infrastructure (PostgreSQL + Redis) ...")
