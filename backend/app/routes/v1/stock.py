@@ -18,6 +18,7 @@ from app.schemas.stocks import (
     DualAnalysisRequest,
     EnhancedAnalysisRequest,
     EvaluationRequest,
+    FactorBacktestRequest,
     FactorEvaluationCreate,
     FactorEvaluationListResponse,
     FactorEvaluationResponse,
@@ -279,6 +280,34 @@ async def get_analysis_task_result(task_id: str):
             task_type=task.task_type,
             result=await run_sync(runner.get_result, task_id),
             error_message=task.error_message,
+        )
+    )
+
+
+# ---- 因子回测 ----
+
+
+@router.post(
+    "/analysis/factor-backtest",
+    response_model=ApiResponse[AnalysisTaskSubmitResponse],
+)
+async def run_factor_backtest(req: FactorBacktestRequest):
+    """提交因子回测任务（生成 factor_*.pkl）。"""
+    runner = _get_analysis_runner()
+    task_id = await run_sync(
+        runner.submit_factor_backtest,
+        factor_name=req.factor_name,
+        start_date=req.start_date,
+        end_date=req.end_date,
+        factor_config=req.factor_config,
+        backtest_name=req.backtest_name,
+    )
+    return ApiResponse(
+        data=AnalysisTaskSubmitResponse(
+            task_id=task_id,
+            status="pending",
+            task_type="factor_backtest",
+            message="因子回测任务已提交",
         )
     )
 

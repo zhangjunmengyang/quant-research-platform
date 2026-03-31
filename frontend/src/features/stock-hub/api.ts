@@ -84,6 +84,27 @@ export const stockApi = {
     return data.data
   },
 
+  submitFactorBacktest: async (
+    factorName: string,
+    startDate: string,
+    endDate: string,
+    factorConfig?: string,
+    backtestName?: string
+  ): Promise<AnalysisTaskSubmit> => {
+    const { data } = await apiClient.post<ApiResponse<AnalysisTaskSubmit>>(
+      `${BASE}/analysis/factor-backtest`,
+      {
+        factor_name: factorName,
+        start_date: startDate,
+        end_date: endDate,
+        factor_config: factorConfig || '',
+        backtest_name: backtestName || undefined,
+      }
+    )
+    if (!data.success || !data.data) throw new Error(data.error || 'Factor backtest failed')
+    return data.data
+  },
+
   runEnhancedAnalysis: async (req: EnhancedAnalysisRequest): Promise<AnalysisTaskSubmit> => {
     const { data } = await apiClient.post<ApiResponse<AnalysisTaskSubmit>>(
       `${BASE}/analysis/enhanced`,

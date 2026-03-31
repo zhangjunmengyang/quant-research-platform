@@ -244,15 +244,18 @@ experience_hub/
 
 ### 5.8 stock_hub - A股千因子分析
 
-集成外部选股框架 (select-stock-pro)，提供因子库浏览、缓存因子查询，以及异步单因子/双因子分析任务。
+集成外部选股框架 (select-stock-pro)，提供因子库浏览、因子回测生成 pkl、缓存因子查询，以及异步单因子/双因子分析任务。
 
 ```
 stock_hub/
   config.py            # 环境变量配置 (框架路径、超时)
   services/            # 因子查询、分析服务、分析任务执行器
+  scripts/             # Fuel Python 子进程脚本 (回测、分析)
   models/              # 数据模型
   api/mcp/             # MCP 服务器 + 工具 (端口 6795)
 ```
+
+**因子回测**: 因子库页面可直接选择因子+时间范围发起回测，生成 `factor_*.pkl` 到统一目录 `data/运行缓存/factor_hub/`。分析页默认从 `factor_hub` 读取可用因子。
 
 **外部依赖** (通过环境变量配置):
 - `STOCK_FRAMEWORK_PATH`: 选股框架目录
