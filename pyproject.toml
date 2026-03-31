@@ -50,6 +50,7 @@ dependencies = [
     # LLM (LangChain)
     "langchain-core>=0.3.0",
     "langchain-openai>=0.2.0",
+    "curl-cffi>=0.14.0",
     # Research Hub - PDF 解析
     "pymupdf>=1.24.0",
     # Research Hub - 嵌入 (使用 OpenAI API，无需本地模型)

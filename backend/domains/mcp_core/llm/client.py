@@ -9,8 +9,6 @@ import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 import httpx
-from curl_cffi.requests import AsyncSession as CurlAsyncSession
-from curl_cffi import requests as curl_requests
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
@@ -25,6 +23,13 @@ from .compatible import ChatOpenAICompatible
 from .config import get_llm_settings, LLMSettings
 from ..observability.llm_logger import get_llm_logger
 
+try:
+    from curl_cffi.requests import AsyncSession as CurlAsyncSession
+    from curl_cffi import requests as curl_requests
+except ImportError:  # pragma: no cover - optional dependency
+    CurlAsyncSession = None
+    curl_requests = None
+
 
 class _CurlCffiAsyncTransport(httpx.AsyncBaseTransport):
     """Async httpx transport backed by curl_cffi (BoringSSL).
@@ -34,6 +39,8 @@ class _CurlCffiAsyncTransport(httpx.AsyncBaseTransport):
     """
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        if CurlAsyncSession is None:
+            raise RuntimeError("http_transport=curl_cffi 但未安装 curl-cffi")
         async with CurlAsyncSession() as s:
             r = await s.request(
                 method=request.method.decode() if isinstance(request.method, bytes) else request.method,
@@ -54,6 +61,8 @@ class _CurlCffiSyncTransport(httpx.BaseTransport):
     """Sync httpx transport backed by curl_cffi."""
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
+        if curl_requests is None:
+            raise RuntimeError("http_transport=curl_cffi 但未安装 curl-cffi")
         r = curl_requests.request(
             method=request.method,
             url=str(request.url),
@@ -95,6 +104,25 @@ class LLMClient:
         self.default_model_key = model_key or self.settings.default_model
         self._models: Dict[str, BaseChatModel] = {}
 
+    @staticmethod
+    def _build_transport_clients(http_transport: str) -> Dict[str, Any]:
+        """按配置构建可选 HTTP 客户端。"""
+        if http_transport == "default":
+            return {}
+
+        if http_transport != "curl_cffi":
+            raise ValueError(f"不支持的 http_transport: {http_transport}")
+
+        if CurlAsyncSession is None or curl_requests is None:
+            raise RuntimeError(
+                "模型配置要求使用 curl_cffi transport，但当前环境未安装 curl-cffi"
+            )
+
+        return {
+            "http_client": httpx.Client(transport=_CurlCffiSyncTransport()),
+            "http_async_client": httpx.AsyncClient(transport=_CurlCffiAsyncTransport()),
+        }
+
     def _create_model(
         self,
         model_key: Optional[str] = None,
@@ -134,11 +162,9 @@ class LLMClient:
             extra_body=extra,
         )
 
-        # Per-model API endpoints (relays) may need BoringSSL (curl_cffi) to
-        # work around OpenSSL 1.1.1 TLS incompatibilities in Python 3.11.0.
-        if config.get("api_url"):
-            kwargs["http_client"] = httpx.Client(transport=_CurlCffiSyncTransport())
-            kwargs["http_async_client"] = httpx.AsyncClient(transport=_CurlCffiAsyncTransport())
+        kwargs.update(
+            self._build_transport_clients(config.get("http_transport", "default"))
+        )
 
         return model_class(**kwargs)
 

@@ -4,6 +4,9 @@
 # API 密钥和端点通过环境变量配置:
 #   LLM_API_KEY: API 密钥
 #   LLM_API_URL: API 端点 (默认: https://api.openai.com/v1/chat/completions)
+#   模型级覆盖可使用:
+#     api_url_env: 端点所在的环境变量名
+#     api_key_env: 密钥所在的环境变量名
 #
 # openai_compatible 参数说明:
 #   设为 true 时使用 ChatOpenAICompatible 类，用于不支持新版 OpenAI API 的代理:
@@ -44,8 +47,9 @@ llm_configs:
     model: gpt-5.4
     temperature: 0.3
     max_tokens: 16384
-    api_url: https://100.24.113.178.sslip.io/openai/v1
-    api_key: cr_6a3fe18a91aec5f6a9803c8fb34b72cd99ff4078c10b4acf8251d45c14ad3c1e
+    api_url_env: GPT54_API_URL
+    api_key_env: GPT54_API_KEY
+    http_transport: curl_cffi
     extra_body:
       reasoning:
         effort: xhigh
