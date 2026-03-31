@@ -1,0 +1,84 @@
+name: PR Checks
+
+on:
+  pull_request:
+
+jobs:
+  guardrails:
+    name: Guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Collect changed files
+        run: |
+          git diff --name-only --diff-filter=AMRT \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}" > changed_files.txt
+          cat changed_files.txt
+
+      - name: Run repository guardrails
+        run: |
+          if [ -s changed_files.txt ]; then
+            xargs python scripts/check_repo_guardrails.py < changed_files.txt
+          else
+            echo "No changed files to scan"
+          fi
+
+  backend-stock-hub-tests:
+    name: Backend Stock Hub Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            fastapi \
+            psycopg2-binary \
+            pydantic \
+            pydantic-settings \
+            pytest \
+            pytest-asyncio \
+            pyyaml
+
+      - name: Run backend tests
+        env:
+          PYTHONPATH: backend
+        run: |
+          python -m pytest \
+            tests/domains/stock_hub \
+            tests/domains/mcp_core/llm/test_config.py
+
+  frontend-typecheck:
+    name: Frontend Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Run typecheck
+        working-directory: frontend
+        run: pnpm typecheck

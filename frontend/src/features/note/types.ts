@@ -113,3 +113,8 @@ export interface VerificationCreate {
 export interface PromoteRequest {
   experience_id: number
 }
+
+export interface ResearchTrail {
+  session_id: string
+  notes: Note[]
+}

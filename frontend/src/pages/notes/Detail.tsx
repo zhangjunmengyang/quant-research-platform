@@ -15,7 +15,7 @@ import {
   Edit2,
   X,
 } from 'lucide-react'
-import { useNoteDetail, useNoteMutations, useVerifications, useNote } from '@/features/note'
+import { useNoteDetail, useNoteMutations, useVerifications } from '@/features/note'
 import { NoteType, NOTE_TYPE_LABELS, NOTE_TYPE_COLORS } from '@/features/note/types'
 import { Link } from 'react-router-dom'
 

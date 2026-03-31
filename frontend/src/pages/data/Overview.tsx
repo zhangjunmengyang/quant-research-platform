@@ -25,7 +25,19 @@ import {
 } from 'lucide-react'
 
 // 标签颜色配置 - 柔和的颜色方案
-const TAG_COLORS = [
+type TagColor = {
+  bg: string
+  text: string
+  dot: string
+}
+
+const FALLBACK_TAG_COLOR: TagColor = {
+  bg: 'bg-slate-100 dark:bg-slate-900/30',
+  text: 'text-slate-700 dark:text-slate-300',
+  dot: 'bg-slate-500',
+}
+
+const TAG_COLORS: TagColor[] = [
   { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
   { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
   { bg: 'bg-pink-100 dark:bg-pink-900/30', text: 'text-pink-700 dark:text-pink-300', dot: 'bg-pink-500' },
@@ -47,8 +59,8 @@ function getTagColorIndex(tag: string): number {
 }
 
 // 获取标签颜色
-function getTagColor(tag: string) {
-  return TAG_COLORS[getTagColorIndex(tag)]
+function getTagColor(tag: string): TagColor {
+  return TAG_COLORS[getTagColorIndex(tag)] ?? FALLBACK_TAG_COLOR
 }
 import { useDataOverview, useSymbols, useKline, useSymbolTags, useAddSymbolTag, useRemoveSymbolTag, useAllTags, useAllSymbolTags } from '@/features/data'
 import type { Symbol } from '@/features/data'
