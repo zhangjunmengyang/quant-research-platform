@@ -9,9 +9,9 @@ LLM 配置管理
 配置文件路径通过函数参数传入，不硬编码业务路径。
 """
 
-from functools import lru_cache
+import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -26,6 +26,11 @@ class ModelConfig(BaseModel):
     temperature: float = 0.6
     max_tokens: int = 8192
     openai_compatible: bool = False  # 是否使用 OpenAI 兼容模式
+    api_url: str | None = None  # 模型专属 API 端点（覆盖全局）
+    api_url_env: str | None = None  # 从环境变量读取模型专属 API 端点
+    api_key_env: str | None = None  # 从环境变量读取模型专属 API 密钥
+    extra_body: Dict[str, Any] | None = None  # 额外请求体参数
+    http_transport: Literal["default", "curl_cffi"] = "default"
 
 
 class LLMSettings(BaseSettings):
@@ -122,12 +127,24 @@ class LLMSettings(BaseSettings):
             最终配置字典，包含 model, temperature, max_tokens
         """
         base = self.get_model_config(model_key)
+        api_url = base.api_url
+        if base.api_url_env:
+            api_url = os.getenv(base.api_url_env, "").strip() or api_url
+
+        api_key = None
+        if base.api_key_env:
+            api_key = os.getenv(base.api_key_env, "").strip() or None
+
         return {
             "model": base.model,
             "provider": base.provider,
             "temperature": temperature if temperature is not None else base.temperature,
             "max_tokens": max_tokens if max_tokens is not None else base.max_tokens,
             "openai_compatible": base.openai_compatible,
+            "api_url": api_url,
+            "api_key": api_key,
+            "extra_body": base.extra_body,
+            "http_transport": base.http_transport,
         }
 
 
