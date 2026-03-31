@@ -143,6 +143,7 @@ frontend/src/features/*/    -> 前端模块
 - **Service**: 单数命名 (`backtest.py`)
 - **前端类型**: 镜像后端 Pydantic
 - **ECharts**: 禁止 ResizeObserver
+- **PR 自动检查**: GitHub Actions 会运行仓库 guardrail（明文密钥/本机路径）、`stock_hub` 后端测试和前端 `pnpm typecheck`
 
 ## 开发任务
 
